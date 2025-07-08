@@ -60,21 +60,26 @@ def get_schedule():
 
 # 🆕 Webhook endpoint for Companion App export
 @app.route('/webhook', methods=['POST'])
+@app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.get_json()
+    print("🔔 Webhook hit!")
+    print("Headers:", dict(request.headers))
+    print("Body:", request.data)
+
+    data = request.get_json(silent=True)
     if not data:
         return 'Invalid JSON', 400
 
     league_data.clear()
     league_data.update(data)
 
-    # Save to disk for backup
     export_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_export.json')
     with open(export_path, 'w') as f:
         json.dump(data, f, indent=4)
 
     print("✅ League data received and saved to disk!")
     return 'League data received!', 200
+
 
 
 
