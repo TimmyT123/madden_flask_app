@@ -67,8 +67,15 @@ def webhook():
 
     league_data.clear()
     league_data.update(data)
-    print("✅ League data received!")  # Shows in Railway Logs
+
+    # Save to disk for backup
+    export_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_export.json')
+    with open(export_path, 'w') as f:
+        json.dump(data, f, indent=4)
+
+    print("✅ League data received and saved to disk!")
     return 'League data received!', 200
+
 
 
 # if __name__ == "__main__":
