@@ -63,12 +63,9 @@ def get_schedule():
 def webhook():
     print("🔔 Webhook hit!")
     headers = dict(request.headers)
-    body = request.data  # raw bytes
+    body = request.data
 
-    print("Headers:", headers)
-    print("Body:", body)
-
-    # Save to a debug file
+    # Save raw debug info
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
     with open(debug_path, 'w') as f:
         f.write("HEADERS:\n")
@@ -77,10 +74,12 @@ def webhook():
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # Try to parse JSON normally
+    # Try to parse JSON
     data = request.get_json(silent=True)
     if not data:
-        return 'Invalid JSON (but raw body saved)', 400
+        print("❌ Invalid JSON received")
+        # Still return 200 OK so the Companion App doesn’t throw error
+        return jsonify({'status': 'error', 'message': 'Invalid JSON received but saved to debug'}), 200
 
     league_data.clear()
     league_data.update(data)
@@ -89,8 +88,9 @@ def webhook():
     with open(export_path, 'w') as f:
         json.dump(data, f, indent=4)
 
-    print("✅ League data received and saved to disk!")
-    return 'League data received!', 200
+    print("✅ League data received and saved!")
+    return jsonify({'status': 'success'}), 200
+
 
 @app.route('/debug', methods=['GET'])
 def get_debug_file():
