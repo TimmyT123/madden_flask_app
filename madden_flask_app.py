@@ -65,7 +65,6 @@ def webhook():
     headers = dict(request.headers)
     body = request.data
 
-    # Save raw debug info
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
     with open(debug_path, 'w') as f:
         f.write("HEADERS:\n")
@@ -74,22 +73,23 @@ def webhook():
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # Try to parse JSON
+    # Parse if you want, but never return an error status
     data = request.get_json(silent=True)
-    if not data:
-        print("❌ Invalid JSON received")
-        # Still return 200 OK so the Companion App doesn’t throw error
-        return jsonify({'status': 'error', 'message': 'Invalid JSON received but saved to debug'}), 200
+    if data:
+        league_data.clear()
+        league_data.update(data)
 
-    league_data.clear()
-    league_data.update(data)
+        export_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_export.json')
+        with open(export_path, 'w') as f:
+            json.dump(data, f, indent=4)
 
-    export_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_export.json')
-    with open(export_path, 'w') as f:
-        json.dump(data, f, indent=4)
+        print("✅ League data received and saved!")
 
-    print("✅ League data received and saved!")
-    return jsonify({'status': 'success'}), 200
+    else:
+        print("❌ Invalid JSON received, but raw body saved.")
+
+    # ALWAYS plain text and 200 OK
+    return 'OK', 200
 
 
 @app.route('/debug', methods=['GET'])
