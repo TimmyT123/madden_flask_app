@@ -80,11 +80,9 @@ def webhook(subpath):
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # Try to parse JSON if you want
     _ = request.get_json(silent=True)
 
     return 'OK', 200
-
 
 
 @app.route('/debug', methods=['GET'])
