@@ -6,6 +6,8 @@ from config import UPLOAD_FOLDER
 from parsers.schedule_parser import parse_schedule_data
 from parsers.rosters_parser import parse_rosters_data
 from parsers.league_parser import parse_league_info_data
+from parsers.passing_parser import parse_passing_stats
+
 
 print("🚀 Running Madden Flask App!")
 
@@ -100,6 +102,8 @@ def webhook(subpath):
         parse_rosters_data(data, subpath)
     elif "league" in subpath:
         parse_league_info_data(data, subpath)
+    elif "passing" in subpath:
+        parse_passing_stats(data, subpath)
 
     return 'OK', 200
 
