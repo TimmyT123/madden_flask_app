@@ -70,6 +70,7 @@ def webhook(subpath):
     print("HEADERS:", headers)
     print("BODY:", body.decode('utf-8', errors='replace'))
 
+    # Save raw body always
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     with open(debug_path, 'w') as f:
@@ -80,7 +81,33 @@ def webhook(subpath):
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    _ = request.get_json(silent=True)
+    # Parse JSON safely
+    try:
+        data = request.get_json(force=True)
+    except Exception as e:
+        print(f"❌ Failed to parse JSON: {e}")
+        return 'Invalid JSON', 400
+
+    # Check for Companion App error
+    if 'error' in data:
+        print(f"⚠️ Companion App Error: {data['error']}")
+        # Save it too
+        error_filename = f"{subpath.replace('/', '_')}_error.json"
+        error_path = os.path.join(app.config['UPLOAD_FOLDER'], error_filename)
+        with open(error_path, 'w') as f:
+            json.dump(data, f, indent=4)
+        return 'Error received', 200
+
+    # If valid, save to separate file per subpath
+    output_filename = f"{subpath.replace('/', '_')}.json"
+    output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
+    with open(output_path, 'w') as f:
+        json.dump(data, f, indent=4)
+
+    print(f"✅ Valid data saved to {output_filename}")
+
+    # Optionally load into in-memory store
+    league_data[subpath] = data
 
     return 'OK', 200
 
