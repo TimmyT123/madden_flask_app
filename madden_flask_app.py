@@ -62,10 +62,16 @@ def get_schedule():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     print("🔔 Webhook hit!")
+
     headers = dict(request.headers)
     body = request.data
 
+    print("HEADERS:", headers)
+    print("BODY:", body.decode('utf-8', errors='replace'))
+
+    # Save raw body for debug
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     with open(debug_path, 'w') as f:
         f.write("HEADERS:\n")
         for k, v in headers.items():
@@ -73,23 +79,12 @@ def webhook():
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # Parse if you want, but never return an error status
-    data = request.get_json(silent=True)
-    if data:
-        league_data.clear()
-        league_data.update(data)
+    # DO NOT reject bad JSON -- just log it
+    _ = request.get_json(silent=True)
 
-        export_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_export.json')
-        with open(export_path, 'w') as f:
-            json.dump(data, f, indent=4)
-
-        print("✅ League data received and saved!")
-
-    else:
-        print("❌ Invalid JSON received, but raw body saved.")
-
-    # ALWAYS plain text and 200 OK
+    # Always respond with plain text and 200 OK
     return 'OK', 200
+
 
 
 @app.route('/debug', methods=['GET'])
