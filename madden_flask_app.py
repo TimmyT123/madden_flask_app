@@ -59,9 +59,10 @@ def get_schedule():
     return jsonify(schedule)
 
 # 🆕 Webhook endpoint for Companion App export
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    print("🔔 Webhook hit!")
+@app.route('/webhook', defaults={'subpath': ''}, methods=['POST'])
+@app.route('/webhook/<path:subpath>', methods=['POST'])
+def webhook(subpath):
+    print(f"🔔 Webhook hit! Subpath: {subpath}")
 
     headers = dict(request.headers)
     body = request.data
@@ -69,20 +70,19 @@ def webhook():
     print("HEADERS:", headers)
     print("BODY:", body.decode('utf-8', errors='replace'))
 
-    # Save raw body for debug
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     with open(debug_path, 'w') as f:
+        f.write(f"SUBPATH: {subpath}\n\n")
         f.write("HEADERS:\n")
         for k, v in headers.items():
             f.write(f"{k}: {v}\n")
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # DO NOT reject bad JSON -- just log it
+    # Try to parse JSON if you want
     _ = request.get_json(silent=True)
 
-    # Always respond with plain text and 200 OK
     return 'OK', 200
 
 
