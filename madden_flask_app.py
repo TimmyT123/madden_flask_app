@@ -92,6 +92,12 @@ def webhook():
     print("✅ League data received and saved to disk!")
     return 'League data received!', 200
 
+@app.route('/debug', methods=['GET'])
+def get_debug_file():
+    debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
+    with open(debug_path) as f:
+        content = f.read()
+    return f"<pre>{content}</pre>"
 
 
 
