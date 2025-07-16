@@ -60,15 +60,27 @@ def get_schedule():
 
 # 🆕 Webhook endpoint for Companion App export
 @app.route('/webhook', methods=['POST'])
-@app.route('/webhook', methods=['POST'])
 def webhook():
     print("🔔 Webhook hit!")
-    print("Headers:", dict(request.headers))
-    print("Body:", request.data)
+    headers = dict(request.headers)
+    body = request.data  # raw bytes
 
+    print("Headers:", headers)
+    print("Body:", body)
+
+    # Save to a debug file
+    debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
+    with open(debug_path, 'w') as f:
+        f.write("HEADERS:\n")
+        for k, v in headers.items():
+            f.write(f"{k}: {v}\n")
+        f.write("\nBODY:\n")
+        f.write(body.decode('utf-8', errors='replace'))
+
+    # Try to parse JSON normally
     data = request.get_json(silent=True)
     if not data:
-        return 'Invalid JSON', 400
+        return 'Invalid JSON (but raw body saved)', 400
 
     league_data.clear()
     league_data.update(data)
@@ -79,6 +91,7 @@ def webhook():
 
     print("✅ League data received and saved to disk!")
     return 'League data received!', 200
+
 
 
 
