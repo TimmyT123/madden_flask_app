@@ -95,9 +95,15 @@ def webhook():
 @app.route('/debug', methods=['GET'])
 def get_debug_file():
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
+    if not os.path.exists(debug_path):
+        return "No debug file found yet!", 404
+
     with open(debug_path) as f:
         content = f.read()
+
+    # Return as HTML <pre> for readability
     return f"<pre>{content}</pre>"
+
 
 
 
