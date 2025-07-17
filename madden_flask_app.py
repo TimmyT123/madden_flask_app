@@ -88,22 +88,21 @@ def webhook(subpath):
             json.dump(data, f, indent=4)
         return 'Error received', 200
 
+    # Save raw file
     output_filename = f"{subpath.replace('/', '_')}.json"
     output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
 
-    print(f"✅ Valid data saved to {output_filename}")
-    league_data[subpath] = data
-
-    if "schedules" in subpath and "week" in subpath:
+    # Parse specific subpath types
+    if subpath.endswith("passing"):
+        parse_passing_stats(subpath, data, app.config["UPLOAD_FOLDER"])
+    elif "schedules" in subpath and "week" in subpath:
         parse_schedule_data(data, subpath)
     elif "rosters" in subpath:
         parse_rosters_data(data, subpath)
     elif "league" in subpath:
         parse_league_info_data(data, subpath)
-    elif "passing" in subpath:
-        parse_passing_stats(data, subpath)
 
     return 'OK', 200
 
