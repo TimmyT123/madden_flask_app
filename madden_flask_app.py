@@ -2,14 +2,17 @@ from flask import Flask, request, jsonify
 from datetime import datetime
 import os
 import json
+import requests
+
 from config import UPLOAD_FOLDER
 from parsers.schedule_parser import parse_schedule_data
 from parsers.rosters_parser import parse_rosters_data
 from parsers.league_parser import parse_league_info_data
 from parsers.passing_parser import parse_passing_stats
 
-
 print("🚀 Running Madden Flask App!")
+
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1395202722227290213/fbpHTWl3nwq0XxD-AKriIJSUdBhgqGhGoGxBScUQLBK2d_SxSlIHsCRAj6A3g55kz0aD"
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -17,9 +20,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 league_data = {}
 
+
 @app.route('/')
 def home():
     return "Madden Franchise API is running!"
+
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -37,10 +42,11 @@ def upload_file():
         league_data.update(data)
     return 'File uploaded and data loaded', 200
 
+
 @app.route('/teams', methods=['GET'])
 def get_teams():
-    teams = league_data.get('teams', [])
-    return jsonify(teams)
+    return jsonify(league_data.get('teams', []))
+
 
 @app.route('/teams/<team_name>', methods=['GET'])
 def get_team(team_name):
@@ -49,10 +55,11 @@ def get_team(team_name):
             return jsonify(team)
     return jsonify({'message': 'Team not found'}), 404
 
+
 @app.route('/schedule', methods=['GET'])
 def get_schedule():
-    schedule = league_data.get('schedule', [])
-    return jsonify(schedule)
+    return jsonify(league_data.get('schedule', []))
+
 
 @app.route('/webhook', defaults={'subpath': ''}, methods=['POST'])
 @app.route('/webhook/<path:subpath>', methods=['POST'])
@@ -67,8 +74,7 @@ def webhook(subpath):
 
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
     with open(debug_path, 'w') as f:
-        f.write(f"SUBPATH: {subpath}\n\n")
-        f.write("HEADERS:\n")
+        f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
         for k, v in headers.items():
             f.write(f"{k}: {v}\n")
         f.write("\nBODY:\n")
@@ -83,8 +89,7 @@ def webhook(subpath):
     if 'error' in data:
         print(f"⚠️ Companion App Error: {data['error']}")
         error_filename = f"{subpath.replace('/', '_')}_error.json"
-        error_path = os.path.join(app.config['UPLOAD_FOLDER'], error_filename)
-        with open(error_path, 'w') as f:
+        with open(os.path.join(app.config['UPLOAD_FOLDER'], error_filename), 'w') as f:
             json.dump(data, f, indent=4)
         return 'Error received', 200
 
@@ -93,10 +98,16 @@ def webhook(subpath):
     output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
+    print(f"✅ Valid data saved to {output_filename}")
 
-    # Parse specific subpath types
+    # Handle different data types
     if subpath.endswith("passing"):
         parse_passing_stats(subpath, data, app.config["UPLOAD_FOLDER"])
+
+        # 🧨 Post a highlight example
+        highlight_msg = "🔥 New highlight: J.Fields throws 2 TDs for 241 yards!"
+        post_highlight_to_discord(highlight_msg, output_path)
+
     elif "schedules" in subpath and "week" in subpath:
         parse_schedule_data(data, subpath)
     elif "rosters" in subpath:
@@ -104,7 +115,9 @@ def webhook(subpath):
     elif "league" in subpath:
         parse_league_info_data(data, subpath)
 
+    league_data[subpath] = data
     return 'OK', 200
+
 
 @app.route('/debug', methods=['GET'])
 def get_debug_file():
@@ -112,5 +125,16 @@ def get_debug_file():
     if not os.path.exists(debug_path):
         return "No debug file found yet!", 404
     with open(debug_path) as f:
-        content = f.read()
-    return f"<pre>{content}</pre>"
+        return f"<pre>{f.read()}</pre>"
+
+
+def post_highlight_to_discord(message, file_path=None):
+    data = {"content": message}
+    files = {}
+    if file_path and os.path.exists(file_path):
+        files["file"] = open(file_path, "rb")
+    response = requests.post(DISCORD_WEBHOOK_URL, data=data, files=files)
+    if response.status_code == 204:
+        print("✅ Highlight posted to Discord!")
+    else:
+        print(f"❌ Failed to post to Discord: {response.status_code} {response.text}")
