@@ -1,36 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Madden Passing Stats</title>
-    <style>
-        table { border-collapse: collapse; width: 80%; margin: auto; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-        th { background-color: #f2f2f2; }
-        body { font-family: Arial; padding-top: 40px; }
-        h1 { text-align: center; }
-    </style>
+    <title>Passing Stats</title>
 </head>
 <body>
     <h1>Passing Stats</h1>
     {% if players %}
-    <table>
-        <tr>
-            <th>Player</th>
-            <th>Catches</th>
-            <th>Yards</th>
-            <th>Touchdowns</th>
-        </tr>
-        {% for p in players %}
-        <tr>
-            <td>{{ p.fullName }}</td>
-            <td>{{ p.recCatches }}</td>
-            <td>{{ p.recYds }}</td>
-            <td>{{ p.recTDs }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+        <table border="1">
+            <tr>
+                <th>Player</th>
+                <th>Team ID</th>
+                <th>Week</th>
+                <th>Season</th>
+                <th>Yards</th>
+                <th>Touchdowns</th>
+                <th>Interceptions</th>
+                <th>Completion %</th>
+                <th>Rating</th>
+            </tr>
+            {% for player in players %}
+                <tr>
+                    <td>{{ player.name }}</td>
+                    <td>{{ player.teamId }}</td>
+                    <td>{{ player.week }}</td>
+                    <td>{{ player.season }}</td>
+                    <td>{{ player.passYds }}</td>
+                    <td>{{ player.passTDs }}</td>
+                    <td>{{ player.passInts }}</td>
+                    <td>{{ player.passCompPct }}</td>
+                    <td>{{ player.passerRating }}</td>
+                </tr>
+            {% endfor %}
+        </table>
     {% else %}
-        <p style="text-align: center;">No stats available yet.</p>
+        <p>No passing stats available yet.</p>
     {% endif %}
 </body>
 </html>
