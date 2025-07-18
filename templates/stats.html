@@ -15,6 +15,11 @@
         th {
             background-color: #f2f2f2;
             cursor: pointer;
+            position: relative;
+        }
+        th .arrow {
+            font-size: 0.7em;
+            margin-left: 4px;
         }
         tr:hover {
             background-color: #f9f9f9;
@@ -27,12 +32,12 @@
     <table id="statsTable">
         <thead>
             <tr>
-                <th onclick="sortTable(0)">Player</th>
-                <th onclick="sortTable(1)">Yards</th>
-                <th onclick="sortTable(2)">Touchdowns</th>
-                <th onclick="sortTable(3)">Interceptions</th>
-                <th onclick="sortTable(4)">Completion %</th>
-                <th onclick="sortTable(5)">Rating</th>
+                <th onclick="sortTable(0)">Player <span class="arrow" id="arrow-0"></span></th>
+                <th onclick="sortTable(1)">Yards <span class="arrow" id="arrow-1"></span></th>
+                <th onclick="sortTable(2)">Touchdowns <span class="arrow" id="arrow-2"></span></th>
+                <th onclick="sortTable(3)">Interceptions <span class="arrow" id="arrow-3"></span></th>
+                <th onclick="sortTable(4)">Completion % <span class="arrow" id="arrow-4"></span></th>
+                <th onclick="sortTable(5)">Rating <span class="arrow" id="arrow-5"></span></th>
             </tr>
         </thead>
         <tbody>
@@ -53,26 +58,49 @@
     {% endif %}
 
     <script>
+    let sortState = {
+        column: null,
+        ascending: false
+    };
+
     function sortTable(columnIndex) {
-    const table = document.getElementById("statsTable");
-    const tbody = table.tBodies[0];
-    const rows = Array.from(tbody.rows);
+        const table = document.getElementById("statsTable");
+        const tbody = table.tBodies[0];
+        const rows = Array.from(tbody.rows);
 
-    const isNumeric = !isNaN(rows[0].cells[columnIndex].innerText.trim());
+        const isNumeric = !isNaN(rows[0].cells[columnIndex].innerText.trim());
 
-    rows.sort((a, b) => {
-        const aText = a.cells[columnIndex].innerText.trim();
-        const bText = b.cells[columnIndex].innerText.trim();
-
-        if (isNumeric) {
-            return parseFloat(bText) - parseFloat(aText); // descending by default
+        if (sortState.column === columnIndex) {
+            sortState.ascending = !sortState.ascending;
         } else {
-            return aText.localeCompare(bText);
+            sortState.column = columnIndex;
+            sortState.ascending = false; // default to descending first
         }
-    });
 
-    // Append sorted rows back into the table body
-    rows.forEach(row => tbody.appendChild(row));
+        rows.sort((a, b) => {
+            const aText = a.cells[columnIndex].innerText.trim();
+            const bText = b.cells[columnIndex].innerText.trim();
+
+            if (isNumeric) {
+                const aVal = parseFloat(aText);
+                const bVal = parseFloat(bText);
+                return sortState.ascending ? aVal - bVal : bVal - aVal;
+            } else {
+                return sortState.ascending
+                    ? aText.localeCompare(bText)
+                    : bText.localeCompare(aText);
+            }
+        });
+
+        // Clear all arrows
+        document.querySelectorAll(".arrow").forEach(el => el.innerText = "");
+
+        // Set arrow on the active column
+        const arrow = document.getElementById("arrow-" + columnIndex);
+        arrow.innerText = sortState.ascending ? "▲" : "▼";
+
+        // Append sorted rows back
+        rows.forEach(row => tbody.appendChild(row));
     }
     </script>
 
