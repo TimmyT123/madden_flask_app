@@ -143,11 +143,12 @@ def show_stats():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'passing.json')
         with open(filepath) as f:
             data = json.load(f)
-            players = data.get("playerReceivingStatInfoList", [])
+            players = data.get("playerPassingStatInfoList", [])  # <-- FIXED
     except Exception as e:
         print(f"Error loading stats: {e}")
         players = []
     return render_template("stats.html", players=players)
+
 
 
 import os
