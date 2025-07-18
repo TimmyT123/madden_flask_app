@@ -105,11 +105,6 @@ def webhook(subpath):
     # Handle different data types
     if subpath.endswith("passing"):
         parse_passing_stats(subpath, data, app.config["UPLOAD_FOLDER"])
-
-        # 🧨 Post a highlight example
-        highlight_msg = "🔥 New highlight: J.Fields throws 2 TDs for 241 yards!"
-        post_highlight_to_discord(highlight_msg, output_path)
-
     elif "schedules" in subpath and "week" in subpath:
         parse_schedule_data(data, subpath)
     elif "rosters" in subpath:

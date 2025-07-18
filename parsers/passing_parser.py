@@ -1,6 +1,6 @@
+import os
 import json
 from datetime import datetime
-import os
 
 def parse_passing_stats(subpath, data, upload_folder):
     if "playerPassingStatInfoList" not in data:
@@ -21,11 +21,17 @@ def parse_passing_stats(subpath, data, upload_folder):
             "passerRating": player.get("passerRating"),
         })
 
+    # Save timestamped version
     filename = f"parsed_{subpath.replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     output_path = os.path.join(upload_folder, filename)
-
     with open(output_path, "w") as f:
         json.dump(parsed, f, indent=2)
-
     print(f"✅ Parsed passing stats saved to {output_path}")
+
+    # Save shared version for website (/stats route)
+    shared_path = os.path.join(upload_folder, "passing.json")
+    with open(shared_path, "w") as f:
+        json.dump({"playerPassingStatInfoList": parsed}, f, indent=2)
+    print(f"🌐 Shared passing stats updated at {shared_path}")
+
     return output_path
