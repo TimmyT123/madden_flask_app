@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import json
 import requests
+from threading import Thread
 
 from config import UPLOAD_FOLDER
 
@@ -76,12 +77,20 @@ def get_schedule():
 def webhook(subpath):
     print(f"🔔 Webhook hit! Subpath: {subpath}")
 
+    try:
+        data = request.get_json(force=True)
+    except Exception as e:
+        print(f"❌ Failed to parse JSON: {e}")
+        return 'Invalid JSON', 400
+
+    # Extract what you need *now*, inside request context
     headers = dict(request.headers)
     body = request.data
+    Thread(target=process_webhook_data, args=(data, subpath, headers, body)).start()
+    return 'OK', 200
 
-    print("HEADERS:", headers)
-    print("BODY:", body.decode('utf-8', errors='replace'))
 
+def process_webhook_data(data, subpath, headers, body):
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
     with open(debug_path, 'w') as f:
         f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
@@ -90,28 +99,45 @@ def webhook(subpath):
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    try:
-        data = request.get_json(force=True)
-    except Exception as e:
-        print(f"❌ Failed to parse JSON: {e}")
-        return 'Invalid JSON', 400
+    # Save raw debug log
+    debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
+    with open(debug_path, 'w') as f:
+        f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
+        for k, v in headers.items():
+            f.write(f"{k}: {v}\n")
+        f.write("\nBODY:\n")
+        f.write(body.decode('utf-8', errors='replace'))
 
+    # Check for Companion App error payload
     if 'error' in data:
         print(f"⚠️ Companion App Error: {data['error']}")
         error_filename = f"{subpath.replace('/', '_')}_error.json"
         with open(os.path.join(app.config['UPLOAD_FOLDER'], error_filename), 'w') as f:
             json.dump(data, f, indent=4)
-        return 'Error received', 200
+        return
 
-    # Save raw file
-    output_filename = f"{subpath.replace('/', '_')}.json"
-    output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
+    # Determine correct file name based on content
+    if "playerPassingStatInfoList" in data:
+        filename = "passing.json"
+    elif "playerReceivingStatInfoList" in data:
+        filename = "receiving.json"
+    elif "scheduleInfoList" in data:
+        filename = "schedule.json"
+    elif "rosterInfoList" in data:
+        filename = "rosters.json"
+    elif "teamInfoList" in data:
+        filename = "league.json"
+    else:
+        filename = f"{subpath.replace('/', '_')}.json"
+
+    output_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
-    print(f"✅ Valid data saved to {output_filename}")
 
-    # Handle different data types
-    if subpath.endswith("passing"):
+    print(f"✅ Data saved to {filename}")
+
+    # Optional: parse known types
+    if subpath.endswith("passing") and "playerPassingStatInfoList" in data:
         parse_passing_stats(subpath, data, app.config["UPLOAD_FOLDER"])
     elif "schedules" in subpath and "week" in subpath:
         parse_schedule_data(data, subpath)
@@ -121,7 +147,7 @@ def webhook(subpath):
         parse_league_info_data(data, subpath)
 
     league_data[subpath] = data
-    return 'OK', 200
+
 
 
 @app.route('/debug', methods=['GET'])
