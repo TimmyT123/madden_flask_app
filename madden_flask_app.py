@@ -125,6 +125,12 @@ def get_debug_file():
         return f"<pre>{f.read()}</pre>"
 
 
+@app.route('/uploads', methods=['GET'])
+def list_uploaded_files():
+    files = os.listdir(app.config['UPLOAD_FOLDER'])
+    return render_template('uploads.html', files=files)
+
+
 def post_highlight_to_discord(message, file_path=None):
     data = {"content": message}
     files = {}
