@@ -2,38 +2,73 @@
 <html>
 <head>
     <title>Passing Stats</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: center;
+            border: 1px solid #ccc;
+        }
+        th {
+            background-color: #f2f2f2;
+            cursor: pointer;
+        }
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+    </style>
 </head>
 <body>
     <h1>Passing Stats</h1>
     {% if players %}
-        <table border="1">
+    <table id="statsTable">
+        <thead>
             <tr>
-                <th>Player</th>
-                <th>Team ID</th>
-                <th>Week</th>
-                <th>Season</th>
-                <th>Yards</th>
-                <th>Touchdowns</th>
-                <th>Interceptions</th>
-                <th>Completion %</th>
-                <th>Rating</th>
+                <th onclick="sortTable(0)">Player</th>
+                <th onclick="sortTable(1)">Yards</th>
+                <th onclick="sortTable(2)">Touchdowns</th>
+                <th onclick="sortTable(3)">Interceptions</th>
+                <th onclick="sortTable(4)">Completion %</th>
+                <th onclick="sortTable(5)">Rating</th>
             </tr>
+        </thead>
+        <tbody>
             {% for player in players %}
-                <tr>
-                    <td>{{ player.name }}</td>
-                    <td>{{ player.teamId }}</td>
-                    <td>{{ player.week }}</td>
-                    <td>{{ player.season }}</td>
-                    <td>{{ player.passYds }}</td>
-                    <td>{{ player.passTDs }}</td>
-                    <td>{{ player.passInts }}</td>
-                    <td>{{ player.passCompPct }}</td>
-                    <td>{{ player.passerRating }}</td>
-                </tr>
+            <tr>
+                <td>{{ player.name }}</td>
+                <td>{{ player.passYds }}</td>
+                <td>{{ player.passTDs }}</td>
+                <td>{{ player.passInts }}</td>
+                <td>{{ player.passCompPct }}</td>
+                <td>{{ player.passerRating }}</td>
+            </tr>
             {% endfor %}
-        </table>
+        </tbody>
+    </table>
     {% else %}
         <p>No passing stats available yet.</p>
     {% endif %}
+
+    <script>
+    function sortTable(columnIndex) {
+        const table = document.getElementById("statsTable");
+        const rows = Array.from(table.rows).slice(1);
+        const isNumeric = !isNaN(rows[0].cells[columnIndex].innerText);
+
+        rows.sort((a, b) => {
+            const aText = a.cells[columnIndex].innerText;
+            const bText = b.cells[columnIndex].innerText;
+            return isNumeric
+                ? parseFloat(bText) - parseFloat(aText)
+                : aText.localeCompare(bText);
+        });
+
+        const tbody = table.tBodies[0];
+        rows.forEach(row => tbody.appendChild(row));
+    }
+    </script>
 </body>
 </html>
