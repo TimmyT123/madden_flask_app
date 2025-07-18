@@ -54,21 +54,27 @@
 
     <script>
     function sortTable(columnIndex) {
-        const table = document.getElementById("statsTable");
-        const rows = Array.from(table.rows).slice(1);
-        const isNumeric = !isNaN(rows[0].cells[columnIndex].innerText);
+    const table = document.getElementById("statsTable");
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.rows);
 
-        rows.sort((a, b) => {
-            const aText = a.cells[columnIndex].innerText;
-            const bText = b.cells[columnIndex].innerText;
-            return isNumeric
-                ? parseFloat(bText) - parseFloat(aText)
-                : aText.localeCompare(bText);
-        });
+    const isNumeric = !isNaN(rows[0].cells[columnIndex].innerText.trim());
 
-        const tbody = table.tBodies[0];
-        rows.forEach(row => tbody.appendChild(row));
+    rows.sort((a, b) => {
+        const aText = a.cells[columnIndex].innerText.trim();
+        const bText = b.cells[columnIndex].innerText.trim();
+
+        if (isNumeric) {
+            return parseFloat(bText) - parseFloat(aText); // descending by default
+        } else {
+            return aText.localeCompare(bText);
+        }
+    });
+
+    // Append sorted rows back into the table body
+    rows.forEach(row => tbody.appendChild(row));
     }
     </script>
+
 </body>
 </html>
