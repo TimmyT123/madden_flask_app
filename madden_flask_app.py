@@ -25,7 +25,7 @@ league_data = {}
 
 @app.route('/')
 def home():
-    return "Madden Franchise API is running!"
+    return render_template("index.html")
 
 
 @app.route('/upload', methods=['POST'])
