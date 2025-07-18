@@ -1,10 +1,13 @@
 from flask import Flask, request, jsonify
+from flask import send_from_directory
+
 from datetime import datetime
 import os
 import json
 import requests
 
 from config import UPLOAD_FOLDER
+
 from parsers.schedule_parser import parse_schedule_data
 from parsers.rosters_parser import parse_rosters_data
 from parsers.league_parser import parse_league_info_data
@@ -43,6 +46,11 @@ def upload_file():
         league_data.clear()
         league_data.update(data)
     return 'File uploaded and data loaded', 200
+
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
 @app.route('/teams', methods=['GET'])

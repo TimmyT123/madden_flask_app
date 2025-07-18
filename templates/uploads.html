@@ -6,9 +6,10 @@
 <body>
     <h1>Files in Upload Folder</h1>
     <ul>
-        {% for file in files %}
-            <li><a href="/uploads/{{ file }}">{{ file }}</a></li>
-        {% endfor %}
+      {% for file in files %}
+        <li><a href="{{ url_for('uploaded_file', filename=file) }}">{{ file }}</a></li>
+      {% endfor %}
     </ul>
+
 </body>
 </html>
