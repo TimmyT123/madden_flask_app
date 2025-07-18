@@ -1,0 +1,13 @@
+SUBPATH: passing
+
+HEADERS:
+Host: 127.0.0.1:5000
+User-Agent: python-requests/2.32.4
+Accept-Encoding: gzip, deflate
+Accept: */*
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 180
+
+BODY:
+{"playerReceivingStatInfoList": [{"fullName": "G. Pickens", "recCatches": 6, "recYds": 89, "recTDs": 2}, {"fullName": "P. Freiermuth", "recCatches": 5, "recYds": 43, "recTDs": 0}]}

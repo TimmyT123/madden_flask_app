@@ -10,6 +10,8 @@ from parsers.rosters_parser import parse_rosters_data
 from parsers.league_parser import parse_league_info_data
 from parsers.passing_parser import parse_passing_stats
 
+from flask import render_template
+
 print("🚀 Running Madden Flask App!")
 
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1395202722227290213/fbpHTWl3nwq0XxD-AKriIJSUdBhgqGhGoGxBScUQLBK2d_SxSlIHsCRAj6A3g55kz0aD"
@@ -138,3 +140,25 @@ def post_highlight_to_discord(message, file_path=None):
         print("✅ Highlight posted to Discord!")
     else:
         print(f"❌ Failed to post to Discord: {response.status_code} {response.text}")
+
+
+@app.route('/stats')
+def show_stats():
+    try:
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'passing.json')
+        with open(filepath) as f:
+            data = json.load(f)
+            players = data.get("playerReceivingStatInfoList", [])
+    except Exception as e:
+        print(f"Error loading stats: {e}")
+        players = []
+    return render_template("stats.html", players=players)
+
+
+import os
+
+if __name__ == '__main__':
+    # Only run this if NOT on Render
+    if not os.environ.get("RENDER"):
+        app.run(host='0.0.0.0', port=5000, debug=True)
+

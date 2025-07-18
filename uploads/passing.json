@@ -1,0 +1,16 @@
+{
+    "playerReceivingStatInfoList": [
+        {
+            "fullName": "G. Pickens",
+            "recCatches": 6,
+            "recYds": 89,
+            "recTDs": 2
+        },
+        {
+            "fullName": "P. Freiermuth",
+            "recCatches": 5,
+            "recYds": 43,
+            "recTDs": 0
+        }
+    ]
+}
