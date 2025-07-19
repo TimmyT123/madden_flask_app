@@ -140,12 +140,13 @@ def process_webhook_data(data, subpath, headers, body):
     if subpath.endswith("passing") and "playerPassingStatInfoList" in data:
         parse_passing_stats(subpath, data, app.config["UPLOAD_FOLDER"])
     elif "schedules" in subpath and "week" in subpath:
-        parse_schedule_data(data, subpath)
+        parse_schedule_data(data, subpath, app.config["UPLOAD_FOLDER"])
     elif "rosters" in subpath:
-        parse_rosters_data(data, subpath)
+        parse_rosters_data(data, subpath, app.config["UPLOAD_FOLDER"])
     elif "league" in subpath:
-        parse_league_info_data(data, subpath)
+        parse_league_info_data(data, subpath, app.config["UPLOAD_FOLDER"])
 
+    # ✅ Keep the in-memory record
     league_data[subpath] = data
 
 

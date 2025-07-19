@@ -1,9 +1,8 @@
-import json
 import os
+import json
 from datetime import datetime
-from flask import current_app as app
 
-def parse_schedule_data(data, subpath):
+def parse_schedule_data(data, subpath, upload_folder):
     parsed = []
     for game in data.get("gameScheduleInfoList", []):
         parsed.append({
@@ -18,7 +17,7 @@ def parse_schedule_data(data, subpath):
             "gameOfTheWeek": game.get("isGameOfTheWeek"),
         })
 
-    filename = os.path.join(app.config['UPLOAD_FOLDER'], f"parsed_{subpath.replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    filename = os.path.join(upload_folder, f"parsed_{subpath.replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
     with open(filename, "w") as f:
         json.dump(parsed, f, indent=2)
 
