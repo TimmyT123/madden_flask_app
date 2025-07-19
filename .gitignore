@@ -22,3 +22,13 @@ Thumbs.db
 
 # Environment files
 .env
+
+# Ignore the entire uploads folder
+uploads/
+
+# Ignore webhook debug files
+webhook_debug.txt
+webhook_debug_*.txt
+
+# Ignore all .json files in uploads
+uploads/*.json

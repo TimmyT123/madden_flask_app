@@ -91,9 +91,21 @@ def webhook(subpath):
 
 
 def process_webhook_data(data, subpath, headers, body):
+    # ✅ 1. Overwrite the latest debug (just like before)
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
     with open(debug_path, 'w') as f:
         f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
+        for k, v in headers.items():
+            f.write(f"{k}: {v}\n")
+        f.write("\nBODY:\n")
+        f.write(body.decode('utf-8', errors='replace'))
+
+    # ✅ 2. Append full webhook output to a timestamped log
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archive_name = f"webhook_debug_{timestamp}.txt"
+    archive_path = os.path.join(app.config['UPLOAD_FOLDER'], archive_name)
+    with open(archive_path, 'w') as f:
+        f.write(f"TIMESTAMP: {timestamp}\nSUBPATH: {subpath}\n\nHEADERS:\n")
         for k, v in headers.items():
             f.write(f"{k}: {v}\n")
         f.write("\nBODY:\n")
