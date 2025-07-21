@@ -91,7 +91,7 @@ def webhook(subpath):
 
 
 def process_webhook_data(data, subpath, headers, body):
-    # ✅ 1. Overwrite the latest debug (just like before)
+    # ✅ 1. Save debug snapshot
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
     with open(debug_path, 'w') as f:
         f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
@@ -100,7 +100,7 @@ def process_webhook_data(data, subpath, headers, body):
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # ✅ 2. Append full webhook output to a timestamped log
+    # ✅ 2. Save timestamped archive
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive_name = f"webhook_debug_{timestamp}.txt"
     archive_path = os.path.join(app.config['UPLOAD_FOLDER'], archive_name)
@@ -111,16 +111,7 @@ def process_webhook_data(data, subpath, headers, body):
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # Save raw debug log
-    debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
-    with open(debug_path, 'w') as f:
-        f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
-        for k, v in headers.items():
-            f.write(f"{k}: {v}\n")
-        f.write("\nBODY:\n")
-        f.write(body.decode('utf-8', errors='replace'))
-
-    # Check for Companion App error payload
+    # ✅ 3. Check for Companion App error
     if 'error' in data:
         print(f"⚠️ Companion App Error: {data['error']}")
         error_filename = f"{subpath.replace('/', '_')}_error.json"
@@ -128,7 +119,7 @@ def process_webhook_data(data, subpath, headers, body):
             json.dump(data, f, indent=4)
         return
 
-    # Determine correct file name based on content
+    # ✅ 4. Determine filename
     if "playerPassingStatInfoList" in data:
         filename = "passing.json"
     elif "playerReceivingStatInfoList" in data:
@@ -142,25 +133,38 @@ def process_webhook_data(data, subpath, headers, body):
     else:
         filename = f"{subpath.replace('/', '_')}.json"
 
-    output_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    # ✅ 5. Determine storage path
+    parts = subpath.split('/')
+    league_id = parts[1] if len(parts) > 1 else "unknown_league"
+    season_index = data.get("seasonIndex", "unknown_season")
+    week_index = data.get("weekIndex", "unknown_week")
+
+    league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, f"season_{season_index}", f"week_{week_index}")
+    os.makedirs(league_folder, exist_ok=True)
+
+    output_path = os.path.join(league_folder, filename)
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
 
-    print(f"✅ Data saved to {filename}")
+    # Optional: also store latest version in league root
+    latest_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, filename)
+    with open(latest_path, 'w') as f:
+        json.dump(data, f, indent=4)
 
-    # Optional: parse known types
-    if subpath.endswith("passing") and "playerPassingStatInfoList" in data:
-        parse_passing_stats(subpath, data, app.config["UPLOAD_FOLDER"])
-    elif "schedules" in subpath and "week" in subpath:
-        parse_schedule_data(data, subpath, app.config["UPLOAD_FOLDER"])
-    elif "rosters" in subpath:
-        parse_rosters_data(data, subpath, app.config["UPLOAD_FOLDER"])
-    elif "league" in subpath:
-        parse_league_info_data(data, subpath, app.config["UPLOAD_FOLDER"])
+    print(f"✅ Data saved to {output_path}")
 
-    # ✅ Keep the in-memory record
+    # ✅ 6. Parse based on data type
+    if "playerPassingStatInfoList" in data:
+        parse_passing_stats(league_id, data, league_folder)
+    elif "scheduleInfoList" in data:
+        parse_schedule_data(data, subpath, league_folder)
+    elif "rosterInfoList" in data:
+        parse_rosters_data(data, subpath, league_folder)
+    elif "teamInfoList" in data:
+        parse_league_info_data(data, subpath, league_folder)
+
+    # ✅ 7. Save in-memory reference
     league_data[subpath] = data
-
 
 
 @app.route('/debug', methods=['GET'])
