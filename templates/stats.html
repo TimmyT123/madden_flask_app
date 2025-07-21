@@ -32,30 +32,33 @@
     <table id="statsTable">
         <thead>
             <tr>
-                <th onclick="sortTable(0)">Player <span class="arrow" id="arrow-0"></span></th>
-                <th onclick="sortTable(1)">Yards <span class="arrow" id="arrow-1"></span></th>
-                <th onclick="sortTable(2)">Touchdowns <span class="arrow" id="arrow-2"></span></th>
-                <th onclick="sortTable(3)">Interceptions <span class="arrow" id="arrow-3"></span></th>
-                <th onclick="sortTable(4)">Completion % <span class="arrow" id="arrow-4"></span></th>
-                <th onclick="sortTable(5)">Rating <span class="arrow" id="arrow-5"></span></th>
+                <th onclick="sortTable(0)">Player</th>
+                <th onclick="sortTable(1)">Team</th>
+                <th onclick="sortTable(2)">Comp</th>
+                <th onclick="sortTable(3)">Yards</th>
+                <th onclick="sortTable(4)">TDs</th>
+                <th onclick="sortTable(5)">INTs</th>
+                <th onclick="sortTable(6)">Rating</th>
             </tr>
         </thead>
         <tbody>
-            {% for player in players %}
+            {% for p in players %}
             <tr>
-                <td>{{ player.name }}</td>
-                <td>{{ player.passYds }}</td>
-                <td>{{ player.passTDs }}</td>
-                <td>{{ player.passInts }}</td>
-                <td>{{ player.passCompPct }}</td>
-                <td>{{ player.passerRating }}</td>
+                <td>{{ p.fullName }}</td>
+                <td>{{ p.teamName }}</td>
+                <td>{{ p.passCompletions }}/{{ p.passAttempts }}</td>
+                <td>{{ p.passYds }}</td>
+                <td>{{ p.passTDs }}</td>
+                <td>{{ p.passInts }}</td>
+                <td>{{ p.passerRating }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-        <p>No passing stats available yet.</p>
+    <p>No stats available.</p>
     {% endif %}
+
 
     <script>
     let sortState = {
