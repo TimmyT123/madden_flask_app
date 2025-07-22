@@ -20,16 +20,21 @@ def parse_passing_stats(subpath, data, upload_folder):
     for player in data["playerPassingStatInfoList"]:
         team_id = player.get("teamId")
         parsed.append({
+            "teamId": player.get("teamId"),
             "name": player.get("fullName"),
-            "teamId": team_id,
-            "teamName": team_lookup.get(team_id, "Unknown"),
-            "week": player.get("weekIndex"),
+            "passYds": player.get("passYds", 0),
+            "passComp": player.get("passComp", 0),
+            "passAtt": player.get("passAtt", 0),
+            "passTDs": player.get("passTDs", 0),
+            "passINTs": player.get("passInts", 0),
+            "passCompPct": player.get("passCompPct", 0.0),
+            "passYdsPerGame": player.get("passYdsPerGame", 0.0),
+            "passRating": player.get("passerRating", 0.0),
+            "passYdsPerAtt": player.get("passYdsPerAtt", 0.0),
+            "passLng": player.get("passLongest", 0),
+            "passSacked": player.get("passSacks", 0),
             "season": player.get("seasonIndex"),
-            "passYds": player.get("passYds"),
-            "passTDs": player.get("passTDs"),
-            "passInts": player.get("passInts"),
-            "passCompPct": player.get("passCompPct"),
-            "passerRating": player.get("passerRating"),
+            "week": player.get("weekIndex"),
         })
 
     # Save timestamped version

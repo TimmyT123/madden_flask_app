@@ -35,23 +35,34 @@
                 <th onclick="sortTable(0)">Team<span id="arrow-0" class="arrow"></span></th>
                 <th onclick="sortTable(1)">Player<span id="arrow-1" class="arrow"></span></th>
                 <th onclick="sortTable(2)">Yards<span id="arrow-2" class="arrow"></span></th>
-                <th onclick="sortTable(3)">TDs<span id="arrow-3" class="arrow"></span></th>
-                <th onclick="sortTable(4)">INTs<span id="arrow-4" class="arrow"></span></th>
-                <th onclick="sortTable(5)">Comp %<span id="arrow-5" class="arrow"></span></th>
-                <th onclick="sortTable(6)">Rating<span id="arrow-6" class="arrow"></span></th>
-
+                <th onclick="sortTable(3)">Comp<span id="arrow-3" class="arrow"></span></th>
+                <th onclick="sortTable(4)">Att<span id="arrow-4" class="arrow"></span></th>
+                <th onclick="sortTable(5)">TD<span id="arrow-5" class="arrow"></span></th>
+                <th onclick="sortTable(6)">INT<span id="arrow-6" class="arrow"></span></th>
+                <th onclick="sortTable(7)">Comp%<span id="arrow-7" class="arrow"></span></th>
+                <th onclick="sortTable(8)">YPG<span id="arrow-8" class="arrow"></span></th>
+                <th onclick="sortTable(9)">Rating<span id="arrow-9" class="arrow"></span></th>
+                <th onclick="sortTable(10)">YPA<span id="arrow-10" class="arrow"></span></th>
+                <th onclick="sortTable(11)">Long<span id="arrow-11" class="arrow"></span></th>
+                <th onclick="sortTable(12)">Sacks<span id="arrow-12" class="arrow"></span></th>
             </tr>
         </thead>
         <tbody>
             {% for p in players %}
             <tr>
-                <td>{{ p.teamName }}</td>
-                <td>{{ p.name }}</td>
-                <td>{{ p.passYds }}</td>
-                <td>{{ p.passTDs }}</td>
-                <td>{{ p.passInts }}</td>
-                <td>{{ p.passCompPct | round(1) }}</td>
-                <td>{{ p.passerRating }}</td>
+              <td>{{ p.team }}</td>
+              <td>{{ p.name }}</td>
+              <td>{{ p.passYds }}</td>
+              <td>{{ p.passComp }}</td>
+              <td>{{ p.passAtt }}</td>
+              <td>{{ p.passTDs }}</td>
+              <td>{{ p.passINTs }}</td>
+              <td>{{ "%.1f"|format(p.passCompPct or 0) }}</td>
+              <td>{{ "%.1f"|format(p.passYdsPerGame or 0) }}</td>
+              <td>{{ "%.1f"|format(p.passRating or 0) }}</td>
+              <td>{{ "%.1f"|format(p.passYdsPerAtt or 0) }}</td>
+              <td>{{ p.passLng }}</td>
+              <td>{{ p.passSacked }}</td>
             </tr>
             {% endfor %}
         </tbody>

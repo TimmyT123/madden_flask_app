@@ -284,19 +284,24 @@ def show_stats():
             players = data.get("playerPassingStatInfoList", [])
 
         # Load team info
-        league_info_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "league.json")
+        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
         teams = {}
-        if os.path.exists(league_info_path):
-            with open(league_info_path) as f:
-                league_data_file = json.load(f)
-                teams = {team["teamId"]: team["abbrName"] for team in league_data_file.get("teamInfoList", [])}
+        if os.path.exists(team_map_path):
+            with open(team_map_path) as f:
+                teams = json.load(f)
 
         for p in players:
-            p["teamName"] = teams.get(p.get("teamId"), "Unknown")
+            team_id = str(p.get("teamId"))
+            team_info = teams.get(team_id, {})
+            p["team"] = team_info.get("abbr", "Unknown")
 
     except Exception as e:
         print(f"Error loading stats: {e}")
         players = []
+
+    print("EXAMPLE PLAYER:")
+    import pprint
+    pprint.pprint(players[0])
 
     return render_template("stats.html", players=players)
 
