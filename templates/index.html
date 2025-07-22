@@ -30,13 +30,16 @@
     <h1>🏈 Welcome to WURD Madden Franchise!</h1>
     <h2>Select League, Season, and Week</h2>
     <form action="/stats" method="get">
-        <label for="league">League ID:</label>
-        <select name="league" id="league" required onchange="populateSeasons()">
-            <option value="">-- Select League --</option>
-            {% for league in leagues %}
-                <option value="{{ league.id }}">{{ league.id }}</option>
-            {% endfor %}
-        </select><br>
+        <!-- Hidden League ID input -->
+        <input type="hidden" name="league" id="league" value="17287266">
+
+<!--        <label for="league">League ID:</label>-->
+<!--        <select name="league" id="league" required onchange="populateSeasons()">-->
+<!--            <option value="">&#45;&#45; Select League &#45;&#45;</option>-->
+<!--            {% for league in leagues %}-->
+<!--                <option value="{{ league.id }}">{{ league.id }}</option>-->
+<!--            {% endfor %}-->
+<!--        </select><br>-->
 
         <label for="season">Season:</label>
         <select name="season" id="season" required onchange="populateWeeks()" disabled>
@@ -48,11 +51,11 @@
             <option value="">-- Select Week --</option>
         </select><br><br>
 
-        <button type="submit">View Passing Stats</button>
+        <!--<button type="submit">View Passing Stats</button> -->
     </form>
 
     <ul>
-        <li><a href="/stats">View Passing Stats</a></li>
+        <li><a href="#" onclick="goToStats()">View Passing Stats</a></li>
         <li><a href="/schedule">View Schedule (coming soon)</a></li>
         <li><a href="/teams">View Teams (coming soon)</a></li>
         <li><a href="/uploads">View Uploads</a></li>
@@ -82,7 +85,6 @@
                 const opt = document.createElement("option");
                 opt.value = s.name.replace("season_", "");
                 opt.text = s.name;
-
                 seasonSelect.appendChild(opt);
             });
 
@@ -101,7 +103,7 @@
             }
 
             const league = leagueData.find(l => l.id === leagueId);
-            const season = league.seasons.find(s => s.name.replace("season_", "") === seasonName);
+            const season = league.seasons.find(s => s.name === "season_" + seasonName);
             if (!season) return;
 
             season.weeks.forEach(w => {
@@ -113,7 +115,24 @@
 
             weekSelect.disabled = false;
         }
+
+        function goToStats() {
+            const league = document.getElementById("league").value;
+            const season = document.getElementById("season").value;
+            const week = document.getElementById("week").value;
+
+            if (!league || !season || !week) {
+                alert("Please select League, Season, and Week first.");
+                return;
+            }
+
+            const url = `/stats?league=${league}&season=${season}&week=${week}`;
+            window.location.href = url;
+        }
+        window.onload = populateSeasons;
     </script>
+
+
 
 
 </body>
