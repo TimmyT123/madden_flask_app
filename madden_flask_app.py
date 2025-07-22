@@ -108,7 +108,7 @@ def get_team(team_name):
     return jsonify({'message': 'Team not found'}), 404
 
 
-@app.route('/schedule', methods=['GET'])
+@app.route('/api/schedule', methods=['GET'])
 def get_schedule():
     return jsonify(league_data.get('schedule', []))
 
@@ -168,7 +168,7 @@ def process_webhook_data(data, subpath, headers, body):
         filename = "passing.json"
     elif "playerReceivingStatInfoList" in data:
         filename = "receiving.json"
-    elif "scheduleInfoList" in data:
+    elif "gameScheduleInfoList" in data:
         filename = "schedule.json"
     elif "rosterInfoList" in data:
         filename = "rosters.json"
@@ -193,7 +193,7 @@ def process_webhook_data(data, subpath, headers, body):
 
     # Prefer extracting from stat blocks (schedule first)
     stat_lists = [
-        "scheduleInfoList",  # ✅ Highest priority
+        "gameScheduleInfoList",  # ✅ Highest priority
         "playerPassingStatInfoList",
         "playerReceivingStatInfoList",
         "playerRushingStatInfoList",
@@ -225,6 +225,16 @@ def process_webhook_data(data, subpath, headers, body):
     if match:
         week_index = match.group(1)
 
+    # Extract seasonIndex/weekIndex from scheduleInfoList if not provided
+    if "gameScheduleInfoList" in data and isinstance(data["gameScheduleInfoList"], list):
+        for game in data["gameScheduleInfoList"]:
+            if isinstance(game, dict):
+                if not season_index:
+                    season_index = game.get("seasonIndex")
+                if not week_index:
+                    week_index = game.get("weekIndex")
+                break
+
     # Fallbacks
     season_index = season_index if season_index is not None else "unknown_season"
     week_index = week_index if week_index is not None else "unknown_week"
@@ -254,7 +264,7 @@ def process_webhook_data(data, subpath, headers, body):
     # ✅ 6. Parse based on data type
     if "playerPassingStatInfoList" in data:
         parse_passing_stats(league_id, data, league_folder)
-    elif "scheduleInfoList" in data:
+    elif "gameScheduleInfoList" in data:
         parse_schedule_data(data, subpath, league_folder)
     elif "rosterInfoList" in data:
         parse_rosters_data(data, subpath, league_folder)
@@ -326,9 +336,9 @@ def show_stats():
         print(f"Error loading stats: {e}")
         players = []
 
-    print("EXAMPLE PLAYER:")
-    import pprint
-    pprint.pprint(players[0])
+    # print("EXAMPLE PLAYER:")
+    # import pprint
+    # pprint.pprint(players[0])
 
     return render_template("stats.html", players=players)
 
@@ -354,10 +364,36 @@ def show_teams():
             if not team.get("teamAbbr"):
                 team["teamAbbr"] = info.get("abbr")
 
-    if teams:
-        print("EXAMPLE TEAM:", teams[0])
+    # if teams:
+    #     print("EXAMPLE TEAM:", teams[0])
 
     return render_template("teams.html", teams=teams)
+
+
+@app.route('/schedule')
+def show_schedule():
+    league_id = "17287266"  # or dynamically from request.args if needed
+    schedule_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "schedule.json")
+
+    parsed_schedule = []
+    if os.path.exists(schedule_path):
+        with open(schedule_path) as f:
+            raw_data = json.load(f)
+            parsed_schedule = raw_data.get("gameScheduleInfoList", [])
+
+    # Load team names (optional)
+    team_map = {}
+    team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "team_map.json")
+    if os.path.exists(team_map_path):
+        with open(team_map_path) as f:
+            team_map = json.load(f)
+
+    # Add readable names
+    for game in parsed_schedule:
+        game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", game["homeTeamId"])
+        game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", game["awayTeamId"])
+
+    return render_template("schedule.html", schedule=parsed_schedule)
 
 
 

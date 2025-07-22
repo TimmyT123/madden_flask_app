@@ -28,7 +28,7 @@
     <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
 
     <h1>🏈 Welcome to WURD Madden Franchise!</h1>
-    <h2>Select League, Season, and Week</h2>
+    <h2>Select Season and Week</h2>
 
     <form action="/stats" method="get">
         <input type="hidden" name="league" id="league" value="{{ latest_league }}">
@@ -47,7 +47,7 @@
     <ul>
         <li><a href="#" onclick="goToStats()">View Passing Stats</a></li>
         <li><a href="/schedule">View Schedule (coming soon)</a></li>
-        <li><a href="/teams">View Teams (coming soon)</a></li>
+        <li><a href="/teams">View Teams</a></li>
     </ul>
 
     <script>
