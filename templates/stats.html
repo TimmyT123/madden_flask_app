@@ -1,123 +1,94 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Passing Stats</title>
-    <style>
-        table {
-            border-collapse: collapse;
-            width: 100%;
-        }
-        th, td {
-            padding: 8px 12px;
-            text-align: center;
-            border: 1px solid #ccc;
-        }
-        th {
-            background-color: #f2f2f2;
-            cursor: pointer;
-            position: relative;
-        }
-        th .arrow {
-            font-size: 0.7em;
-            margin-left: 4px;
-        }
-        tr:hover {
-            background-color: #f9f9f9;
-        }
-    </style>
-</head>
-<body>
-    <h1>Passing Stats</h1>
-    {% if players %}
-    <table id="statsTable">
-        <thead>
-            <tr>
-                <th onclick="sortTable(0)">Team<span id="arrow-0" class="arrow"></span></th>
-                <th onclick="sortTable(1)">Player<span id="arrow-1" class="arrow"></span></th>
-                <th onclick="sortTable(2)">Yards<span id="arrow-2" class="arrow"></span></th>
-                <th onclick="sortTable(3)">Comp<span id="arrow-3" class="arrow"></span></th>
-                <th onclick="sortTable(4)">Att<span id="arrow-4" class="arrow"></span></th>
-                <th onclick="sortTable(5)">TD<span id="arrow-5" class="arrow"></span></th>
-                <th onclick="sortTable(6)">INT<span id="arrow-6" class="arrow"></span></th>
-                <th onclick="sortTable(7)">Comp%<span id="arrow-7" class="arrow"></span></th>
-                <th onclick="sortTable(8)">YPG<span id="arrow-8" class="arrow"></span></th>
-                <th onclick="sortTable(9)">Rating<span id="arrow-9" class="arrow"></span></th>
-                <th onclick="sortTable(10)">YPA<span id="arrow-10" class="arrow"></span></th>
-                <th onclick="sortTable(11)">Long<span id="arrow-11" class="arrow"></span></th>
-                <th onclick="sortTable(12)">Sacks<span id="arrow-12" class="arrow"></span></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in players %}
-            <tr>
-              <td>{{ p.team }}</td>
-              <td>{{ p.name }}</td>
-              <td>{{ p.passYds }}</td>
-              <td>{{ p.passComp }}</td>
-              <td>{{ p.passAtt }}</td>
-              <td>{{ p.passTDs }}</td>
-              <td>{{ p.passINTs }}</td>
-              <td>{{ "%.1f"|format(p.passCompPct or 0) }}</td>
-              <td>{{ "%.1f"|format(p.passYdsPerGame or 0) }}</td>
-              <td>{{ "%.1f"|format(p.passRating or 0) }}</td>
-              <td>{{ "%.1f"|format(p.passYdsPerAtt or 0) }}</td>
-              <td>{{ p.passLng }}</td>
-              <td>{{ p.passSacked }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>No stats available.</p>
-    {% endif %}
+{% extends "base.html" %}
 
+{% block title %}Passing Stats{% endblock %}
 
-    <script>
-    let sortState = {
-        column: null,
-        ascending: false
-    };
+{% block content %}
+<h1>Passing Stats</h1>
 
-    function sortTable(columnIndex) {
-        const table = document.getElementById("statsTable");
-        const tbody = table.tBodies[0];
-        const rows = Array.from(tbody.rows);
+{% if players %}
+<table id="statsTable">
+    <thead>
+        <tr>
+            <th onclick="sortTable(0)">Team<span id="arrow-0" class="arrow"></span></th>
+            <th onclick="sortTable(1)">Player<span id="arrow-1" class="arrow"></span></th>
+            <th onclick="sortTable(2)">Yards<span id="arrow-2" class="arrow"></span></th>
+            <th onclick="sortTable(3)">Comp<span id="arrow-3" class="arrow"></span></th>
+            <th onclick="sortTable(4)">Att<span id="arrow-4" class="arrow"></span></th>
+            <th onclick="sortTable(5)">TD<span id="arrow-5" class="arrow"></span></th>
+            <th onclick="sortTable(6)">INT<span id="arrow-6" class="arrow"></span></th>
+            <th onclick="sortTable(7)">Comp%<span id="arrow-7" class="arrow"></span></th>
+            <th onclick="sortTable(8)">YPG<span id="arrow-8" class="arrow"></span></th>
+            <th onclick="sortTable(9)">Rating<span id="arrow-9" class="arrow"></span></th>
+            <th onclick="sortTable(10)">YPA<span id="arrow-10" class="arrow"></span></th>
+            <th onclick="sortTable(11)">Long<span id="arrow-11" class="arrow"></span></th>
+            <th onclick="sortTable(12)">Sacks<span id="arrow-12" class="arrow"></span></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in players %}
+        <tr>
+            <td>{{ p.team }}</td>
+            <td>{{ p.name }}</td>
+            <td>{{ p.passYds }}</td>
+            <td>{{ p.passComp }}</td>
+            <td>{{ p.passAtt }}</td>
+            <td>{{ p.passTDs }}</td>
+            <td>{{ p.passINTs }}</td>
+            <td>{{ "%.1f"|format(p.passCompPct or 0) }}</td>
+            <td>{{ "%.1f"|format(p.passYdsPerGame or 0) }}</td>
+            <td>{{ "%.1f"|format(p.passRating or 0) }}</td>
+            <td>{{ "%.1f"|format(p.passYdsPerAtt or 0) }}</td>
+            <td>{{ p.passLng }}</td>
+            <td>{{ p.passSacked }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No stats available.</p>
+{% endif %}
 
-        const isNumeric = !isNaN(rows[0].cells[columnIndex].innerText.trim());
+<script>
+let sortState = {
+    column: null,
+    ascending: false
+};
 
-        if (sortState.column === columnIndex) {
-            sortState.ascending = !sortState.ascending;
-        } else {
-            sortState.column = columnIndex;
-            sortState.ascending = false; // default to descending first
-        }
+function sortTable(columnIndex) {
+    const table = document.getElementById("statsTable");
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.rows);
 
-        rows.sort((a, b) => {
-            const aText = a.cells[columnIndex].innerText.trim();
-            const bText = b.cells[columnIndex].innerText.trim();
+    const isNumeric = !isNaN(rows[0].cells[columnIndex].innerText.trim());
 
-            if (isNumeric) {
-                const aVal = parseFloat(aText);
-                const bVal = parseFloat(bText);
-                return sortState.ascending ? aVal - bVal : bVal - aVal;
-            } else {
-                return sortState.ascending
-                    ? aText.localeCompare(bText)
-                    : bText.localeCompare(aText);
-            }
-        });
-
-        // Clear all arrows
-        document.querySelectorAll(".arrow").forEach(el => el.innerText = "");
-
-        // Set arrow on the active column
-        const arrow = document.getElementById("arrow-" + columnIndex);
-        arrow.innerText = sortState.ascending ? "▲" : "▼";
-
-        // Append sorted rows back
-        rows.forEach(row => tbody.appendChild(row));
+    if (sortState.column === columnIndex) {
+        sortState.ascending = !sortState.ascending;
+    } else {
+        sortState.column = columnIndex;
+        sortState.ascending = false;
     }
-    </script>
 
-</body>
-</html>
+    rows.sort((a, b) => {
+        const aText = a.cells[columnIndex].innerText.trim();
+        const bText = b.cells[columnIndex].innerText.trim();
+
+        if (isNumeric) {
+            const aVal = parseFloat(aText);
+            const bVal = parseFloat(bText);
+            return sortState.ascending ? aVal - bVal : bVal - aVal;
+        } else {
+            return sortState.ascending
+                ? aText.localeCompare(bText)
+                : bText.localeCompare(aText);
+        }
+    });
+
+    document.querySelectorAll(".arrow").forEach(el => el.innerText = "");
+
+    const arrow = document.getElementById("arrow-" + columnIndex);
+    arrow.innerText = sortState.ascending ? "▲" : "▼";
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>
+{% endblock %}
