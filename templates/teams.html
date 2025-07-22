@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teams</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 8px 12px;
+            text-align: center;
+            border: 1px solid #ccc;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teams</h1>
+    {% if teams %}
+    <table>
+        <thead>
+            <tr>
+                <th>Team ID</th>
+                <th>Team Name</th>
+                <th>Abbreviation</th>
+                <th>User Name</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for team in teams %}
+            <tr>
+                <td>{{ team.teamId }}</td>
+                <td>{{ team.teamName }}</td>
+                <td>{{ team.teamAbbr }}</td>
+                <td>{{ team.userName }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No teams loaded yet.</p>
+    {% endif %}
+</body>
+</html>

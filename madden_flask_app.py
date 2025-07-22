@@ -27,10 +27,15 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 league_data = {}
 
 
+import re
+
 @app.route('/')
 def home():
     base_path = app.config['UPLOAD_FOLDER']
     leagues = []
+    latest_season = None
+    latest_week = None
+    latest_league_id = None
 
     if os.path.exists(base_path):
         for league_id in os.listdir(base_path):
@@ -42,9 +47,25 @@ def home():
                     if os.path.isdir(season_path):
                         weeks = [w for w in os.listdir(season_path) if os.path.isdir(os.path.join(season_path, w))]
                         seasons.append({'name': season, 'weeks': sorted(weeks)})
+
+                        # ✅ Only consider valid season_X for latest detection
+                        if re.match(r'^season_\d+$', season):
+                            if not latest_season or season > latest_season:
+                                latest_season = season
+                                latest_week = sorted(weeks)[-1] if weeks else None
+                                latest_league_id = league_id
+
                 leagues.append({'id': league_id, 'seasons': seasons})
 
-    return render_template('index.html', leagues=leagues)
+    return render_template(
+        'index.html',
+        leagues=leagues,
+        latest_league=latest_league_id,
+        latest_season=latest_season,
+        latest_week=latest_week
+    )
+
+
 
 
 @app.route('/upload', methods=['POST'])
