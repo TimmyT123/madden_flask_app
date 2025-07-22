@@ -69,9 +69,14 @@ def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 
-@app.route('/teams', methods=['GET'])
+@app.route('/api/teams', methods=['GET'])
 def get_teams():
-    return jsonify(league_data.get('teams', []))
+    # Try to find the key that contains the team list
+    for key, value in league_data.items():
+        if "leagueTeamInfoList" in value:
+            return jsonify(value["leagueTeamInfoList"])
+    return jsonify({'error': 'No team data found'}), 404
+
 
 
 @app.route('/teams/<team_name>', methods=['GET'])
@@ -150,10 +155,11 @@ def process_webhook_data(data, subpath, headers, body):
     elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         filename = "league.json"
         print("🏈 League Info received and saved!")
-
         # Normalize key to "teamInfoList"
         if "leagueTeamInfoList" in data and "teamInfoList" not in data:
             data["teamInfoList"] = data["leagueTeamInfoList"]
+
+        league_data["teams"] = data["leagueTeamInfoList"]  # saving teams in league_data
 
     else:
         filename = f"{subpath.replace('/', '_')}.json"
@@ -304,6 +310,34 @@ def show_stats():
     pprint.pprint(players[0])
 
     return render_template("stats.html", players=players)
+
+
+@app.route('/teams')
+def show_teams():
+    teams = league_data.get("teams", [])
+    team_id_to_info = {}
+
+    # Load team_map.json if it exists
+    try:
+        with open("uploads/17287266/team_map.json") as f:
+            team_id_to_info = json.load(f)
+    except Exception as e:
+        print("⚠️ team_map.json not found or unreadable:", e)
+
+    # Fill in missing info from team_map
+    for team in teams:
+        info = team_id_to_info.get(str(team.get("teamId")))
+        if info:
+            if not team.get("teamName"):
+                team["teamName"] = info.get("name")
+            if not team.get("teamAbbr"):
+                team["teamAbbr"] = info.get("abbr")
+
+    if teams:
+        print("EXAMPLE TEAM:", teams[0])
+
+    return render_template("teams.html", teams=teams)
+
 
 
 import os
