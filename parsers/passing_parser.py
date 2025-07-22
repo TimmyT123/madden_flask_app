@@ -7,11 +7,22 @@ def parse_passing_stats(subpath, data, upload_folder):
         print("⚠️ No passing stats found")
         return None
 
+    # Try to load league info for team name mapping
+    league_path = os.path.join(upload_folder, "league.json")
+    if os.path.exists(league_path):
+        with open(league_path) as f:
+            league_data = json.load(f)
+        team_lookup = {team["teamId"]: team["displayName"] for team in league_data.get("leagueTeamInfoList", [])}
+    else:
+        team_lookup = {}
+
     parsed = []
     for player in data["playerPassingStatInfoList"]:
+        team_id = player.get("teamId")
         parsed.append({
             "name": player.get("fullName"),
-            "teamId": player.get("teamId"),
+            "teamId": team_id,
+            "teamName": team_lookup.get(team_id, "Unknown"),
             "week": player.get("weekIndex"),
             "season": player.get("seasonIndex"),
             "passYds": player.get("passYds"),

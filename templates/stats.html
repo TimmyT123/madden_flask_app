@@ -32,24 +32,25 @@
     <table id="statsTable">
         <thead>
             <tr>
-                <th onclick="sortTable(0)">Player</th>
-                <th onclick="sortTable(1)">Team</th>
-                <th onclick="sortTable(2)">Comp</th>
-                <th onclick="sortTable(3)">Yards</th>
-                <th onclick="sortTable(4)">TDs</th>
-                <th onclick="sortTable(5)">INTs</th>
-                <th onclick="sortTable(6)">Rating</th>
+                <th onclick="sortTable(0)">Team<span id="arrow-0" class="arrow"></span></th>
+                <th onclick="sortTable(1)">Player<span id="arrow-1" class="arrow"></span></th>
+                <th onclick="sortTable(2)">Yards<span id="arrow-2" class="arrow"></span></th>
+                <th onclick="sortTable(3)">TDs<span id="arrow-3" class="arrow"></span></th>
+                <th onclick="sortTable(4)">INTs<span id="arrow-4" class="arrow"></span></th>
+                <th onclick="sortTable(5)">Comp %<span id="arrow-5" class="arrow"></span></th>
+                <th onclick="sortTable(6)">Rating<span id="arrow-6" class="arrow"></span></th>
+
             </tr>
         </thead>
         <tbody>
             {% for p in players %}
             <tr>
-                <td>{{ p.fullName }}</td>
                 <td>{{ p.teamName }}</td>
-                <td>{{ p.passCompletions }}/{{ p.passAttempts }}</td>
+                <td>{{ p.name }}</td>
                 <td>{{ p.passYds }}</td>
                 <td>{{ p.passTDs }}</td>
                 <td>{{ p.passInts }}</td>
+                <td>{{ p.passCompPct | round(1) }}</td>
                 <td>{{ p.passerRating }}</td>
             </tr>
             {% endfor %}
