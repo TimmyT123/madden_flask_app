@@ -26,32 +26,26 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 league_data = {}
 
+
 @app.route('/')
 def home():
-    uploads_dir = app.config['UPLOAD_FOLDER']
+    base_path = app.config['UPLOAD_FOLDER']
     leagues = []
 
-    if os.path.exists(uploads_dir):
-        for league_id in os.listdir(uploads_dir):
-            league_path = os.path.join(uploads_dir, league_id)
+    if os.path.exists(base_path):
+        for league_id in os.listdir(base_path):
+            league_path = os.path.join(base_path, league_id)
             if os.path.isdir(league_path):
-                league = {"id": league_id, "seasons": []}
-
-                for season_name in os.listdir(league_path):
-                    season_path = os.path.join(league_path, season_name)
+                seasons = []
+                for season in os.listdir(league_path):
+                    season_path = os.path.join(league_path, season)
                     if os.path.isdir(season_path):
-                        season = {"name": season_name, "weeks": []}
+                        weeks = [w for w in os.listdir(season_path) if os.path.isdir(os.path.join(season_path, w))]
+                        seasons.append({'name': season, 'weeks': sorted(weeks)})
+                leagues.append({'id': league_id, 'seasons': seasons})
 
-                        for week_name in os.listdir(season_path):
-                            week_path = os.path.join(season_path, week_name)
-                            if os.path.isdir(week_path):
-                                season["weeks"].append(week_name)
+    return render_template('index.html', leagues=leagues)
 
-                        league["seasons"].append(season)
-
-                leagues.append(league)
-
-    return render_template("index.html", leagues=leagues)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -153,9 +147,14 @@ def process_webhook_data(data, subpath, headers, body):
     elif "rosterInfoList" in data:
         filename = "rosters.json"
         print("📥 Roster data received and saved!")
-    elif "teamInfoList" in data:
+    elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         filename = "league.json"
         print("🏈 League Info received and saved!")
+
+        # Normalize key to "teamInfoList"
+        if "leagueTeamInfoList" in data and "teamInfoList" not in data:
+            data["teamInfoList"] = data["leagueTeamInfoList"]
+
     else:
         filename = f"{subpath.replace('/', '_')}.json"
 
@@ -211,6 +210,9 @@ def process_webhook_data(data, subpath, headers, body):
     league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, f"season_{season_index}", f"week_{week_index}")
     os.makedirs(league_folder, exist_ok=True)
 
+    if filename == "league.json":
+        parse_league_info_data(data, subpath, league_folder)
+
     output_path = os.path.join(league_folder, filename)
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
@@ -263,26 +265,6 @@ def post_highlight_to_discord(message, file_path=None):
         print(f"❌ Failed to post to Discord: {response.status_code} {response.text}")
 
 
-@app.route('/')
-def index():
-    base_path = app.config['UPLOAD_FOLDER']
-    leagues = []
-
-    if os.path.exists(base_path):
-        for league_id in os.listdir(base_path):
-            league_path = os.path.join(base_path, league_id)
-            if os.path.isdir(league_path):
-                seasons = []
-                for season in os.listdir(league_path):
-                    season_path = os.path.join(league_path, season)
-                    if os.path.isdir(season_path):
-                        weeks = [w for w in os.listdir(season_path) if os.path.isdir(os.path.join(season_path, w))]
-                        seasons.append({'name': season, 'weeks': sorted(weeks)})
-                leagues.append({'id': league_id, 'seasons': seasons})
-
-    return render_template('index.html', leagues=leagues)
-
-
 @app.route('/stats')
 def show_stats():
     league = request.args.get("league")
@@ -324,5 +306,5 @@ import os
 if __name__ == '__main__':
     # Only run this if NOT on Render
     if not os.environ.get("RENDER"):
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        app.run(host='0.0.0.0', port=5000, debug=True)  #5000 for pi - 5001 for local: http://127.0.0.1:5000
 
