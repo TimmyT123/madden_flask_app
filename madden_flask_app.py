@@ -254,10 +254,11 @@ def process_webhook_data(data, subpath, headers, body):
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
 
-    # Optional latest version copy in league root
-    latest_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, filename)
-    with open(latest_path, 'w') as f:
-        json.dump(data, f, indent=4)
+    # Only store flat files in root for global data
+    if season_index == "global" and week_index == "global":
+        latest_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, filename)
+        with open(latest_path, 'w') as f:
+            json.dump(data, f, indent=4)
 
     print(f"✅ Data saved to {output_path}")
 
