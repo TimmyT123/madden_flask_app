@@ -26,11 +26,32 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 league_data = {}
 
-
 @app.route('/')
 def home():
-    return render_template("index.html")
+    uploads_dir = app.config['UPLOAD_FOLDER']
+    leagues = []
 
+    if os.path.exists(uploads_dir):
+        for league_id in os.listdir(uploads_dir):
+            league_path = os.path.join(uploads_dir, league_id)
+            if os.path.isdir(league_path):
+                league = {"id": league_id, "seasons": []}
+
+                for season_name in os.listdir(league_path):
+                    season_path = os.path.join(league_path, season_name)
+                    if os.path.isdir(season_path):
+                        season = {"name": season_name, "weeks": []}
+
+                        for week_name in os.listdir(season_path):
+                            week_path = os.path.join(season_path, week_name)
+                            if os.path.isdir(week_path):
+                                season["weeks"].append(week_name)
+
+                        league["seasons"].append(season)
+
+                leagues.append(league)
+
+    return render_template("index.html", leagues=leagues)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -93,7 +114,6 @@ def webhook(subpath):
     return 'OK', 200
 
 
-
 def process_webhook_data(data, subpath, headers, body):
     # ✅ 1. Save debug snapshot
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
@@ -142,20 +162,19 @@ def process_webhook_data(data, subpath, headers, body):
     # ✅ 5. Determine storage path
     parts = subpath.split('/')
     league_id = parts[1] if len(parts) > 1 else "unknown_league"
-    # Try top-level first
     season_index = data.get("seasonIndex") or data.get("season")
     week_index = data.get("weekIndex") or data.get("week")
 
-    # If not found, try nested inside first stat object
+    # Prefer extracting from stat blocks (schedule first)
     stat_lists = [
+        "scheduleInfoList",  # ✅ Highest priority
         "playerPassingStatInfoList",
         "playerReceivingStatInfoList",
         "playerRushingStatInfoList",
         "playerKickingStatInfoList",
         "playerPuntingStatInfoList",
         "playerDefensiveStatInfoList",
-        "teamStatInfoList",
-        "scheduleInfoList"
+        "teamStatInfoList"
     ]
 
     for key in stat_lists:
@@ -166,9 +185,28 @@ def process_webhook_data(data, subpath, headers, body):
                 week_index = week_index or first.get("weekIndex") or first.get("week")
             break
 
-    # Final fallback
+    # Manually set season/week for league-wide files
+    if "teamInfoList" in data:
+        season_index = season_index or "0"
+        week_index = week_index or "0"
+    elif "rosterInfoList" in data:
+        season_index = season_index or "0"
+        week_index = week_index or "0"
+
+    # Try to parse weekIndex from subpath (e.g., "week/reg/1")
+    import re
+    match = re.search(r'week/reg/(\d+)', subpath)
+    if match:
+        week_index = match.group(1)
+
+    # Fallbacks
     season_index = season_index if season_index is not None else "unknown_season"
     week_index = week_index if week_index is not None else "unknown_week"
+
+    # Global data override
+    if "leagueteams" in subpath or "standings" in subpath:
+        season_index = "global"
+        week_index = "global"
 
     league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, f"season_{season_index}", f"week_{week_index}")
     os.makedirs(league_folder, exist_ok=True)
@@ -177,7 +215,7 @@ def process_webhook_data(data, subpath, headers, body):
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
 
-    # Optional: also store latest version in league root
+    # Optional latest version copy in league root
     latest_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, filename)
     with open(latest_path, 'w') as f:
         json.dump(data, f, indent=4)
@@ -225,31 +263,59 @@ def post_highlight_to_discord(message, file_path=None):
         print(f"❌ Failed to post to Discord: {response.status_code} {response.text}")
 
 
+@app.route('/')
+def index():
+    base_path = app.config['UPLOAD_FOLDER']
+    leagues = []
+
+    if os.path.exists(base_path):
+        for league_id in os.listdir(base_path):
+            league_path = os.path.join(base_path, league_id)
+            if os.path.isdir(league_path):
+                seasons = []
+                for season in os.listdir(league_path):
+                    season_path = os.path.join(league_path, season)
+                    if os.path.isdir(season_path):
+                        weeks = [w for w in os.listdir(season_path) if os.path.isdir(os.path.join(season_path, w))]
+                        seasons.append({'name': season, 'weeks': sorted(weeks)})
+                leagues.append({'id': league_id, 'seasons': seasons})
+
+    return render_template('index.html', leagues=leagues)
+
+
 @app.route('/stats')
 def show_stats():
+    league = request.args.get("league")
+    season = request.args.get("season")
+    week = request.args.get("week")
+
+    if not league or not season or not week:
+        return "Missing league, season, or week", 400
+
     try:
-        # Load passing stats
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'passing.json')
+        # Dynamic path based on user input
+        base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, f"season_{season}", f"week_{week}")
+        filepath = os.path.join(base_path, "passing.json")
+
         with open(filepath) as f:
             data = json.load(f)
             players = data.get("playerPassingStatInfoList", [])
 
-        # Load team info (league.json)
-        league_path = os.path.join(app.config['UPLOAD_FOLDER'], 'league.json')
-        if os.path.exists(league_path):
-            with open(league_path) as f:
+        # Load team info
+        league_info_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "league.json")
+        teams = {}
+        if os.path.exists(league_info_path):
+            with open(league_info_path) as f:
                 league_data_file = json.load(f)
                 teams = {team["teamId"]: team["abbrName"] for team in league_data_file.get("teamInfoList", [])}
-        else:
-            teams = {}
 
         for p in players:
             p["teamName"] = teams.get(p.get("teamId"), "Unknown")
 
-
     except Exception as e:
         print(f"Error loading stats: {e}")
         players = []
+
     return render_template("stats.html", players=players)
 
 

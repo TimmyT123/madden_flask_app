@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-<img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
 <head>
     <title>Madden Dashboard</title>
     <style>
@@ -26,12 +25,96 @@
     </style>
 </head>
 <body>
+    <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
+
     <h1>🏈 Welcome to WURD Madden Franchise!</h1>
+    <h2>Select League, Season, and Week</h2>
+    <form action="/stats" method="get">
+        <label for="league">League ID:</label>
+        <select name="league" id="league" required onchange="populateSeasons()">
+            <option value="">-- Select League --</option>
+            {% for league in leagues %}
+                <option value="{{ league.id }}">{{ league.id }}</option>
+            {% endfor %}
+        </select><br>
+
+        <label for="season">Season:</label>
+        <select name="season" id="season" required onchange="populateWeeks()" disabled>
+            <option value="">-- Select Season --</option>
+        </select><br>
+
+        <label for="week">Week:</label>
+        <select name="week" id="week" required disabled>
+            <option value="">-- Select Week --</option>
+        </select><br><br>
+
+        <button type="submit">View Passing Stats</button>
+    </form>
+
     <ul>
         <li><a href="/stats">View Passing Stats</a></li>
         <li><a href="/schedule">View Schedule (coming soon)</a></li>
         <li><a href="/teams">View Teams (coming soon)</a></li>
         <li><a href="/uploads">View Uploads</a></li>
     </ul>
+
+    <script>
+        const leagueData = {{ leagues|tojson }};
+
+        function populateSeasons() {
+            const leagueId = document.getElementById("league").value;
+            const seasonSelect = document.getElementById("season");
+            const weekSelect = document.getElementById("week");
+
+            seasonSelect.innerHTML = '<option value="">-- Select Season --</option>';
+            weekSelect.innerHTML = '<option value="">-- Select Week --</option>';
+            weekSelect.disabled = true;
+
+            if (!leagueId) {
+                seasonSelect.disabled = true;
+                return;
+            }
+
+            const league = leagueData.find(l => l.id === leagueId);
+            if (!league) return;
+
+            league.seasons.forEach(s => {
+                const opt = document.createElement("option");
+                opt.value = s.name.replace("season_", "");
+                opt.text = s.name;
+
+                seasonSelect.appendChild(opt);
+            });
+
+            seasonSelect.disabled = false;
+        }
+
+        function populateWeeks() {
+            const leagueId = document.getElementById("league").value;
+            const seasonName = document.getElementById("season").value;
+            const weekSelect = document.getElementById("week");
+            weekSelect.innerHTML = '<option value="">-- Select Week --</option>';
+
+            if (!leagueId || !seasonName) {
+                weekSelect.disabled = true;
+                return;
+            }
+
+            const league = leagueData.find(l => l.id === leagueId);
+            const season = league.seasons.find(s => s.name.replace("season_", "") === seasonName);
+            if (!season) return;
+
+            season.weeks.forEach(w => {
+                const opt = document.createElement("option");
+                opt.value = w.replace("week_", "");
+                opt.text = w;
+                weekSelect.appendChild(opt);
+            });
+
+            weekSelect.disabled = false;
+        }
+    </script>
+
+
 </body>
 </html>
