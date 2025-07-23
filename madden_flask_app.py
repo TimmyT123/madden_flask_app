@@ -425,7 +425,6 @@ def show_schedule():
     return render_template("schedule.html", schedule=parsed_schedule)
 
 
-
 @app.route("/standings")
 def show_standings():
     league_id = "17287266"
@@ -451,11 +450,18 @@ def show_standings():
             if info:
                 team["name"] = info.get("name", "")
                 team["abbr"] = info.get("abbr", "")
+
+            # Fix streak value if it's 255 (means no streak)
+            if team.get("streak") == ' 255':
+                team["streak"] = 0
+
+        # Sort by win percentage
+        teams.sort(key=lambda x: x.get("pct") or 0, reverse=True)
+
     except Exception as e:
         print("⚠️ Failed to load standings:", e)
 
     return render_template("standings.html", teams=teams)
-
 
 
 import os
