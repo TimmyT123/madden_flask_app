@@ -450,9 +450,12 @@ def show_standings():
             if info:
                 team["name"] = info.get("name", "")
 
-            # Fix streak value if it's 255 (means no streak)
-            if team.get("streak") == ' 255':
-                team["streak"] = 0
+            # Fix streak value if it's in the 200s (means no streak)
+            try:
+                if 200 < int(str(team.get("streak")).strip()) <= 299:
+                    team["streak"] = '0'
+            except (ValueError, TypeError):
+                team["streak"] = '0'  # Optional: default/fallback
 
         # Sort by win percentage
         teams.sort(key=lambda x: x.get("pct") or 0, reverse=True)
