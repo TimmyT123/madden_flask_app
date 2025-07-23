@@ -146,16 +146,16 @@ def process_webhook_data(data, subpath, headers, body):
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # ✅ 2. Save timestamped archive
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    archive_name = f"webhook_debug_{timestamp}.txt"
-    archive_path = os.path.join(app.config['UPLOAD_FOLDER'], archive_name)
-    with open(archive_path, 'w') as f:
-        f.write(f"TIMESTAMP: {timestamp}\nSUBPATH: {subpath}\n\nHEADERS:\n")
-        for k, v in headers.items():
-            f.write(f"{k}: {v}\n")
-        f.write("\nBODY:\n")
-        f.write(body.decode('utf-8', errors='replace'))
+    # # ✅ 2. Save timestamped archive
+    # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # archive_name = f"webhook_debug_{timestamp}.txt"
+    # archive_path = os.path.join(app.config['UPLOAD_FOLDER'], archive_name)
+    # with open(archive_path, 'w') as f:
+    #     f.write(f"TIMESTAMP: {timestamp}\nSUBPATH: {subpath}\n\nHEADERS:\n")
+    #     for k, v in headers.items():
+    #         f.write(f"{k}: {v}\n")
+    #     f.write("\nBODY:\n")
+    #     f.write(body.decode('utf-8', errors='replace'))
 
     # ✅ 3. Check for Companion App error
     if 'error' in data:
