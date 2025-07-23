@@ -267,8 +267,8 @@ def process_webhook_data(data, subpath, headers, body):
         season_index = season_index or "0"
         week_index = week_index or "0"
     elif "rosterInfoList" in data:
-        season_index = season_index or "0"
-        week_index = week_index or "0"
+        season_index = "global"
+        week_index = "global"
 
     # Try to parse weekIndex from subpath (e.g., "week/reg/1")
     import re
