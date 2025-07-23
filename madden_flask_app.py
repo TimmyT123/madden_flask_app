@@ -13,6 +13,8 @@ from parsers.schedule_parser import parse_schedule_data
 from parsers.rosters_parser import parse_rosters_data
 from parsers.league_parser import parse_league_info_data
 from parsers.passing_parser import parse_passing_stats
+from parsers.standings_parser import parse_standings_data
+
 
 from flask import render_template
 
@@ -176,11 +178,19 @@ def process_webhook_data(data, subpath, headers, body):
     elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         filename = "league.json"
         print("🏈 League Info received and saved!")
-        # Normalize key to "teamInfoList"
+
+        # Normalize key
         if "leagueTeamInfoList" in data and "teamInfoList" not in data:
             data["teamInfoList"] = data["leagueTeamInfoList"]
 
-        league_data["teams"] = data["leagueTeamInfoList"]  # saving teams in league_data
+        if "teamInfoList" in data:
+            league_data["teams"] = data["teamInfoList"]
+
+    elif "teamStandingInfoList" in data:
+        filename = "standings.json"
+        print("📊 Standings data received and saved!")
+
+        # Don't touch league_data here — standings data doesn't contain team info
 
     else:
         filename = f"{subpath.replace('/', '_')}.json"
@@ -271,6 +281,8 @@ def process_webhook_data(data, subpath, headers, body):
         parse_rosters_data(data, subpath, league_folder)
     elif "teamInfoList" in data:
         parse_league_info_data(data, subpath, league_folder)
+    elif "teamStandingInfoList" in data:
+        parse_standings_data(data, subpath, league_folder)
 
     # ✅ 7. Save in-memory reference
     league_data[subpath] = data
@@ -346,29 +358,35 @@ def show_stats():
 
 @app.route('/teams')
 def show_teams():
-    teams = league_data.get("teams", [])
-    team_id_to_info = {}
+    league_id = "17287266"
+    league_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global", "league.json")
+    team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "team_map.json")
 
-    # Load team_map.json if it exists
-    try:
-        with open("uploads/17287266/team_map.json") as f:
-            team_id_to_info = json.load(f)
-    except Exception as e:
-        print("⚠️ team_map.json not found or unreadable:", e)
+    teams = []
 
-    # Fill in missing info from team_map
+    # Load league.json
+    if os.path.exists(league_path):
+        with open(league_path, 'r') as f:
+            data = json.load(f)
+            teams = data.get("leagueTeamInfoList") or data.get("teamInfoList") or []
+
+    # Load team_map.json
+    team_map = {}
+    if os.path.exists(team_map_path):
+        with open(team_map_path, 'r') as f:
+            team_map = json.load(f)
+
+    # Merge overrides from team_map
     for team in teams:
-        info = team_id_to_info.get(str(team.get("teamId")))
-        if info:
-            if not team.get("teamName"):
-                team["teamName"] = info.get("name")
-            if not team.get("teamAbbr"):
-                team["teamAbbr"] = info.get("abbr")
-
-    # if teams:
-    #     print("EXAMPLE TEAM:", teams[0])
+        tid = str(team.get("teamId"))
+        if tid in team_map:
+            overrides = team_map[tid]
+            team["teamName"] = overrides.get("name", team.get("teamName", ""))
+            team["teamAbbr"] = overrides.get("abbr", team.get("teamAbbr", ""))
+            team["userName"] = overrides.get("user", team.get("userName", ""))
 
     return render_template("teams.html", teams=teams)
+
 
 
 @app.route('/schedule')
@@ -395,6 +413,37 @@ def show_schedule():
         game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", game["awayTeamId"])
 
     return render_template("schedule.html", schedule=parsed_schedule)
+
+
+@app.route("/standings")
+def show_standings():
+    league_id = "17287266"
+    folder = f"uploads/{league_id}/season_global/week_global"
+    standings_file = os.path.join(folder, "parsed_standings.json")
+
+    teams = []
+    team_map_path = os.path.join("uploads", league_id, "team_map.json")
+    team_id_to_info = {}
+
+    try:
+        with open(team_map_path) as f:
+            team_id_to_info = json.load(f)
+    except:
+        pass
+
+    try:
+        with open(standings_file) as f:
+            teams = json.load(f)
+
+        for team in teams:
+            info = team_id_to_info.get(str(team["teamId"]))
+            if info:
+                team["name"] = info.get("name", "")
+                team["abbr"] = info.get("abbr", "")
+    except Exception as e:
+        print("⚠️ Failed to load standings:", e)
+
+    return render_template("standings.html", teams=teams)
 
 
 

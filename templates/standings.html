@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🏆 League Standings</h1>
+{% if teams %}
+<table>
+  <tr>
+    <th>Team</th><th>W</th><th>L</th><th>T</th><th>PCT</th><th>PF</th><th>PA</th><th>Streak</th>
+    <th>Div W</th><th>Div L</th><th>Div T</th>
+    <th>Conf W</th><th>Conf L</th><th>Conf T</th>
+  </tr>
+  {% for team in teams %}
+  <tr>
+    <td>{{ team.abbr or team.teamId }}</td>
+    <td>{{ team.wins }}</td><td>{{ team.losses }}</td><td>{{ team.ties }}</td><td>{{ "%.3f"|format(team.pct or 0) }}</td>
+    <td>{{ team.pointsFor }}</td><td>{{ team.pointsAgainst }}</td><td>{{ team.streak }}</td>
+    <td>{{ team.divWins }}</td><td>{{ team.divLosses }}</td><td>{{ team.divTies }}</td>
+    <td>{{ team.confWins }}</td><td>{{ team.confLosses }}</td><td>{{ team.confTies }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No standings data available.</p>
+{% endif %}
+{% endblock %}
