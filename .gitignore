@@ -23,10 +23,6 @@ Thumbs.db
 # Environment files
 .env
 
-# Ignore webhook debug files
-webhook_debug.txt
-webhook_debug_*.txt
-
 # No pics
 *.png
 *.jpg
