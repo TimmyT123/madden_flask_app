@@ -1,0 +1,23 @@
+
+===== NEW WEBHOOK: ps5/17287266/passing/ps5/17287266/week/reg/2/kicking =====
+HEADERS:
+Host: wurd-madden.com
+User-Agent: Dalvik/2.1.0 (Linux; U; Android 15; SM-S936U Build/AP3A.240905.015.A2)
+Content-Length: 1937
+Accept: application/json
+Accept-Charset: UTF-8
+Accept-Encoding: gzip, br
+Cdn-Loop: cloudflare; loops=1
+Cf-Connecting-Ip: 2607:fb90:2d98:927:88fb:4e9a:9828:aa51
+Cf-Ipcountry: US
+Cf-Ray: 963bdf93fdd10527-PHX
+Cf-Visitor: {"scheme":"https"}
+Cf-Warp-Tag-Id: 026816f7-58c0-46b5-9288-d2d6904a1ca3
+Connection: keep-alive
+Content-Type: application/json
+X-Forwarded-For: 2607:fb90:2d98:927:88fb:4e9a:9828:aa51
+X-Forwarded-Proto: https
+
+BODY:
+{"playerKickingStatInfoList":[{"kickPts":0,"fGAtt":0,"fG50PlusAtt":0,"fG50PlusMade":0,"fGLongest":0,"fGMade":0,"fGCompPct":0,"fullName":"Y.Obeid","kickoffAtt":2,"kickoffTBs":2,"rosterId":551028826,"scheduleId":543031369,"seasonIndex":4,"statId":545652994,"stageIndex":1,"teamId":759955456,"weekIndex":1,"xPAtt":0,"xPMade":0,"xPCompPct":0},{"kickPts":0,"fGAtt":1,"fG50PlusAtt":0,"fG50PlusMade":0,"fGLongest":0,"fGMade":0,"fGCompPct":0,"fullName":"M.Palardy","kickoffAtt":0,"kickoffTBs":0,"rosterId":551029829,"scheduleId":543031369,"seasonIndex":4,"statId":545653077,"stageIndex":1,"teamId":759955456,"weekIndex":1,"xPAtt":1,"xPMade":1,"xPCompPct":100},{"kickPts":0,"fGAtt":0,"fG50PlusAtt":0,"fG50PlusMade":0,"fGLongest":0,"fGMade":0,"fGCompPct":0,"fullName":"J.Browning","kickoffAtt":11,"kickoffTBs":11,"rosterId":551029810,"scheduleId":543031369,"seasonIndex":4,"statId":545652797,"stageIndex":1,"teamId":759955479,"weekIndex":1,"xPAtt":0,"xPMade":0,"xPCompPct":0},{"kickPts":0,"fGAtt":2,"fG50PlusAtt":0,"fG50PlusMade":0,"fGLongest":48,"fGMade":2,"fGCompPct":100,"fullName":"J.Moody","kickoffAtt":0,"kickoffTBs":0,"rosterId":551028576,"scheduleId":543031369,"seasonIndex":4,"statId":545653765,"stageIndex":1,"teamId":759955479,"weekIndex":1,"xPAtt":8,"xPMade":8,"xPCompPct":100},{"kickPts":0,"fGAtt":0,"fG50PlusAtt":0,"fG50PlusMade":0,"fGLongest":0,"fGMade":0,"fGCompPct":0,"fullName":"C.Little","kickoffAtt":3,"kickoffTBs":0,"rosterId":551028330,"scheduleId":543031358,"seasonIndex":4,"statId":545652864,"stageIndex":1,"teamId":759955477,"weekIndex":1,"xPAtt":2,"xPMade":2,"xPCompPct":100},{"kickPts":0,"fGAtt":3,"fG50PlusAtt":1,"fG50PlusMade":1,"fGLongest":56,"fGMade":3,"fGCompPct":100,"fullName":"B.Aubrey","kickoffAtt":10,"kickoffTBs":0,"rosterId":551026792,"scheduleId":543031358,"seasonIndex":4,"statId":545653188,"stageIndex":1,"teamId":759955484,"weekIndex":1,"xPAtt":6,"xPMade":6,"xPCompPct":100}],"message":"","success":true}
+

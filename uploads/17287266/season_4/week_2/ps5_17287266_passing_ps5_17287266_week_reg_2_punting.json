@@ -1,0 +1,44 @@
+{
+    "playerPuntingStatInfoList": [
+        {
+            "fullName": "M.Palardy",
+            "puntsBlocked": 0,
+            "puntsIn20": 0,
+            "puntLongest": 41,
+            "puntTBs": 0,
+            "puntNetYdsPerAtt": 34,
+            "puntNetYds": 34,
+            "puntAtt": 1,
+            "puntYdsPerAtt": 41,
+            "puntYds": 41,
+            "rosterId": 551029829,
+            "scheduleId": 543031369,
+            "seasonIndex": 4,
+            "statId": 545653077,
+            "stageIndex": 1,
+            "teamId": 759955456,
+            "weekIndex": 1
+        },
+        {
+            "fullName": "C.Little",
+            "puntsBlocked": 0,
+            "puntsIn20": 1,
+            "puntLongest": 45,
+            "puntTBs": 0,
+            "puntNetYdsPerAtt": 36.5,
+            "puntNetYds": 73,
+            "puntAtt": 2,
+            "puntYdsPerAtt": 36.5,
+            "puntYds": 73,
+            "rosterId": 551028330,
+            "scheduleId": 543031358,
+            "seasonIndex": 4,
+            "statId": 545652864,
+            "stageIndex": 1,
+            "teamId": 759955477,
+            "weekIndex": 1
+        }
+    ],
+    "message": "",
+    "success": true
+}
