@@ -55,7 +55,6 @@ def home():
                         weeks = [w for w in os.listdir(season_path) if os.path.isdir(os.path.join(season_path, w))]
                         seasons.append({'name': season, 'weeks': sorted(weeks)})
 
-                        # ✅ Only consider valid season_X for latest detection
                         if re.match(r'^season_\d+$', season):
                             if not latest_season or season > latest_season:
                                 latest_season = season
@@ -63,6 +62,11 @@ def home():
                                 latest_league_id = league_id
 
                 leagues.append({'id': league_id, 'seasons': seasons})
+
+    # 💾 Save latest season/week to memory
+    league_data["latest_season"] = latest_season
+    league_data["latest_week"] = latest_week
+    league_data["latest_league"] = latest_league_id
 
     return render_template(
         'index.html',
@@ -355,8 +359,8 @@ def post_highlight_to_discord(message, file_path=None):
 @app.route('/stats')
 def show_stats():
     league = request.args.get("league")
-    season = request.args.get("season")
-    week = request.args.get("week")
+    season = request.args.get("season") or league_data.get("latest_season")
+    week = request.args.get("week") or league_data.get("latest_week")
 
     if not league or not season or not week:
         return "Missing league, season, or week", 400
@@ -429,32 +433,33 @@ import glob
 
 @app.route('/schedule')
 def show_schedule():
-    league_id = "17287266"  # You can make this dynamic later
-
-    # ✅ Walk through uploads to find parsed_schedule.json
-    schedule_path = None
-    league_dir = os.path.join(app.config['UPLOAD_FOLDER'], league_id)
-    for root, dirs, files in os.walk(league_dir):
-        if "parsed_schedule.json" in files:
-            schedule_path = os.path.join(root, "parsed_schedule.json")
-            break
+    league_id = league_data.get("latest_league", "17287266")
+    season = request.args.get("season") or league_data.get("latest_season")
+    week = request.args.get("week") or league_data.get("latest_week")
 
     parsed_schedule = []
-    if schedule_path and os.path.exists(schedule_path):
-        with open(schedule_path) as f:
-            try:
-                parsed_schedule = json.load(f)
-            except json.JSONDecodeError:
-                print("❌ Failed to parse JSON in schedule file.")
+    if league_id and season and week:
+        schedule_path = os.path.join(
+            app.config['UPLOAD_FOLDER'],
+            league_id,
+            season,
+            week,
+            "parsed_schedule.json"
+        )
+        if os.path.exists(schedule_path):
+            with open(schedule_path) as f:
+                try:
+                    parsed_schedule = json.load(f)
+                except json.JSONDecodeError:
+                    print("❌ Failed to parse JSON in schedule file.")
 
-    # ✅ Load team_map.json
+    # Load team_map.json
+    team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "team_map.json")
     team_map = {}
-    team_map_path = os.path.join(league_dir, "team_map.json")
     if os.path.exists(team_map_path):
         with open(team_map_path) as f:
             team_map = json.load(f)
 
-    # ✅ Map team IDs to readable names
     for game in parsed_schedule:
         game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", str(game["homeTeamId"]))
         game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", str(game["awayTeamId"]))

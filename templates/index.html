@@ -4,6 +4,7 @@
     <title>Madden Dashboard</title>
     <style>
         body {
+            background-color: #E8E8E8; /* light gray */
             text-align: center;
             font-family: Arial, sans-serif;
         }
@@ -30,25 +31,41 @@
     <h1>🏈 Welcome to WURD Madden Franchise!</h1>
     <h2>Select Season and Week</h2>
 
-    <form action="/stats" method="get">
-        <input type="hidden" name="league" id="league" value="{{ latest_league }}">
-
+    <form id="navForm" method="get" onsubmit="return false;">
         <label for="season">Season:</label>
-        <select name="season" id="season" required onchange="populateWeeks()">
-            <option value="">-- Select Season --</option>
-        </select><br>
+        <select name="season" id="season">
+            {% for league in leagues %}
+                {% for season in league.seasons %}
+                    <option value="{{ season.name | replace('season_', '') }}"
+                        {% if season.name == latest_season %}selected{% endif %}>
+                        {{ season.name }}
+                    </option>
+                {% endfor %}
+            {% endfor %}
+        </select>
 
         <label for="week">Week:</label>
-        <select name="week" id="week" required>
-            <option value="">-- Select Week --</option>
-        </select><br><br>
+        <select name="week" id="week">
+            {% for league in leagues %}
+                {% for season in league.seasons %}
+                    {% if season.name == latest_season %}
+                        {% for w in season.weeks %}
+                            <option value="{{ w | replace('week_', '') }}"
+                                {% if w == latest_week %}selected{% endif %}>
+                                {{ w }}
+                            </option>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+        </select>
     </form>
 
     <ul>
-        <li><a href="#" onclick="goToStats()">View Passing Stats</a></li>
-        <li><a href="/schedule">View Schedule</a></li>
+        <li><a href="#" id="statsLink" onclick="goToStats()">View Passing Stats</a></li>
+        <li><a href="#" id="scheduleLink" onclick="goToSchedule()">View Schedule</a></li>
         <li><a href="/teams">View Teams</a></li>
-        <li><a href="/standings">View Standings</a></li>
+        <li><a href="#" id="standingsLink" onclick="goToStandings()">View Standings</a></li>
     </ul>
 
     <script>
@@ -58,72 +75,85 @@
         const latestWeek = "{{ latest_week }}";
 
         function populateSeasons() {
-            const leagueId = latestLeague;
             const seasonSelect = document.getElementById("season");
             const weekSelect = document.getElementById("week");
 
-            seasonSelect.innerHTML = '<option value="">-- Select Season --</option>';
-            weekSelect.innerHTML = '<option value="">-- Select Week --</option>';
+            seasonSelect.innerHTML = '';
+            weekSelect.innerHTML = '';
 
-            const league = leagueData.find(l => l.id === leagueId);
+            const league = leagueData.find(l => l.id === latestLeague);
             if (!league) return;
 
             league.seasons.forEach(s => {
-                // ⛔️ Skip global or unknown seasons
                 if (!/^season_\d+$/.test(s.name)) return;
 
-                const seasonValue = s.name.replace("season_", "");
+                const seasonVal = s.name.replace("season_", "");
                 const opt = document.createElement("option");
-                opt.value = seasonValue;
+                opt.value = seasonVal;
                 opt.text = s.name;
-                if (s.name === latestSeason) {
-                    opt.selected = true;
-                }
+                if (s.name === latestSeason) opt.selected = true;
                 seasonSelect.appendChild(opt);
             });
 
-            populateWeeks(); // auto-populate weeks for selected season
+            populateWeeks();
         }
 
-
         function populateWeeks() {
-            const leagueId = latestLeague;
-            const seasonName = document.getElementById("season").value;
+            const seasonVal = document.getElementById("season").value;
             const weekSelect = document.getElementById("week");
 
-            weekSelect.innerHTML = '<option value="">-- Select Week --</option>';
+            weekSelect.innerHTML = '';
 
-            const league = leagueData.find(l => l.id === leagueId);
-            const season = league?.seasons?.find(s => s.name === "season_" + seasonName);
+            const league = leagueData.find(l => l.id === latestLeague);
+            const season = league?.seasons?.find(s => s.name === "season_" + seasonVal);
             if (!season) return;
 
             season.weeks.forEach(w => {
-                const weekValue = w.replace("week_", "");
+                const weekVal = w.replace("week_", "");
                 const opt = document.createElement("option");
-                opt.value = weekValue;
+                opt.value = weekVal;
                 opt.text = w;
-                if (w === latestWeek) {
-                    opt.selected = true;
-                }
+                if (w === latestWeek) opt.selected = true;
                 weekSelect.appendChild(opt);
             });
         }
 
-        function goToStats() {
-            const league = document.getElementById("league").value;
+        function getDropdownValues() {
+            const league = latestLeague;
             const season = document.getElementById("season").value;
             const week = document.getElementById("week").value;
+            return { league, season, week };
+        }
 
-            if (!league || !season || !week) {
-                alert("Please select League, Season, and Week first.");
+        function goToStats() {
+            const { league, season, week } = getDropdownValues();
+            if (!season || !week) {
+                alert("Please select Season and Week.");
                 return;
             }
+            window.location.href = `/stats?league=${league}&season=${season}&week=${week}`;
+        }
 
-            const url = `/stats?league=${league}&season=${season}&week=${week}`;
-            window.location.href = url;
+        function goToSchedule() {
+            const { season, week } = getDropdownValues();
+            if (!season || !week) {
+                alert("Please select Season and Week.");
+                return;
+            }
+            window.location.href = `/schedule?season=season_${season}&week=week_${week}`;
+        }
+
+        function goToStandings() {
+            const { season, week } = getDropdownValues();
+            if (!season || !week) {
+                alert("Please select Season and Week.");
+                return;
+            }
+            window.location.href = `/standings?season=season_${season}&week=week_${week}`;
         }
 
         window.onload = populateSeasons;
+        document.getElementById("season").addEventListener("change", populateWeeks);
     </script>
 </body>
 </html>
