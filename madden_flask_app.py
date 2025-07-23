@@ -343,7 +343,7 @@ def show_stats():
         for p in players:
             team_id = str(p.get("teamId"))
             team_info = teams.get(team_id, {})
-            p["team"] = team_info.get("abbr", "Unknown")
+            p["team"] = team_info.get("name", "Unknown")
 
     except Exception as e:
         print(f"Error loading stats: {e}")
@@ -449,7 +449,6 @@ def show_standings():
             info = team_id_to_info.get(str(team["teamId"]))
             if info:
                 team["name"] = info.get("name", "")
-                team["abbr"] = info.get("abbr", "")
 
             # Fix streak value if it's 255 (means no streak)
             if team.get("streak") == ' 255':

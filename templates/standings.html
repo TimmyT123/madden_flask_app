@@ -10,7 +10,7 @@
   </tr>
   {% for team in teams %}
   <tr>
-    <td>{{ team.abbr or team.teamId }}</td>
+    <td>{{ team.name or team.teamId }}</td>
     <td>{{ team.wins }}</td><td>{{ team.losses }}</td><td>{{ team.ties }}</td><td>{{ "%.3f"|format(team.pct or 0) }}</td>
     <td>{{ team.pointsFor }}</td><td>{{ team.pointsAgainst }}</td><td>{{ team.streak }}</td>
     <td>{{ team.divWins }}</td><td>{{ team.divLosses }}</td><td>{{ team.divTies }}</td>
