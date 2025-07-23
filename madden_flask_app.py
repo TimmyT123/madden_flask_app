@@ -388,31 +388,42 @@ def show_teams():
     return render_template("teams.html", teams=teams)
 
 
+import glob
 
 @app.route('/schedule')
 def show_schedule():
-    league_id = "17287266"  # or dynamically from request.args if needed
-    schedule_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "schedule.json")
+    league_id = "17287266"  # You can make this dynamic later
+
+    # ✅ Walk through uploads to find parsed_schedule.json
+    schedule_path = None
+    league_dir = os.path.join(app.config['UPLOAD_FOLDER'], league_id)
+    for root, dirs, files in os.walk(league_dir):
+        if "parsed_schedule.json" in files:
+            schedule_path = os.path.join(root, "parsed_schedule.json")
+            break
 
     parsed_schedule = []
-    if os.path.exists(schedule_path):
+    if schedule_path and os.path.exists(schedule_path):
         with open(schedule_path) as f:
-            raw_data = json.load(f)
-            parsed_schedule = raw_data.get("gameScheduleInfoList", [])
+            try:
+                parsed_schedule = json.load(f)
+            except json.JSONDecodeError:
+                print("❌ Failed to parse JSON in schedule file.")
 
-    # Load team names (optional)
+    # ✅ Load team_map.json
     team_map = {}
-    team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "team_map.json")
+    team_map_path = os.path.join(league_dir, "team_map.json")
     if os.path.exists(team_map_path):
         with open(team_map_path) as f:
             team_map = json.load(f)
 
-    # Add readable names
+    # ✅ Map team IDs to readable names
     for game in parsed_schedule:
-        game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", game["homeTeamId"])
-        game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", game["awayTeamId"])
+        game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", str(game["homeTeamId"]))
+        game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", str(game["awayTeamId"]))
 
     return render_template("schedule.html", schedule=parsed_schedule)
+
 
 
 @app.route("/standings")

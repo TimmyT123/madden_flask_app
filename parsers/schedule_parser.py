@@ -17,7 +17,7 @@ def parse_schedule_data(data, subpath, upload_folder):
             "gameOfTheWeek": game.get("isGameOfTheWeek"),
         })
 
-    filename = os.path.join(upload_folder, f"parsed_{subpath.replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    filename = os.path.join(upload_folder, "parsed_schedule.json")
     with open(filename, "w") as f:
         json.dump(parsed, f, indent=2)
 

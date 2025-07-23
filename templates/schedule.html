@@ -9,7 +9,6 @@
 <table>
     <thead>
         <tr>
-            <th>Week</th>
             <th>Home</th>
             <th>Score</th>
             <th>Away</th>
@@ -20,7 +19,6 @@
     <tbody>
         {% for game in schedule %}
         <tr>
-            <td>{{ game.week }}</td>
             <td>{{ game.homeName }}</td>
             <td>{{ game.homeScore }} - {{ game.awayScore }}</td>
             <td>{{ game.awayName }}</td>
