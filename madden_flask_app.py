@@ -28,6 +28,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 league_data = {}
 
+batch_written = {
+    "league": False,
+    "stats": False,
+    "roster": False
+}
 
 import re
 
@@ -66,8 +71,6 @@ def home():
         latest_season=latest_season,
         latest_week=latest_week
     )
-
-
 
 
 @app.route('/upload', methods=['POST'])
@@ -156,6 +159,40 @@ def process_webhook_data(data, subpath, headers, body):
     #         f.write(f"{k}: {v}\n")
     #     f.write("\nBODY:\n")
     #     f.write(body.decode('utf-8', errors='replace'))
+
+
+    # 1️⃣ Determine batch type
+    if "standings" in subpath:
+        batch_type = "league"
+        filename = "webhook_debug_league.txt"
+    elif "kicking" in subpath:
+        batch_type = "stats"
+        filename = "webhook_debug_stats.txt"
+    elif "roster" in subpath:
+        batch_type = "roster"
+        filename = "webhook_debug_roster.txt"
+    else:
+        # Use fallback if not in a known batch
+        batch_type = "other"
+        filename = "webhook_debug_misc.txt"
+
+    debug_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    # 2️⃣ Write or append
+    mode = 'w' if not batch_written.get(batch_type) else 'a'
+    with open(debug_path, mode) as f:
+        f.write(f"\n===== NEW WEBHOOK: {subpath} =====\n")
+        f.write("HEADERS:\n")
+        for k, v in headers.items():
+            f.write(f"{k}: {v}\n")
+        f.write("\nBODY:\n")
+        f.write(body.decode('utf-8', errors='replace'))
+        f.write("\n\n")
+
+    # 3️⃣ Mark this batch as written
+    if batch_type in batch_written:
+        batch_written[batch_type] = True
+
 
     # ✅ 3. Check for Companion App error
     if 'error' in data:
@@ -457,8 +494,18 @@ def show_standings():
             except (ValueError, TypeError):
                 team["streak"] = '0'  # Optional: default/fallback
 
-        # Sort by win percentage
-        teams.sort(key=lambda x: x.get("pct") or 0, reverse=True)
+        # sorting by the higher the PF compared to PA
+        def safe_int(val):
+            try:
+                return int(str(val).strip())
+            except:
+                return 0
+
+        teams.sort(
+            key=lambda x: (safe_int(x.get("pointsFor")) - safe_int(x.get("pointsAgainst"))),
+            reverse=True
+        )
+
 
     except Exception as e:
         print("⚠️ Failed to load standings:", e)
