@@ -539,9 +539,14 @@ def show_standings():
             except:
                 return 0
 
+        # Sort teams
         teams.sort(
-            key=lambda x: (safe_int(x.get("pointsFor")) - safe_int(x.get("pointsAgainst"))),
-            reverse=True
+            key=lambda t: (
+                -safe_int(t.get("wins", 0)),  # Most wins
+                safe_int(t.get("losses", 0)),  # Fewest losses
+                -(safe_int(t.get("pointsFor", 0)) - safe_int(t.get("pointsAgainst", 0))),  # Best point differential
+                -safe_int(t.get("pointsFor", 0))  # More points scored
+            )
         )
 
 

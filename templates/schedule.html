@@ -8,25 +8,38 @@
 {% if schedule %}
 <table>
     <thead>
-        <tr>
-            <th>Home</th>
-            <th>Score</th>
-            <th>Away</th>
-            <th>Status</th>
-            <th>Game of the Week</th>
-        </tr>
+      <tr>
+        <th>Away</th>
+        <th>Score</th>
+        <th>Home</th>
+        <th>Status</th>
+        <th>Game of the Week</th>
+      </tr>
     </thead>
+
     <tbody>
-        {% for game in schedule %}
-        <tr>
-            <td>{{ game.homeName }}</td>
-            <td>{{ game.homeScore }} - {{ game.awayScore }}</td>
-            <td>{{ game.awayName }}</td>
-            <td>{{ game.status }}</td>
-            <td>{% if game.gameOfTheWeek %}⭐{% endif %}</td>
-        </tr>
-        {% endfor %}
+      {% for game in schedule %}
+      <tr>
+        <td>{{ game.awayName }}</td>
+        <td>{{ game.awayScore }} - {{ game.homeScore }}</td>
+        <td>{{ game.homeName }}</td>
+        <td>
+          {% if game.status == 1 %}
+            Not Played
+          {% elif game.status == 2 %}
+            Away Won
+          {% elif game.status == 3 %}
+            Home Won
+          {% else %}
+            Unknown
+          {% endif %}
+        </td>
+
+        <td>{% if game.gameOfTheWeek %}⭐{% endif %}</td>
+      </tr>
+      {% endfor %}
     </tbody>
+
 </table>
 {% else %}
 <p>No schedule data available.</p>
