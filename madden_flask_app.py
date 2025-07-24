@@ -5,7 +5,8 @@ from datetime import datetime
 import os
 import json
 import requests
-from threading import Thread
+from threading import Timer
+from time import time
 
 from config import UPLOAD_FOLDER
 
@@ -33,6 +34,18 @@ batch_written = {
     "stats": False,
     "roster": False
 }
+
+webhook_buffer = {
+    "league": [],
+    "stats": [],
+    "roster": []
+}
+last_webhook_time = {
+    "league": 0,
+    "stats": 0,
+    "roster": 0
+}
+batch_timers = {}
 
 import re
 
@@ -153,18 +166,6 @@ def process_webhook_data(data, subpath, headers, body):
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # # ✅ 2. Save timestamped archive
-    # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # archive_name = f"webhook_debug_{timestamp}.txt"
-    # archive_path = os.path.join(app.config['UPLOAD_FOLDER'], archive_name)
-    # with open(archive_path, 'w') as f:
-    #     f.write(f"TIMESTAMP: {timestamp}\nSUBPATH: {subpath}\n\nHEADERS:\n")
-    #     for k, v in headers.items():
-    #         f.write(f"{k}: {v}\n")
-    #     f.write("\nBODY:\n")
-    #     f.write(body.decode('utf-8', errors='replace'))
-
-
     # 1️⃣ Determine batch type
     if "standings" in subpath:
         batch_type = "league"
@@ -182,21 +183,50 @@ def process_webhook_data(data, subpath, headers, body):
 
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
-    # 2️⃣ Write or append
-    mode = 'w' if not batch_written.get(batch_type) else 'a'
-    with open(debug_path, mode) as f:
-        f.write(f"\n===== NEW WEBHOOK: {subpath} =====\n")
-        f.write("HEADERS:\n")
-        for k, v in headers.items():
-            f.write(f"{k}: {v}\n")
-        f.write("\nBODY:\n")
-        f.write(body.decode('utf-8', errors='replace'))
-        f.write("\n\n")
+    # 🧠 Skip misc/other batches
+    if batch_type not in ["league", "stats", "roster"]:
+        # Write immediately for other types
+        with open(debug_path, 'a') as f:
+            f.write(f"\n===== NEW WEBHOOK: {subpath} =====\n")
+            f.write("HEADERS:\n")
+            for k, v in headers.items():
+                f.write(f"{k}: {v}\n")
+            f.write("\nBODY:\n")
+            f.write(body.decode('utf-8', errors='replace'))
+            f.write("\n\n")
+    else:
+        # Store current time
+        last_webhook_time[batch_type] = time()
 
-    # 3️⃣ Mark this batch as written
-    if batch_type in batch_written:
-        batch_written[batch_type] = True
+        # Buffer the data
+        webhook_buffer[batch_type].append({
+            "subpath": subpath,
+            "headers": headers,
+            "body": body.decode('utf-8', errors='replace')
+        })
 
+        # Cancel any existing flush timer
+        if batch_type in batch_timers and batch_timers[batch_type]:
+            batch_timers[batch_type].cancel()
+
+        # Set new flush timer
+        def flush_batch(bt=batch_type):
+            debug_path = os.path.join(app.config['UPLOAD_FOLDER'], f'webhook_debug_{bt}.txt')
+            with open(debug_path, 'w') as f:
+                for entry in webhook_buffer[bt]:
+                    f.write(f"\n===== NEW WEBHOOK: {entry['subpath']} =====\n")
+                    f.write("HEADERS:\n")
+                    for k, v in entry['headers'].items():
+                        f.write(f"{k}: {v}\n")
+                    f.write("\nBODY:\n")
+                    f.write(entry['body'])
+                    f.write("\n\n")
+            print(f"✅ Flushed {bt} batch with {len(webhook_buffer[bt])} webhooks.")
+            webhook_buffer[bt] = []
+
+        # Start or restart timer
+        batch_timers[batch_type] = Timer(5.0, flush_batch)
+        batch_timers[batch_type].start()
 
     # ✅ 3. Check for Companion App error
     if 'error' in data:
