@@ -539,15 +539,25 @@ def show_standings():
             except:
                 return 0
 
-        # Sort teams
+        # Sort by: overall W-L-T, then conf W-L-T, then div W-L-T
         teams.sort(
             key=lambda t: (
-                -safe_int(t.get("wins", 0)),  # Most wins
-                safe_int(t.get("losses", 0)),  # Fewest losses
-                -(safe_int(t.get("pointsFor", 0)) - safe_int(t.get("pointsAgainst", 0))),  # Best point differential
-                -safe_int(t.get("pointsFor", 0))  # More points scored
+                -safe_int(t.get("wins", 0)),
+                safe_int(t.get("losses", 0)),
+                safe_int(t.get("ties", 0)),
+
+                -safe_int(t.get("confWins", 0)),
+                safe_int(t.get("confLosses", 0)),
+                safe_int(t.get("confTies", 0)),
+
+                -safe_int(t.get("divWins", 0)),
+                safe_int(t.get("divLosses", 0)),
+                safe_int(t.get("divTies", 0)),
+
+                -(safe_int(t.get("pointsFor", 0)) - safe_int(t.get("pointsAgainst", 0)))  # point differential
             )
         )
+
 
 
     except Exception as e:
