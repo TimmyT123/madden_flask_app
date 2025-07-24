@@ -523,5 +523,5 @@ import os
 if __name__ == '__main__':
     # Only run this if NOT on Render
     if not os.environ.get("RENDER"):
-        app.run(host='0.0.0.0', port=5000, debug=True)  #5000 for pi - 5001 for local: http://127.0.0.1:5000
+        app.run(host='0.0.0.0', port=5000, debug=False)  #5000 for pi - 5001 for local: http://127.0.0.1:5000
 
