@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>🏆 League Standings</h1>
+
 {% if teams %}
 <table>
   <tr>
@@ -21,4 +22,38 @@
 {% else %}
 <p>No standings data available.</p>
 {% endif %}
+
+<h2>Division Standings</h2>
+{% for division, div_teams in divisions.items() %}
+  <h3>{{ division }}</h3>
+  <table>
+      <thead>
+          <tr>
+              <th>Team</th>
+              <th>W</th>
+              <th>L</th>
+              <th>T</th>
+              <th>Div W-L-T</th>
+              <th>PF</th>
+              <th>PA</th>
+              <th>Streak</th>
+          </tr>
+      </thead>
+      <tbody>
+          {% for team in div_teams %}
+          <tr>
+              <td>{{ team.name }}</td>
+              <td>{{ team.wins }}</td>
+              <td>{{ team.losses }}</td>
+              <td>{{ team.ties }}</td>
+              <td>{{ team.divWins }}-{{ team.divLosses }}-{{ team.divTies }}</td>
+              <td>{{ team.pointsFor }}</td>
+              <td>{{ team.pointsAgainst }}</td>
+              <td>{{ team.streak }}</td>
+          </tr>
+          {% endfor %}
+      </tbody>
+  </table>
+{% endfor %}
+
 {% endblock %}

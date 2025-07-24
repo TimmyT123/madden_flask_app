@@ -16,7 +16,8 @@ def parse_league_info_data(data, subpath, output_folder):
         team_map[team_id] = {
             "abbr": team.get("abbrName", ""),
             "name": team.get("displayName", ""),
-            "user": team.get("userName", "")
+            "user": team.get("userName", ""),
+            "divisionName": team.get("divName", "Unknown Division")
         }
 
     # Figure out where to store it

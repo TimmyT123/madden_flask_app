@@ -500,6 +500,8 @@ def show_schedule():
     return render_template("schedule.html", schedule=parsed_schedule)
 
 
+from collections import defaultdict
+
 @app.route("/standings")
 def show_standings():
     league_id = "17287266"
@@ -507,6 +509,7 @@ def show_standings():
     standings_file = os.path.join(folder, "parsed_standings.json")
 
     teams = []
+    divisions = defaultdict(list)
     team_map_path = os.path.join("uploads", league_id, "team_map.json")
     team_id_to_info = {}
 
@@ -520,50 +523,63 @@ def show_standings():
         with open(standings_file) as f:
             teams = json.load(f)
 
-        for team in teams:
-            info = team_id_to_info.get(str(team["teamId"]))
-            if info:
-                team["name"] = info.get("name", "")
-
-            # Fix streak value if it's in the 200s (means no streak)
-            try:
-                if 200 < int(str(team.get("streak")).strip()) <= 299:
-                    team["streak"] = '0'
-            except (ValueError, TypeError):
-                team["streak"] = '0'  # Optional: default/fallback
-
-        # sorting by the higher the PF compared to PA
         def safe_int(val):
             try:
                 return int(str(val).strip())
             except:
                 return 0
 
-        # Sort by: overall W-L-T, then conf W-L-T, then div W-L-T
+        for team in teams:
+            info = team_id_to_info.get(str(team["teamId"]))
+            if info:
+                team["name"] = info.get("name", "")
+                team["divisionName"] = info.get("divisionName", "Unknown Division")
+
+            # Fix streak
+            try:
+                if 200 < int(str(team.get("streak")).strip()) <= 299:
+                    team["streak"] = '0'
+            except (ValueError, TypeError):
+                team["streak"] = '0'
+
+            # Group into division
+            division_name = team.get("divisionName", "Unknown Division")
+            divisions[division_name].append(team)
+
+        # Sort overall
         teams.sort(
             key=lambda t: (
-                -safe_int(t.get("wins", 0)),
-                safe_int(t.get("losses", 0)),
-                safe_int(t.get("ties", 0)),
-
-                -safe_int(t.get("confWins", 0)),
-                safe_int(t.get("confLosses", 0)),
-                safe_int(t.get("confTies", 0)),
-
-                -safe_int(t.get("divWins", 0)),
-                safe_int(t.get("divLosses", 0)),
-                safe_int(t.get("divTies", 0)),
-
-                -(safe_int(t.get("pointsFor", 0)) - safe_int(t.get("pointsAgainst", 0)))  # point differential
+                -safe_int(t.get("wins")),
+                safe_int(t.get("losses")),
+                -safe_int(t.get("ties")),
+                -safe_int(t.get("confWins")),
+                safe_int(t.get("confLosses")),
+                -safe_int(t.get("confTies")),
+                -safe_int(t.get("divWins")),
+                safe_int(t.get("divLosses")),
+                -safe_int(t.get("divTies")),
+                -(safe_int(t.get("pointsFor")) - safe_int(t.get("pointsAgainst")))
             )
         )
 
-
+        # Sort within each division
+        for div in divisions:
+            divisions[div].sort(
+                key=lambda t: (
+                    -safe_int(t.get("wins")),
+                    safe_int(t.get("losses")),
+                    -safe_int(t.get("ties")),
+                    -safe_int(t.get("divWins")),
+                    safe_int(t.get("divLosses")),
+                    -safe_int(t.get("divTies")),
+                    -(safe_int(t.get("pointsFor")) - safe_int(t.get("pointsAgainst")))
+                )
+            )
 
     except Exception as e:
         print("⚠️ Failed to load standings:", e)
 
-    return render_template("standings.html", teams=teams)
+    return render_template("standings.html", teams=teams, divisions=divisions)
 
 
 import os
