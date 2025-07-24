@@ -38,9 +38,9 @@
     "scheduleId": 543031380,
     "homeTeamId": 759955489,
     "awayTeamId": 759955486,
-    "homeScore": 0,
-    "awayScore": 0,
-    "status": 1,
+    "homeScore": 32,
+    "awayScore": 14,
+    "status": 3,
     "gameOfTheWeek": false
   },
   {
@@ -93,9 +93,9 @@
     "scheduleId": 543031344,
     "homeTeamId": 759955463,
     "awayTeamId": 759955488,
-    "homeScore": 0,
-    "awayScore": 0,
-    "status": 1,
+    "homeScore": 49,
+    "awayScore": 42,
+    "status": 3,
     "gameOfTheWeek": false
   },
   {
@@ -115,9 +115,9 @@
     "scheduleId": 543031368,
     "homeTeamId": 759955487,
     "awayTeamId": 759955467,
-    "homeScore": 0,
-    "awayScore": 0,
-    "status": 1,
+    "homeScore": 17,
+    "awayScore": 63,
+    "status": 2,
     "gameOfTheWeek": false
   },
   {

@@ -19,6 +19,10 @@ from parsers.standings_parser import parse_standings_data
 
 from flask import render_template
 
+from dotenv import load_dotenv
+load_dotenv()
+
+
 print("🚀 Running Madden Flask App!")
 
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1395202722227290213/fbpHTWl3nwq0XxD-AKriIJSUdBhgqGhGoGxBScUQLBK2d_SxSlIHsCRAj6A3g55kz0aD"
@@ -167,17 +171,16 @@ def process_webhook_data(data, subpath, headers, body):
         f.write(body.decode('utf-8', errors='replace'))
 
     # 1️⃣ Determine batch type
-    if "standings" in subpath:
+    if "league" in subpath:
         batch_type = "league"
         filename = "webhook_debug_league.txt"
-    elif "kicking" in subpath:
+    elif any(x in subpath for x in ["passing", "kicking", "rushing", "receiving", "defense"]):
         batch_type = "stats"
         filename = "webhook_debug_stats.txt"
     elif "roster" in subpath:
         batch_type = "roster"
         filename = "webhook_debug_roster.txt"
     else:
-        # Use fallback if not in a known batch
         batch_type = "other"
         filename = "webhook_debug_misc.txt"
 
@@ -551,7 +554,7 @@ def show_standings():
 import os
 
 if __name__ == '__main__':
-    # Only run this if NOT on Render
-    if not os.environ.get("RENDER"):
-        app.run(host='0.0.0.0', port=5000, debug=False)  #5000 for pi - 5001 for local: http://127.0.0.1:5000
+    debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
+
 
