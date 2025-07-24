@@ -172,6 +172,25 @@
             "weekIndex": 1
         },
         {
+            "fullName": "M.Shipley",
+            "puntsBlocked": 0,
+            "puntsIn20": 0,
+            "puntLongest": 56,
+            "puntTBs": 2,
+            "puntNetYdsPerAtt": 48.6667,
+            "puntNetYds": 146,
+            "puntAtt": 3,
+            "puntYdsPerAtt": 48.6667,
+            "puntYds": 146,
+            "rosterId": 551029769,
+            "scheduleId": 543031363,
+            "seasonIndex": 4,
+            "statId": 545653450,
+            "stageIndex": 1,
+            "teamId": 759955461,
+            "weekIndex": 1
+        },
+        {
             "fullName": "M.Vassett",
             "puntsBlocked": 0,
             "puntsIn20": 1,

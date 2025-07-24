@@ -104,9 +104,9 @@
     "scheduleId": 543031363,
     "homeTeamId": 759955461,
     "awayTeamId": 759955490,
-    "homeScore": 0,
-    "awayScore": 0,
-    "status": 1,
+    "homeScore": 16,
+    "awayScore": 21,
+    "status": 2,
     "gameOfTheWeek": false
   },
   {

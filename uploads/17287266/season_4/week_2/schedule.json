@@ -109,15 +109,15 @@
             "weekIndex": 1
         },
         {
-            "awayScore": 0,
+            "awayScore": 21,
             "awayTeamId": 759955490,
             "isGameOfTheWeek": false,
-            "homeScore": 0,
+            "homeScore": 16,
             "homeTeamId": 759955461,
             "scheduleId": 543031363,
             "seasonIndex": 4,
             "stageIndex": 1,
-            "status": 1,
+            "status": 2,
             "weekIndex": 1
         },
         {
