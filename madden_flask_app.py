@@ -160,6 +160,25 @@ def webhook(subpath):
     return 'OK', 200
 
 
+def get_latest_season_week():
+    base_path = app.config['UPLOAD_FOLDER']
+    for league_id in os.listdir(base_path):
+        league_path = os.path.join(base_path, league_id)
+        if os.path.isdir(league_path):
+            seasons = [s for s in os.listdir(league_path) if s.startswith("season_")]
+            seasons.sort(reverse=True)
+            if seasons:
+                latest_season = seasons[0]
+                weeks_path = os.path.join(league_path, latest_season)
+                weeks = [w for w in os.listdir(weeks_path) if w.startswith("week_")]
+                weeks.sort(reverse=True)
+                if weeks:
+                    league_data["latest_league"] = league_id
+                    league_data["latest_season"] = latest_season
+                    league_data["latest_week"] = weeks[0]
+                    return
+
+
 def process_webhook_data(data, subpath, headers, body):
     # ✅ 1. Save debug snapshot
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
@@ -504,74 +523,126 @@ from collections import defaultdict
 
 @app.route("/standings")
 def show_standings():
-    league_id = "17287266"
-    folder = f"uploads/{league_id}/season_global/week_global"
-    standings_file = os.path.join(folder, "parsed_standings.json")
-
-    teams = []
-    divisions = defaultdict(list)
-    team_map_path = os.path.join("uploads", league_id, "team_map.json")
-    team_id_to_info = {}
-
-    def safe_int(val):
-        try:
-            return int(str(val).strip())
-        except:
-            return 0
-
     try:
-        with open(team_map_path) as f:
-            team_id_to_info = json.load(f)
-    except:
-        pass
+        league_id = "17287266"
+        folder = f"uploads/{league_id}/season_global/week_global"
+        standings_file = os.path.join(folder, "parsed_standings.json")
 
-    if os.path.exists(standings_file):
-        with open(standings_file) as f:
-            teams = json.load(f)
+        if not league_data.get("latest_season") or not league_data.get("latest_week"):
+            get_latest_season_week()
 
-        updated = False
+        season = league_data.get("latest_season")
+        week = league_data.get("latest_week")
+
+        teams = []
+        divisions = defaultdict(list)
+        team_map_path = os.path.join("uploads", league_id, "team_map.json")
+        team_id_to_info = {}
+
+        def safe_int(val):
+            try:
+                return int(str(val).strip())
+            except:
+                return 0
+
+        # Load team_map.json
+        try:
+            with open(team_map_path) as f:
+                team_id_to_info = json.load(f)
+        except:
+            pass
+
+        # Load standings
+        if os.path.exists(standings_file):
+            with open(standings_file) as f:
+                teams = json.load(f)
+
+            # Update team_map with latest seed/rank
+            updated = False
+            for team in teams:
+                tid = str(team["teamId"])
+                info = team_id_to_info.get(tid, {})
+                info["rank"] = team.get("rank")
+                info["seed"] = team.get("seed")
+                team_id_to_info[tid] = info
+                updated = True
+
+            if updated:
+                with open(team_map_path, "w") as f:
+                    json.dump(team_id_to_info, f, indent=2)
+
+        # Accumulate pointsFor and pointsAgainst across weeks
+        team_scores = defaultdict(lambda: {"pointsFor": 0, "pointsAgainst": 0})
+
+        try:
+            week_number = int(week.replace("week_", "")) if week.startswith("week_") else int(week)
+        except:
+            week_number = 0
+
+        print(f"📆 latest_season = {season}")
+        print(f"📆 latest_week = {week}")
+
+        for w in range(1, week_number + 1):
+            week_folder = os.path.join("uploads", league_id, season, f"week_{w}")
+            schedule_path = os.path.join(week_folder, "parsed_schedule.json")
+
+            if os.path.exists(schedule_path):
+                with open(schedule_path) as f:
+                    try:
+                        weekly_games = json.load(f)
+                    except:
+                        continue
+
+                    for game in weekly_games:
+                        home_id = str(game["homeTeamId"])
+                        away_id = str(game["awayTeamId"])
+                        home_pts = int(game.get("homeScore", 0))
+                        away_pts = int(game.get("awayScore", 0))
+
+                        team_scores[home_id]["pointsFor"] += home_pts
+                        team_scores[home_id]["pointsAgainst"] += away_pts
+
+                        team_scores[away_id]["pointsFor"] += away_pts
+                        team_scores[away_id]["pointsAgainst"] += home_pts
+
+        # Enhance team data with name, division, and points
         for team in teams:
             tid = str(team["teamId"])
             info = team_id_to_info.get(tid, {})
-            info["rank"] = team.get("rank")
-            info["seed"] = team.get("seed")
-            team_id_to_info[tid] = info
-            updated = True
+            team["name"] = info.get("name", "")
+            team["divisionName"] = info.get("divisionName", "Unknown Division")
+            team["pointsFor"] = team_scores[tid]["pointsFor"]
+            team["pointsAgainst"] = team_scores[tid]["pointsAgainst"]
 
-        if updated:
-            with open(team_map_path, "w") as f:
-                json.dump(team_id_to_info, f, indent=2)
-
-        for team in teams:
-            info = team_id_to_info.get(str(team["teamId"]))
-            if info:
-                team["name"] = info.get("name", "")
-                team["divisionName"] = info.get("divisionName", "Unknown Division")
-
+            # Clean up streaks that are invalid (e.g., 255 = bugged/unknown)
             try:
                 if 200 < int(str(team.get("streak")).strip()) <= 299:
                     team["streak"] = '0'
             except (ValueError, TypeError):
                 team["streak"] = '0'
 
-            division_name = team.get("divisionName", "Unknown Division")
+            division_name = team["divisionName"]
             divisions[division_name].append(team)
 
-        # Sort overall and by division using rank
+        # Sort and rank
         teams.sort(key=lambda t: safe_int(t.get("rank")) or 999)
         for div in divisions:
             divisions[div].sort(key=lambda t: safe_int(t.get("rank")) or 999)
 
-        # Add overall ranking numbers
         for i, team in enumerate(teams, start=1):
             team["overallRank"] = i
 
-        # Add divisional ranking numbers
         for div in divisions:
             for i, team in enumerate(divisions[div], start=1):
                 team["divisionRank"] = i
 
-    return render_template("standings.html", teams=teams, divisions=divisions)
+        return render_template("standings.html", teams=teams, divisions=divisions)
+
+    except Exception as e:
+            import traceback
+            error_text = traceback.format_exc()
+            print("❌ Standings Error:\n", error_text)
+            return f"<pre>{error_text}</pre>", 500
 
 
 import os
