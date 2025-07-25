@@ -562,6 +562,15 @@ def show_standings():
         for div in divisions:
             divisions[div].sort(key=lambda t: safe_int(t.get("rank")) or 999)
 
+        # Add overall ranking numbers
+        for i, team in enumerate(teams, start=1):
+            team["overallRank"] = i
+
+        # Add divisional ranking numbers
+        for div in divisions:
+            for i, team in enumerate(divisions[div], start=1):
+                team["divisionRank"] = i
+
     return render_template("standings.html", teams=teams, divisions=divisions)
 
 

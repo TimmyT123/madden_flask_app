@@ -5,12 +5,13 @@
 {% if teams %}
 <table>
   <tr>
-    <th>Team</th><th>W</th><th>L</th><th>T</th><th>PCT</th><th>PF</th><th>PA</th><th>Streak</th>
+    <th>#</th><th>Team</th><th>W</th><th>L</th><th>T</th><th>PCT</th><th>PF</th><th>PA</th><th>Streak</th>
     <th>Div W</th><th>Div L</th><th>Div T</th>
     <th>Conf W</th><th>Conf L</th><th>Conf T</th>
   </tr>
   {% for team in teams %}
   <tr>
+    <td>{{ team.overallRank }}</td>
     <td>{{ team.name or team.teamId }}</td>
     <td>{{ team.wins }}</td><td>{{ team.losses }}</td><td>{{ team.ties }}</td><td>{{ "%.3f"|format(team.pct or 0) }}</td>
     <td>{{ team.pointsFor }}</td><td>{{ team.pointsAgainst }}</td><td>{{ team.streak }}</td>
@@ -29,6 +30,7 @@
   <table>
       <thead>
           <tr>
+              <th>#</th>
               <th>Team</th>
               <th>W</th>
               <th>L</th>
@@ -42,6 +44,7 @@
       <tbody>
           {% for team in div_teams %}
           <tr>
+              <td>{{ team.divisionRank }}</td>
               <td>{{ team.name }}</td>
               <td>{{ team.wins }}</td>
               <td>{{ team.losses }}</td>
