@@ -579,9 +579,6 @@ def show_standings():
         except:
             week_number = 0
 
-        print(f"📆 latest_season = {season}")
-        print(f"📆 latest_week = {week}")
-
         for w in range(1, week_number + 1):
             week_folder = os.path.join("uploads", league_id, season, f"week_{w}")
             schedule_path = os.path.join(week_folder, "parsed_schedule.json")
