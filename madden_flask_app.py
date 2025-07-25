@@ -513,21 +513,34 @@ def show_standings():
     team_map_path = os.path.join("uploads", league_id, "team_map.json")
     team_id_to_info = {}
 
+    def safe_int(val):
+        try:
+            return int(str(val).strip())
+        except:
+            return 0
+
     try:
         with open(team_map_path) as f:
             team_id_to_info = json.load(f)
     except:
         pass
 
-    try:
+    if os.path.exists(standings_file):
         with open(standings_file) as f:
             teams = json.load(f)
 
-        def safe_int(val):
-            try:
-                return int(str(val).strip())
-            except:
-                return 0
+        updated = False
+        for team in teams:
+            tid = str(team["teamId"])
+            info = team_id_to_info.get(tid, {})
+            info["rank"] = team.get("rank")
+            info["seed"] = team.get("seed")
+            team_id_to_info[tid] = info
+            updated = True
+
+        if updated:
+            with open(team_map_path, "w") as f:
+                json.dump(team_id_to_info, f, indent=2)
 
         for team in teams:
             info = team_id_to_info.get(str(team["teamId"]))
@@ -535,49 +548,19 @@ def show_standings():
                 team["name"] = info.get("name", "")
                 team["divisionName"] = info.get("divisionName", "Unknown Division")
 
-            # Fix streak
             try:
                 if 200 < int(str(team.get("streak")).strip()) <= 299:
                     team["streak"] = '0'
             except (ValueError, TypeError):
                 team["streak"] = '0'
 
-            # Group into division
             division_name = team.get("divisionName", "Unknown Division")
             divisions[division_name].append(team)
 
-        # Sort overall
-        teams.sort(
-            key=lambda t: (
-                -safe_int(t.get("wins")),
-                safe_int(t.get("losses")),
-                -safe_int(t.get("ties")),
-                -safe_int(t.get("confWins")),
-                safe_int(t.get("confLosses")),
-                -safe_int(t.get("confTies")),
-                -safe_int(t.get("divWins")),
-                safe_int(t.get("divLosses")),
-                -safe_int(t.get("divTies")),
-                -(safe_int(t.get("pointsFor")) - safe_int(t.get("pointsAgainst")))
-            )
-        )
-
-        # Sort within each division
+        # Sort overall and by division using rank
+        teams.sort(key=lambda t: safe_int(t.get("rank")) or 999)
         for div in divisions:
-            divisions[div].sort(
-                key=lambda t: (
-                    -safe_int(t.get("wins")),
-                    safe_int(t.get("losses")),
-                    -safe_int(t.get("ties")),
-                    -safe_int(t.get("divWins")),
-                    safe_int(t.get("divLosses")),
-                    -safe_int(t.get("divTies")),
-                    -(safe_int(t.get("pointsFor")) - safe_int(t.get("pointsAgainst")))
-                )
-            )
-
-    except Exception as e:
-        print("⚠️ Failed to load standings:", e)
+            divisions[div].sort(key=lambda t: safe_int(t.get("rank")) or 999)
 
     return render_template("standings.html", teams=teams, divisions=divisions)
 
