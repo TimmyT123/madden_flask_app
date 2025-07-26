@@ -4,23 +4,23 @@
     "name": "Ravens",
     "user": "GeosRios",
     "divisionName": "AFC North",
-    "rank": 25,
-    "seed": 13
+    "rank": 27,
+    "seed": 15
   },
   "759955489": {
     "abbr": "PIT",
     "name": "Steelers",
     "user": "asuhh_",
     "divisionName": "AFC North",
-    "rank": 2,
-    "seed": 1
+    "rank": 8,
+    "seed": 3
   },
   "759955458": {
     "abbr": "CIN",
     "name": "Bengals",
     "user": "KYZASOSAY",
     "divisionName": "AFC North",
-    "rank": 24,
+    "rank": 23,
     "seed": 12
   },
   "759955461": {
@@ -28,15 +28,15 @@
     "name": "Browns",
     "user": "Fatal-Dream72",
     "divisionName": "AFC North",
-    "rank": 18,
-    "seed": 10
+    "rank": 25,
+    "seed": 13
   },
   "759955477": {
     "abbr": "JAX",
     "name": "Jaguars",
     "user": "hazysfinest",
     "divisionName": "AFC South",
-    "rank": 28,
+    "rank": 26,
     "seed": 14
   },
   "759955491": {
@@ -44,39 +44,39 @@
     "name": "Titans",
     "user": "Breck56",
     "divisionName": "AFC South",
-    "rank": 17,
-    "seed": 9
+    "rank": 12,
+    "seed": 7
   },
   "759955490": {
     "abbr": "HOU",
     "name": "Texans",
     "user": "Marr9k",
     "divisionName": "AFC South",
-    "rank": 3,
-    "seed": 2
+    "rank": 6,
+    "seed": 5
   },
   "759955468": {
     "abbr": "IND",
     "name": "Colts",
     "user": "BiggSteppa22",
     "divisionName": "AFC South",
-    "rank": 6,
-    "seed": 5
+    "rank": 3,
+    "seed": 2
   },
   "759955471": {
     "abbr": "MIA",
     "name": "Dolphins",
     "user": "Sav_Dolo525",
     "divisionName": "AFC East",
-    "rank": 4,
-    "seed": 3
+    "rank": 2,
+    "seed": 1
   },
   "759955478": {
     "abbr": "NYJ",
     "name": "Jets",
     "user": "rainfallcrusher",
     "divisionName": "AFC East",
-    "rank": 11,
+    "rank": 10,
     "seed": 6
   },
   "759955483": {
@@ -84,15 +84,15 @@
     "name": "Patriots",
     "user": "lilsnoop619",
     "divisionName": "AFC East",
-    "rank": 21,
-    "seed": 11
+    "rank": 15,
+    "seed": 8
   },
   "759955459": {
     "abbr": "BUF",
     "name": "Bills",
     "user": "stewiegottach0p",
     "divisionName": "AFC East",
-    "rank": 32,
+    "rank": 30,
     "seed": 16
   },
   "759955484": {
@@ -100,31 +100,31 @@
     "name": "Raiders",
     "user": "",
     "divisionName": "AFC West",
-    "rank": 14,
-    "seed": 8
+    "rank": 20,
+    "seed": 11
   },
   "759955460": {
     "abbr": "DEN",
     "name": "Broncos",
     "user": "humblenugs",
     "divisionName": "AFC West",
-    "rank": 13,
-    "seed": 7
+    "rank": 18,
+    "seed": 9
   },
   "759955466": {
     "abbr": "LAC",
     "name": "Chargers",
     "user": "sinphilly79",
     "divisionName": "AFC West",
-    "rank": 31,
-    "seed": 15
+    "rank": 19,
+    "seed": 10
   },
   "759955467": {
     "abbr": "KC",
     "name": "Chiefs",
     "user": "Godzprofit",
     "divisionName": "AFC West",
-    "rank": 9,
+    "rank": 13,
     "seed": 4
   },
   "759955479": {
@@ -140,23 +140,23 @@
     "name": "Packers",
     "user": "RNF_MILK",
     "divisionName": "NFC North",
-    "rank": 12,
-    "seed": 7
+    "rank": 16,
+    "seed": 8
   },
   "759955492": {
     "abbr": "MIN",
     "name": "Vikings",
     "user": "Jstoll_11",
     "divisionName": "NFC North",
-    "rank": 20,
-    "seed": 10
+    "rank": 17,
+    "seed": 9
   },
   "759955457": {
     "abbr": "CHI",
     "name": "Bears",
     "user": "jmishim17",
     "divisionName": "NFC North",
-    "rank": 10,
+    "rank": 9,
     "seed": 6
   },
   "759955473": {
@@ -164,31 +164,31 @@
     "name": "Falcons",
     "user": "JayEndYoDay",
     "divisionName": "NFC South",
-    "rank": 7,
-    "seed": 3
+    "rank": 4,
+    "seed": 2
   },
   "759955482": {
     "abbr": "CAR",
     "name": "Panthers",
     "user": "",
     "divisionName": "NFC South",
-    "rank": 22,
-    "seed": 11
+    "rank": 21,
+    "seed": 10
   },
   "759955487": {
     "abbr": "NO",
     "name": "Saints",
     "user": "Biig_Shaq313",
     "divisionName": "NFC South",
-    "rank": 19,
-    "seed": 9
+    "rank": 24,
+    "seed": 12
   },
   "759955462": {
     "abbr": "TB",
     "name": "Buccaneers",
     "user": "Eazy_Work1",
     "divisionName": "NFC South",
-    "rank": 8,
+    "rank": 5,
     "seed": 5
   },
   "759955470": {
@@ -197,22 +197,22 @@
     "user": "sAul77222",
     "divisionName": "NFC East",
     "rank": 29,
-    "seed": 15
+    "seed": 14
   },
   "759955472": {
     "abbr": "PHI",
     "name": "Eagles",
     "user": "fryday_63",
     "divisionName": "NFC East",
-    "rank": 23,
-    "seed": 12
+    "rank": 22,
+    "seed": 11
   },
   "759955475": {
     "abbr": "NYG",
     "name": "Giants",
     "user": "Badboys691979",
     "divisionName": "NFC East",
-    "rank": 30,
+    "rank": 32,
     "seed": 16
   },
   "759955469": {
@@ -220,7 +220,7 @@
     "name": "Commanders",
     "user": "L3_TricksYoutube",
     "divisionName": "NFC East",
-    "rank": 16,
+    "rank": 14,
     "seed": 4
   },
   "759955456": {
@@ -228,15 +228,15 @@
     "name": "49ers",
     "user": "BucNasty00",
     "divisionName": "NFC West",
-    "rank": 15,
-    "seed": 8
+    "rank": 11,
+    "seed": 7
   },
   "759955485": {
     "abbr": "LAR",
     "name": "Rams",
     "user": "Figgy-shot823",
     "divisionName": "NFC West",
-    "rank": 26,
+    "rank": 28,
     "seed": 13
   },
   "759955488": {
@@ -244,15 +244,15 @@
     "name": "Seahawks",
     "user": "DrewBreezy1999",
     "divisionName": "NFC West",
-    "rank": 27,
-    "seed": 14
+    "rank": 31,
+    "seed": 15
   },
   "759955463": {
     "abbr": "ARI",
     "name": "Cardinals",
     "user": "TRushing88",
     "divisionName": "NFC West",
-    "rank": 5,
-    "seed": 2
+    "rank": 7,
+    "seed": 3
   }
 }
