@@ -408,6 +408,8 @@ def post_highlight_to_discord(message, file_path=None):
         print(f"❌ Failed to post to Discord: {response.status_code} {response.text}")
 
 
+import json
+
 @app.route('/stats')
 def show_stats():
     league = request.args.get("league")
@@ -418,67 +420,66 @@ def show_stats():
         return "Missing league, season, or week", 400
 
     try:
-        # Dynamic path based on user input
+        # Build full path to passing.json
         base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, f"season_{season}", f"week_{week}")
         filepath = os.path.join(base_path, "passing.json")
 
-        with open(filepath) as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
             players = data.get("playerPassingStatInfoList", [])
 
-        # Load team info
+        # Load team_map.json for team name lookups
         team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
         teams = {}
         if os.path.exists(team_map_path):
-            with open(team_map_path) as f:
+            with open(team_map_path, "r", encoding="utf-8") as f:
                 teams = json.load(f)
 
+        # Inject team name into each player
         for p in players:
             team_id = str(p.get("teamId"))
             team_info = teams.get(team_id, {})
             p["team"] = team_info.get("name", "Unknown")
 
     except Exception as e:
-        print(f"Error loading stats: {e}")
+        print(f"❌ Error loading stats: {e}")
         players = []
 
-    # print("EXAMPLE PLAYER:")
-    # import pprint
-    # pprint.pprint(players[0])
-
-    return render_template("stats.html", players=players)
+    return render_template("stats.html", players=players, season=season, week=week)
 
 
-@app.route('/teams')
+
+@app.route("/teams")
 def show_teams():
     league_id = "17287266"
-    league_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global", "league.json")
-    team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "team_map.json")
+    path = f"uploads/{league_id}/season_global/week_global/parsed_league_info.json"
 
-    teams = []
-
-    # Load league.json
-    if os.path.exists(league_path):
-        with open(league_path, 'r') as f:
+    try:
+        with open(path) as f:
             data = json.load(f)
-            teams = data.get("leagueTeamInfoList") or data.get("teamInfoList") or []
+    except Exception as e:
+        print(f"⚠️ Error loading league info: {e}")
+        return "League info not found", 404
 
-    # Load team_map.json
-    team_map = {}
-    if os.path.exists(team_map_path):
-        with open(team_map_path, 'r') as f:
-            team_map = json.load(f)
+    calendar_year = data.get("calendarYear", "Unknown")
+    teams = data.get("leagueTeamInfoList", [])
 
-    # Merge overrides from team_map
     for team in teams:
-        tid = str(team.get("teamId"))
-        if tid in team_map:
-            overrides = team_map[tid]
-            team["teamName"] = overrides.get("name", team.get("teamName", ""))
-            team["teamAbbr"] = overrides.get("abbr", team.get("teamAbbr", ""))
-            team["userName"] = overrides.get("user", team.get("userName", ""))
+        try:
+            cap = int(team.get("capAvailable", 0) or 0)
+            team["capAvailableFormatted"] = f"{cap / 1_000_000:.1f} M"
+        except:
+            team["capAvailableFormatted"] = "0.0 M"
 
-    return render_template("teams.html", teams=teams)
+    return render_template("teams.html", calendar_year=calendar_year, teams=teams)
+
+
+
+def format_cap(value):
+    try:
+        return f"{round(int(value)/1_000_000, 1)} M"
+    except:
+        return "N/A"
 
 
 import glob
@@ -555,7 +556,8 @@ def show_standings():
         # Load standings
         if os.path.exists(standings_file):
             with open(standings_file) as f:
-                teams = json.load(f)
+                standings_data = json.load(f)
+                teams = standings_data.get("standings", [])
 
             # Update team_map with latest seed/rank
             updated = False

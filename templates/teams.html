@@ -3,30 +3,32 @@
 {% block title %}Teams - WURD Madden{% endblock %}
 
 {% block content %}
-<h1>Teams</h1>
+<h2>Teams - {{ calendar_year }}</h2>
 
-{% if teams %}
 <table>
-    <thead>
-        <tr>
-            <th>Team ID</th>
-            <th>Team Name</th>
-            <th>Abbreviation</th>
-            <th>User Name</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for team in teams %}
-        <tr>
-            <td>{{ team.teamId }}</td>
-            <td>{{ team.teamName }}</td>
-            <td>{{ team.teamAbbr }}</td>
-            <td>{{ team.userName }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+  <thead>
+    <tr>
+      <th>Team Name</th>
+      <th>User Name</th>
+      <th>OVR</th>
+      <th>Cap Available</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for team in teams %}
+    <tr>
+      <td>{{ team.name or "Unknown" }}</td>
+      <td>{{ team.user or "Unknown" }}</td>
+      <td>{{ team.teamOvr or "N/A" }}</td>
+      <td>
+        {% if team.capAvailableFormatted %}
+          {{ team.capAvailableFormatted }}
+        {% else %}
+          N/A
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
 </table>
-{% else %}
-<p>No teams loaded yet.</p>
-{% endif %}
 {% endblock %}
