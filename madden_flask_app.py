@@ -471,7 +471,14 @@ def show_teams():
         except:
             team["capAvailableFormatted"] = "0.0 M"
 
+    # ✅ Sort by teamOvr (highest first)
+    try:
+        teams.sort(key=lambda x: int(x.get("teamOvr", 0)), reverse=True)
+    except Exception as e:
+        print(f"⚠️ Error sorting by teamOvr: {e}")
+
     return render_template("teams.html", calendar_year=calendar_year, teams=teams)
+
 
 
 
