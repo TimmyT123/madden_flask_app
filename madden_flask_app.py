@@ -465,10 +465,19 @@ def show_teams():
     teams = data.get("leagueTeamInfoList", [])
 
     for team in teams:
+        raw_cap = team.get("capAvailable", "0")
+
         try:
-            cap = int(team.get("capAvailable", 0) or 0)
+            # Parse the cap as int
+            cap = int(str(raw_cap).strip())
+
+            # Detect and fix unsigned overflow
+            if cap > 2_000_000_000:
+                cap -= 4_294_967_296  # Fix for 32-bit signed overflow
+
             team["capAvailableFormatted"] = f"{cap / 1_000_000:.1f} M"
-        except:
+        except Exception as e:
+            print(f"⚠️ Cap formatting error for {team.get('name')}: {e}")
             team["capAvailableFormatted"] = "0.0 M"
 
     # ✅ Sort by teamOvr (highest first)
@@ -478,9 +487,6 @@ def show_teams():
         print(f"⚠️ Error sorting by teamOvr: {e}")
 
     return render_template("teams.html", calendar_year=calendar_year, teams=teams)
-
-
-
 
 def format_cap(value):
     try:
