@@ -18,7 +18,7 @@
     {% for team in teams %}
     <tr>
       <td>{{ team.name or "Unknown" }}</td>
-      <td>{{ team.user or "Unknown" }}</td>
+      <td>{{ team.user or "CPU" }}</td>
       <td>{{ team.teamOvr or "N/A" }}</td>
       <td>
         {% if team.capAvailableFormatted %}
