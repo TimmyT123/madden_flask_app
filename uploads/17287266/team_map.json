@@ -6,8 +6,8 @@
     "divisionName": "AFC North",
     "teamOvr": 88,
     "capAvailable": 32690000,
-    "rank": 27,
-    "seed": 15
+    "rank": 29,
+    "seed": 16
   },
   "759955489": {
     "abbr": "PIT",
@@ -16,7 +16,7 @@
     "divisionName": "AFC North",
     "teamOvr": 87,
     "capAvailable": 9960000,
-    "rank": 8,
+    "rank": 7,
     "seed": 3
   },
   "759955458": {
@@ -25,29 +25,29 @@
     "user": "KYZASOSAY",
     "divisionName": "AFC North",
     "teamOvr": 92,
-    "capAvailable": 4273677296,
-    "rank": 23,
-    "seed": 12
+    "capAvailable": 10130000,
+    "rank": 18,
+    "seed": 10
   },
   "759955461": {
     "abbr": "CLE",
     "name": "Browns",
     "user": "Fatal-Dream72",
     "divisionName": "AFC North",
-    "teamOvr": 82,
+    "teamOvr": 83,
     "capAvailable": 71900000,
-    "rank": 25,
-    "seed": 13
+    "rank": 27,
+    "seed": 14
   },
   "759955477": {
     "abbr": "JAX",
     "name": "Jaguars",
     "user": "hazysfinest",
     "divisionName": "AFC South",
-    "teamOvr": 83,
-    "capAvailable": 12290000,
-    "rank": 26,
-    "seed": 14
+    "teamOvr": 82,
+    "capAvailable": 47630000,
+    "rank": 28,
+    "seed": 15
   },
   "759955491": {
     "abbr": "TEN",
@@ -56,7 +56,7 @@
     "divisionName": "AFC South",
     "teamOvr": 89,
     "capAvailable": 5570000,
-    "rank": 12,
+    "rank": 15,
     "seed": 7
   },
   "759955490": {
@@ -66,7 +66,7 @@
     "divisionName": "AFC South",
     "teamOvr": 87,
     "capAvailable": 6240000,
-    "rank": 6,
+    "rank": 8,
     "seed": 5
   },
   "759955468": {
@@ -86,7 +86,7 @@
     "divisionName": "AFC East",
     "teamOvr": 88,
     "capAvailable": 2040000,
-    "rank": 2,
+    "rank": 1,
     "seed": 1
   },
   "759955478": {
@@ -96,7 +96,7 @@
     "divisionName": "AFC East",
     "teamOvr": 91,
     "capAvailable": 14400000,
-    "rank": 10,
+    "rank": 12,
     "seed": 6
   },
   "759955483": {
@@ -104,10 +104,10 @@
     "name": "Patriots",
     "user": "lilsnoop619",
     "divisionName": "AFC East",
-    "teamOvr": 86,
+    "teamOvr": 87,
     "capAvailable": 4294457296,
-    "rank": 15,
-    "seed": 8
+    "rank": 22,
+    "seed": 12
   },
   "759955459": {
     "abbr": "BUF",
@@ -116,8 +116,8 @@
     "divisionName": "AFC East",
     "teamOvr": 82,
     "capAvailable": 105050000,
-    "rank": 30,
-    "seed": 16
+    "rank": 23,
+    "seed": 13
   },
   "759955484": {
     "abbr": "LV",
@@ -126,7 +126,7 @@
     "divisionName": "AFC West",
     "teamOvr": 86,
     "capAvailable": 630000,
-    "rank": 20,
+    "rank": 21,
     "seed": 11
   },
   "759955460": {
@@ -136,8 +136,8 @@
     "divisionName": "AFC West",
     "teamOvr": 88,
     "capAvailable": 82530000,
-    "rank": 18,
-    "seed": 9
+    "rank": 17,
+    "seed": 8
   },
   "759955466": {
     "abbr": "LAC",
@@ -146,8 +146,8 @@
     "divisionName": "AFC West",
     "teamOvr": 86,
     "capAvailable": 26450000,
-    "rank": 19,
-    "seed": 10
+    "rank": 20,
+    "seed": 9
   },
   "759955467": {
     "abbr": "KC",
@@ -156,7 +156,7 @@
     "divisionName": "AFC West",
     "teamOvr": 88,
     "capAvailable": 38610000,
-    "rank": 13,
+    "rank": 9,
     "seed": 4
   },
   "759955479": {
@@ -165,8 +165,8 @@
     "user": "amdew77",
     "divisionName": "NFC North",
     "teamOvr": 92,
-    "capAvailable": 230000,
-    "rank": 1,
+    "capAvailable": 370000,
+    "rank": 2,
     "seed": 1
   },
   "759955481": {
@@ -175,8 +175,8 @@
     "user": "RNF_MILK",
     "divisionName": "NFC North",
     "teamOvr": 84,
-    "capAvailable": 19700000,
-    "rank": 16,
+    "capAvailable": 16460000,
+    "rank": 14,
     "seed": 8
   },
   "759955492": {
@@ -186,7 +186,7 @@
     "divisionName": "NFC North",
     "teamOvr": 88,
     "capAvailable": 1600000,
-    "rank": 17,
+    "rank": 16,
     "seed": 9
   },
   "759955457": {
@@ -195,8 +195,8 @@
     "user": "jmishim17",
     "divisionName": "NFC North",
     "teamOvr": 84,
-    "capAvailable": 14860000,
-    "rank": 9,
+    "capAvailable": 12870000,
+    "rank": 10,
     "seed": 6
   },
   "759955473": {
@@ -205,7 +205,7 @@
     "user": "JayEndYoDay",
     "divisionName": "NFC South",
     "teamOvr": 90,
-    "capAvailable": 17750000,
+    "capAvailable": 18160000,
     "rank": 4,
     "seed": 2
   },
@@ -216,8 +216,8 @@
     "divisionName": "NFC South",
     "teamOvr": 85,
     "capAvailable": 10000,
-    "rank": 21,
-    "seed": 10
+    "rank": 24,
+    "seed": 11
   },
   "759955487": {
     "abbr": "NO",
@@ -226,8 +226,8 @@
     "divisionName": "NFC South",
     "teamOvr": 84,
     "capAvailable": 117560000,
-    "rank": 24,
-    "seed": 12
+    "rank": 19,
+    "seed": 10
   },
   "759955462": {
     "abbr": "TB",
@@ -246,7 +246,7 @@
     "divisionName": "NFC East",
     "teamOvr": 84,
     "capAvailable": 7380000,
-    "rank": 29,
+    "rank": 30,
     "seed": 14
   },
   "759955472": {
@@ -256,8 +256,8 @@
     "divisionName": "NFC East",
     "teamOvr": 82,
     "capAvailable": 41200000,
-    "rank": 22,
-    "seed": 11
+    "rank": 25,
+    "seed": 12
   },
   "759955475": {
     "abbr": "NYG",
@@ -276,7 +276,7 @@
     "divisionName": "NFC East",
     "teamOvr": 92,
     "capAvailable": 32120000,
-    "rank": 14,
+    "rank": 11,
     "seed": 4
   },
   "759955456": {
@@ -285,8 +285,8 @@
     "user": "BucNasty00",
     "divisionName": "NFC West",
     "teamOvr": 85,
-    "capAvailable": 4294227296,
-    "rank": 11,
+    "capAvailable": 4293547296,
+    "rank": 13,
     "seed": 7
   },
   "759955485": {
@@ -296,7 +296,7 @@
     "divisionName": "NFC West",
     "teamOvr": 85,
     "capAvailable": 43720000,
-    "rank": 28,
+    "rank": 26,
     "seed": 13
   },
   "759955488": {
@@ -305,7 +305,7 @@
     "user": "DrewBreezy1999",
     "divisionName": "NFC West",
     "teamOvr": 88,
-    "capAvailable": 1540000,
+    "capAvailable": 580000,
     "rank": 31,
     "seed": 15
   },
@@ -315,8 +315,8 @@
     "user": "TRushing88",
     "divisionName": "NFC West",
     "teamOvr": 89,
-    "capAvailable": 13950000,
-    "rank": 7,
+    "capAvailable": 12690000,
+    "rank": 6,
     "seed": 3
   }
 }
