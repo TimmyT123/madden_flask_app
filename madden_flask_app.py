@@ -53,6 +53,16 @@ batch_timers = {}
 
 import re
 
+def get_default_season_week():
+    league_id = league_data.get("latest_league", "17287266")
+    path = os.path.join("uploads", league_id, "default_week.json")
+    try:
+        with open(path) as f:
+            data = json.load(f)
+            return data.get("season", "season_0"), data.get("week", "week_0")
+    except:
+        return "season_0", "week_0"
+
 @app.route('/')
 def home():
     base_path = app.config['UPLOAD_FOLDER']
@@ -79,6 +89,12 @@ def home():
                                 latest_league_id = league_id
 
                 leagues.append({'id': league_id, 'seasons': seasons})
+
+    # ✅ Use default_week.json if it exists
+    if latest_league_id:
+        season_from_default, week_from_default = get_default_season_week()
+        latest_season = season_from_default
+        latest_week = week_from_default
 
     # 💾 Save latest season/week to memory
     league_data["latest_season"] = latest_season
@@ -178,6 +194,21 @@ def get_latest_season_week():
                     league_data["latest_week"] = weeks[0]
                     return
 
+def update_default_week(season_index, week_index):
+    try:
+        league_id = league_data.get("latest_league", "17287266")
+        default_path = os.path.join("uploads", league_id, "default_week.json")
+        season_str = f"season_{season_index}"
+        week_str = f"week_{week_index}"
+        default_data = {
+            "season": season_str,
+            "week": week_str
+        }
+        with open(default_path, "w") as f:
+            json.dump(default_data, f, indent=2)
+        print(f"🆕 Default week updated: {season_str}, {week_str}")
+    except Exception as e:
+        print(f"⚠️ Failed to update default week: {e}")
 
 def process_webhook_data(data, subpath, headers, body):
     # ✅ 1. Save debug snapshot
@@ -328,15 +359,26 @@ def process_webhook_data(data, subpath, headers, body):
     if match:
         week_index = match.group(1)
 
-    # Extract seasonIndex/weekIndex from scheduleInfoList if not provided
+    # Try to extract season/week from gameScheduleInfoList
     if "gameScheduleInfoList" in data and isinstance(data["gameScheduleInfoList"], list):
         for game in data["gameScheduleInfoList"]:
             if isinstance(game, dict):
-                if not season_index:
-                    season_index = game.get("seasonIndex")
-                if not week_index:
-                    week_index = game.get("weekIndex")
+                season_index = season_index or game.get("seasonIndex")
+                week_index = week_index or game.get("weekIndex")
                 break
+
+    # If still not found, try teamStandingInfoList
+    if "teamStandingInfoList" in data and isinstance(data["teamStandingInfoList"], list):
+        for team in data["teamStandingInfoList"]:
+            if isinstance(team, dict):
+                season_index = season_index or team.get("seasonIndex")
+                week_index = week_index or team.get("weekIndex")
+                break
+
+    # ✅ Only update if both values are valid integers
+    if isinstance(season_index, int) and isinstance(week_index, int):
+        print(f"📌 Auto-updating default_week.json: season_{season_index}, week_{week_index}")
+        update_default_week(season_index, week_index)
 
     # Fallbacks
     season_index = season_index if season_index is not None else "unknown_season"
