@@ -79,8 +79,15 @@ def home():
                 for season in os.listdir(league_path):
                     season_path = os.path.join(league_path, season)
                     if os.path.isdir(season_path):
-                        weeks = [w for w in os.listdir(season_path) if os.path.isdir(os.path.join(season_path, w))]
-                        seasons.append({'name': season, 'weeks': sorted(weeks)})
+                        weeks = [
+                            w for w in os.listdir(season_path)
+                            if os.path.isdir(os.path.join(season_path, w)) and re.match(r'^week_\d+$', w)
+                        ]
+
+                        # Sort weeks by extracting the number after "week_"
+                        weeks.sort(key=lambda x: int(x.replace("week_", "")))
+
+                        seasons.append({'name': season, 'weeks': weeks})
 
                         if re.match(r'^season_\d+$', season):
                             if not latest_season or season > latest_season:
@@ -572,7 +579,7 @@ def show_schedule():
         game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", str(game["homeTeamId"]))
         game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", str(game["awayTeamId"]))
 
-    return render_template("schedule.html", schedule=parsed_schedule)
+    return render_template("schedule.html", schedule=parsed_schedule, season=season, week=week)
 
 
 from collections import defaultdict

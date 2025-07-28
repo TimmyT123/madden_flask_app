@@ -5,6 +5,10 @@
 {% block content %}
 <h1>Passing Stats</h1>
 
+<div style="margin-bottom: 20px; font-size: 1.2em; font-weight: bold;">
+  Season: {{ season | replace('season_', '') }} &nbsp; &nbsp; Week: {{ week | replace('week_', '') }}
+</div>
+
 {% if players %}
 <table id="statsTable">
     <thead>

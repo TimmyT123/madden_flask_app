@@ -5,6 +5,10 @@
 {% block content %}
 <h1>📅 League Schedule</h1>
 
+<div style="margin-bottom: 20px; font-size: 1.2em; font-weight: bold;">
+  Season: {{ season | replace('season_', '') }} &nbsp; &nbsp; Week: {{ week | replace('week_', '') }}
+</div>
+
 {% if schedule %}
 <table>
     <thead>
@@ -13,7 +17,7 @@
         <th>Score</th>
         <th>Home</th>
         <th>Status</th>
-        <th>Game of the Week</th>
+        <!-- <th>Game of the Week</th> -->
       </tr>
     </thead>
 
@@ -35,7 +39,7 @@
           {% endif %}
         </td>
 
-        <td>{% if game.gameOfTheWeek %}⭐{% endif %}</td>
+        <!-- <td>{% if game.gameOfTheWeek %}⭐{% endif %}</td> -->
       </tr>
       {% endfor %}
     </tbody>
