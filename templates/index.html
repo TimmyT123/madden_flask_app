@@ -27,46 +27,48 @@
 </head>
 <body>
     <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
+    <div style="font-size: 1.5rem; line-height: 1.5;">
+        <h1>🏈 Welcome to WURD Madden Franchise!</h1>
+        <p style="margin-bottom: 0.2rem;"><strong>Current Week:</strong> {{ latest_week | replace('week_', '') }}</p>
+        <h2 style="margin-top: 0; margin-bottom: 0;">Select Season and Week</h2>
 
-    <h1>🏈 Welcome to WURD Madden Franchise!</h1>
-    <h2>Select Season and Week</h2>
-
-    <form id="navForm" method="get" onsubmit="return false;">
-        <label for="season">Season:</label>
-        <select name="season" id="season">
-            {% for league in leagues %}
-                {% for season in league.seasons %}
-                    <option value="{{ season.name | replace('season_', '') }}"
-                        {% if season.name == latest_season %}selected{% endif %}>
-                        {{ season.name }}
-                    </option>
+        <form id="navForm" method="get" onsubmit="return false;">
+            <label for="season">Season:</label>
+            <select name="season" id="season">
+                {% for league in leagues %}
+                    {% for season in league.seasons %}
+                        <option value="{{ season.name | replace('season_', '') }}"
+                            {% if season.name == latest_season %}selected{% endif %}>
+                            {{ season.name }}
+                        </option>
+                    {% endfor %}
                 {% endfor %}
-            {% endfor %}
-        </select>
+            </select>
 
-        <label for="week">Week:</label>
-        <select name="week" id="week">
-            {% for league in leagues %}
-                {% for season in league.seasons %}
-                    {% if season.name == latest_season %}
-                        {% for w in season.weeks %}
-                            <option value="{{ w | replace('week_', '') }}"
-                                {% if w == latest_week %}selected{% endif %}>
-                                {{ w }}
-                            </option>
-                        {% endfor %}
-                    {% endif %}
+            <label for="week">Week:</label>
+            <select name="week" id="week">
+                {% for league in leagues %}
+                    {% for season in league.seasons %}
+                        {% if season.name == latest_season %}
+                            {% for w in season.weeks %}
+                                <option value="{{ w | replace('week_', '') }}"
+                                    {% if w == latest_week %}selected{% endif %}>
+                                    {{ w }}
+                                </option>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
                 {% endfor %}
-            {% endfor %}
-        </select>
-    </form>
+            </select>
+        </form>
 
-    <ul>
-        <li><a href="#" id="statsLink" onclick="goToStats()">View Passing Stats</a></li>
-        <li><a href="#" id="scheduleLink" onclick="goToSchedule()">View Schedule</a></li>
-        <li><a href="/teams">View Teams</a></li>
-        <li><a href="#" id="standingsLink" onclick="goToStandings()">View Standings</a></li>
-    </ul>
+        <ul>
+            <li><a href="#" id="statsLink" onclick="goToStats()">View Passing Stats</a></li>
+            <li><a href="#" id="scheduleLink" onclick="goToSchedule()">View Schedule</a></li>
+            <li style="margin-top: 1.5rem;"><a href="/teams">View Teams</a></li>
+            <li><a href="#" id="standingsLink" onclick="goToStandings()">View Standings</a></li>
+        </ul>
+    </div>
 
     <script>
         const leagueData = {{ leagues|tojson }};
