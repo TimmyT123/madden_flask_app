@@ -1,0 +1,167 @@
+[
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031480,
+    "homeTeamId": 759955458,
+    "awayTeamId": 759955489,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031503,
+    "homeTeamId": 759955459,
+    "awayTeamId": 759955463,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031507,
+    "homeTeamId": 759955492,
+    "awayTeamId": 759955470,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031515,
+    "homeTeamId": 759955471,
+    "awayTeamId": 759955488,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031517,
+    "homeTeamId": 759955461,
+    "awayTeamId": 759955478,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031520,
+    "homeTeamId": 759955477,
+    "awayTeamId": 759955491,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031530,
+    "homeTeamId": 759955481,
+    "awayTeamId": 759955457,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031531,
+    "homeTeamId": 759955482,
+    "awayTeamId": 759955475,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031490,
+    "homeTeamId": 759955484,
+    "awayTeamId": 759955468,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031519,
+    "homeTeamId": 759955490,
+    "awayTeamId": 759955466,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031488,
+    "homeTeamId": 759955469,
+    "awayTeamId": 759955472,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031533,
+    "homeTeamId": 759955486,
+    "awayTeamId": 759955473,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031484,
+    "homeTeamId": 759955460,
+    "awayTeamId": 759955462,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031481,
+    "homeTeamId": 759955485,
+    "awayTeamId": 759955487,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  },
+  {
+    "week": 10,
+    "season": 4,
+    "scheduleId": 543031492,
+    "homeTeamId": 759955456,
+    "awayTeamId": 759955483,
+    "homeScore": 0,
+    "awayScore": 0,
+    "status": 1,
+    "gameOfTheWeek": false
+  }
+]
