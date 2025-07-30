@@ -83,8 +83,6 @@ def home():
                             w for w in os.listdir(season_path)
                             if os.path.isdir(os.path.join(season_path, w)) and re.match(r'^week_\d+$', w)
                         ]
-
-                        # Sort weeks by extracting the number after "week_"
                         weeks.sort(key=lambda x: int(x.replace("week_", "")))
 
                         seasons.append({'name': season, 'weeks': weeks})
@@ -101,19 +99,34 @@ def home():
     if latest_league_id:
         season_from_default, week_from_default = get_default_season_week()
         latest_season = season_from_default
-        latest_week = week_from_default
+        match = re.match(r'^week_(\d+)$', week_from_default)
+        if match:
+            next_week_num = int(match.group(1)) + 1
+            latest_week = f"week_{next_week_num}"
+            print(f"🔁 Adjusted week from default: {week_from_default} ➜ {latest_week}")
+        else:
+            latest_week = week_from_default
 
     # 💾 Save latest season/week to memory
     league_data["latest_season"] = latest_season
     league_data["latest_week"] = latest_week
     league_data["latest_league"] = latest_league_id
 
+    # ✅ NEW: Compute latest_week_display (Week # for UI)
+    if latest_week and latest_week.startswith("week_"):
+        latest_week_display = int(latest_week.replace("week_", ""))
+    else:
+        latest_week_display = "?"
+
+    print(f"latest_week passed to template: {latest_week}", flush=True)
+
     return render_template(
         'index.html',
         leagues=leagues,
         latest_league=latest_league_id,
         latest_season=latest_season,
-        latest_week=latest_week
+        latest_week=latest_week,
+        latest_week_display=latest_week_display  # ✅ pass this to template
     )
 
 

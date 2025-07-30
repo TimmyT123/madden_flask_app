@@ -29,7 +29,7 @@
     <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
     <div style="font-size: 1.5rem; line-height: 1.5;">
         <h1>🏈 Welcome to WURD Madden Franchise!</h1>
-        <p style="margin-bottom: 0.2rem;"><strong>Current Week:</strong> {{ latest_week | replace('week_', '') }}</p>
+        <p style="margin-bottom: 0.2rem;"><strong>Current Week:</strong> {{ latest_week_display }}</p>
         <h2 style="margin-top: 0; margin-bottom: 0;">Select Season and Week</h2>
 
         <form id="navForm" method="get" onsubmit="return false;">
@@ -51,6 +51,7 @@
                     {% for season in league.seasons %}
                         {% if season.name == latest_season %}
                             {% for w in season.weeks %}
+                                <!-- DEBUG: w = {{ w }}, latest_week = {{ latest_week }} -->
                                 <option value="{{ w | replace('week_', '') }}"
                                     {% if w == latest_week %}selected{% endif %}>
                                     {{ w }}

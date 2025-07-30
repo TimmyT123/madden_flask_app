@@ -13,7 +13,10 @@ DEBUG_FILES = {
 }
 
 def clear_terminal():
-    os.system('cls' if platform.system() == 'Windows' else 'clear')
+    if platform.system() == 'Windows':
+        os.system('cls')
+    else:
+        os.system('clear')
 
 def print_menu():
     print("\nSelect a webhook debug file to view:")
@@ -41,7 +44,7 @@ def extract_top_level_titles(lines):
     return titles
 
 def view_from_line(lines, start_line):
-    print(f"\n📄 Viewing from line {start_line}:\n")
+    #print(f"\n📄 Viewing from line {start_line}:\n")
     for idx in range(start_line - 1, len(lines)):
         line = lines[idx]
         pretty = try_pretty_json(line)
@@ -60,8 +63,6 @@ def read_debug_file(filename):
 
     with open(path, "r", encoding="utf-8") as f:
         lines = f.readlines()
-
-    clear_terminal()
 
     # Show dictionary-style JSON block titles
     print(f"\n📂 Titles found in {filename}:\n")
@@ -85,6 +86,8 @@ def read_debug_file(filename):
         try:
             line_number = int(input("Enter line number to jump to: "))
             if 1 <= line_number <= len(lines):
+                #print("📣 About to clear terminal...")  # DEBUG
+                clear_terminal()  # This should now visibly run
                 view_from_line(lines, line_number)
             else:
                 print("⚠️ Line number out of range.")
