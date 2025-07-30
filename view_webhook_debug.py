@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import platform
 
 # Define file paths
 DEBUG_FOLDER = "uploads"
@@ -10,6 +11,9 @@ DEBUG_FILES = {
     "3": "webhook_debug_roster.txt",
     "4": "webhook_debug_stats.txt"
 }
+
+def clear_terminal():
+    os.system('cls' if platform.system() == 'Windows' else 'clear')
 
 def print_menu():
     print("\nSelect a webhook debug file to view:")
@@ -56,6 +60,8 @@ def read_debug_file(filename):
 
     with open(path, "r", encoding="utf-8") as f:
         lines = f.readlines()
+
+    clear_terminal()
 
     # Show dictionary-style JSON block titles
     print(f"\n📂 Titles found in {filename}:\n")
