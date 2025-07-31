@@ -26,6 +26,3 @@ Thumbs.db
 # Environment files
 .env
 
-# No pics
-*.png
-*.jpg
