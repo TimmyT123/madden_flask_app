@@ -65,8 +65,9 @@
 
         <ul>
             <li><a href="#" id="statsLink" onclick="goToStats()">View Passing Stats</a></li>
+            <li><a href="#" onclick="goToReceiving()">View Receiving Stats</a></li>
             <li><a href="#" id="scheduleLink" onclick="goToSchedule()">View Schedule</a></li>
-            <li style="margin-top: 1.5rem;"><a href="/teams">View Teams</a></li>
+            <li style="margin-top: 1.6rem;"><a href="/teams">View Teams</a></li>
             <li><a href="#" id="standingsLink" onclick="goToStandings()">View Standings</a></li>
         </ul>
     </div>
@@ -135,6 +136,13 @@
                 return;
             }
             window.location.href = `/stats?league=${league}&season=${season}&week=${week}`;
+        }
+
+        function goToReceiving() {
+            const season = document.getElementById("season").value;
+            const week = document.getElementById("week").value;
+            const league = latestLeague;
+            window.location.href = `/receiving?league=${league}&season=${season}&week=${week}`;
         }
 
         function goToSchedule() {

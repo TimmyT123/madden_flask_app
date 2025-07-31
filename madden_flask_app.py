@@ -510,6 +510,54 @@ def show_stats():
     return render_template("stats.html", players=players, season=season, week=week)
 
 
+@app.route('/receiving')
+def show_receiving_stats():
+    league = request.args.get("league")
+
+    if not league_data.get("latest_season") or not league_data.get("latest_week"):
+        get_latest_season_week()
+
+    season = request.args.get("season") or league_data.get("latest_season")
+    week = request.args.get("week") or league_data.get("latest_week")
+
+    # Fix folder names
+    season = "season_" + season if not season.startswith("season_") else season
+    week = "week_" + week if not week.startswith("week_") else week
+
+    print(f"league: {league}")
+    print(f"season: {season}")
+    print(f"week: {week}")
+
+    if not league or not season or not week:
+        return "Missing league, season, or week", 400
+
+    try:
+        base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, season, week)
+        filepath = os.path.join(base_path, "receiving.json")
+
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            players = data.get("playerReceivingStatInfoList", [])
+
+        # Load team names
+        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
+        teams = {}
+        if os.path.exists(team_map_path):
+            with open(team_map_path, "r", encoding="utf-8") as f:
+                teams = json.load(f)
+
+        # Inject team name into each player
+        for p in players:
+            team_id = str(p.get("teamId"))
+            team_info = teams.get(team_id, {})
+            p["team"] = team_info.get("name", "Unknown")
+
+    except Exception as e:
+        print(f"❌ Error loading receiving stats: {e}")
+        players = []
+
+    return render_template("receiving.html", players=players, season=season, week=week)
+
 
 @app.route("/teams")
 def show_teams():
