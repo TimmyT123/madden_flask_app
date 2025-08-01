@@ -45,6 +45,14 @@
     </tbody>
 
 </table>
+  {% if bye_teams %}
+            <h3 style="margin-top: 2rem;">BYE WEEK</h3>
+            <ul style="list-style: none; padding: 0;">
+                {% for team in bye_teams %}
+                    <li>{{ team }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
 {% else %}
 <p>No schedule data available.</p>
 {% endif %}

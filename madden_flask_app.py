@@ -605,8 +605,6 @@ def format_cap(value):
         return "N/A"
 
 
-import glob
-
 @app.route('/schedule')
 def show_schedule():
     league_id = league_data.get("latest_league", "17287266")
@@ -640,7 +638,18 @@ def show_schedule():
         game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", str(game["homeTeamId"]))
         game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", str(game["awayTeamId"]))
 
-    return render_template("schedule.html", schedule=parsed_schedule, season=season, week=week)
+    # ➕ NEW: Calculate BYE week teams
+    all_team_ids = set(team_map.keys())
+    teams_played = set()
+
+    for game in parsed_schedule:
+        teams_played.add(str(game["homeTeamId"]))
+        teams_played.add(str(game["awayTeamId"]))
+
+    bye_team_ids = all_team_ids - teams_played
+    bye_teams = sorted([team_map[tid]["name"] for tid in bye_team_ids])
+
+    return render_template("schedule.html", schedule=parsed_schedule, season=season, week=week, bye_teams=bye_teams)
 
 
 from collections import defaultdict
