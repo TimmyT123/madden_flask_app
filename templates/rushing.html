@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Rushing Stats{% endblock %}
+
+{% block content %}
+<h1>Rushing Stats</h1>
+
+<div style="margin-bottom: 20px; font-size: 1.2em; font-weight: bold;">
+  Season: {{ season | replace('season_', '') }} &nbsp; &nbsp; Week: {{ week | replace('week_', '') }}
+</div>
+
+{% if players %}
+<table id="statsTable">
+    <thead>
+        <tr>
+            <th onclick="sortTable(0)">Team<span id="arrow-0" class="arrow"></span></th>
+            <th onclick="sortTable(1)">Player<span id="arrow-1" class="arrow"></span></th>
+            <th onclick="sortTable(2)">Carries<span id="arrow-2" class="arrow"></span></th>
+            <th onclick="sortTable(3)">Yards<span id="arrow-3" class="arrow"></span></th>
+            <th onclick="sortTable(4)">TDs<span id="arrow-4" class="arrow"></span></th>
+            <th onclick="sortTable(5)">Fumbles<span id="arrow-5" class="arrow"></span></th>
+            <th onclick="sortTable(6)">Longest<span id="arrow-6" class="arrow"></span></th>
+            <th onclick="sortTable(7)">YPC<span id="arrow-7" class="arrow"></span></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in players %}
+        <tr>
+            <td>{{ p.team }}</td>
+            <td>{{ p.fullName }}</td>
+            <td>{{ p.rushAttempts }}</td>
+            <td>{{ p.rushYds }}</td>
+            <td>{{ p.rushTDs }}</td>
+            <td>{{ p.rushFumbles }}</td>
+            <td>{{ p.rushLongest }}</td>
+            <td>{{ "%.1f"|format(p.rushYdsPerAttempt or 0) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No rushing stats available.</p>
+{% endif %}
+
+<script>
+let sortState = {
+    column: null,
+    ascending: false
+};
+
+function sortTable(columnIndex) {
+    const table = document.getElementById("statsTable");
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.rows);
+
+    const isNumeric = !isNaN(rows[0].cells[columnIndex].innerText.trim());
+
+    if (sortState.column === columnIndex) {
+        sortState.ascending = !sortState.ascending;
+    } else {
+        sortState.column = columnIndex;
+        sortState.ascending = false;
+    }
+
+    rows.sort((a, b) => {
+        const aText = a.cells[columnIndex].innerText.trim();
+        const bText = b.cells[columnIndex].innerText.trim();
+
+        if (isNumeric) {
+            const aVal = parseFloat(aText);
+            const bVal = parseFloat(bText);
+            return sortState.ascending ? aVal - bVal : bVal - aVal;
+        } else {
+            return sortState.ascending
+                ? aText.localeCompare(bText)
+                : bText.localeCompare(aText);
+        }
+    });
+
+    document.querySelectorAll(".arrow").forEach(el => el.innerText = "");
+    document.getElementById("arrow-" + columnIndex).innerText = sortState.ascending ? "▲" : "▼";
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+</script>
+{% endblock %}

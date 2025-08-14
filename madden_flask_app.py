@@ -7,6 +7,7 @@ import json
 import requests
 from threading import Timer
 from time import time
+import re
 
 from config import UPLOAD_FOLDER
 
@@ -51,7 +52,6 @@ last_webhook_time = {
 }
 batch_timers = {}
 
-import re
 
 def get_default_season_week():
     league_id = league_data.get("latest_league", "17287266")
@@ -96,16 +96,24 @@ def home():
                 leagues.append({'id': league_id, 'seasons': seasons})
 
     # ✅ Use default_week.json if it exists
+    # ✅ Use default_week.json if it exists — but do NOT shift weeks
     if latest_league_id:
         season_from_default, week_from_default = get_default_season_week()
-        latest_season = season_from_default
-        match = re.match(r'^week_(\d+)$', week_from_default)
-        if match:
-            next_week_num = int(match.group(1)) + 1
-            latest_week = f"week_{next_week_num}"
-            print(f"🔁 Adjusted week from default: {week_from_default} ➜ {latest_week}")
-        else:
+
+        # If the default paths exist on disk, trust them
+        default_dir = os.path.join(base_path, latest_league_id, season_from_default, week_from_default)
+        if os.path.isdir(default_dir):
+            latest_season = season_from_default
             latest_week = week_from_default
+        else:
+            # Fallback: pick the latest week that actually exists for the latest season
+            season_dir = os.path.join(base_path, latest_league_id, latest_season or "")
+            weeks = []
+            if os.path.isdir(season_dir):
+                weeks = [w for w in os.listdir(season_dir)
+                         if os.path.isdir(os.path.join(season_dir, w)) and re.match(r'^week_\d+$', w)]
+                weeks.sort(key=lambda x: int(x.replace("week_", "")))
+            latest_week = weeks[-1] if weeks else None
 
     # 💾 Save latest season/week to memory
     league_data["latest_season"] = latest_season
@@ -230,6 +238,39 @@ def update_default_week(season_index, week_index):
     except Exception as e:
         print(f"⚠️ Failed to update default week: {e}")
 
+
+def find_league_in_subpath(subpath: str | None) -> str | None:
+    # Handles "ps5/17287266/league" or "17287266/league"
+    for seg in (subpath or "").split("/"):
+        if seg.isdigit() and 6 <= len(seg) <= 12:
+            return seg
+    return None
+
+def resolve_league_id(payload: dict, subpath: str | None = None) -> str | None:
+    # Try payload fields first
+    lid = (
+        payload.get("leagueId")
+        or payload.get("leagueInfo", {}).get("leagueId")
+        or payload.get("franchiseInfo", {}).get("leagueId")
+    )
+    if lid:
+        return str(lid)
+
+    # Then parse from URL
+    lid = find_league_in_subpath(subpath)
+    if lid:
+        return lid
+
+    # Then in-memory cache
+    lid = league_data.get("latest_league") or league_data.get("league_id")
+    if lid:
+        return str(lid)
+
+    # Optional dev fallback via .env
+    env_default = os.getenv("DEFAULT_LEAGUE_ID")
+    return str(env_default) if env_default else None
+
+
 def process_webhook_data(data, subpath, headers, body):
     # ✅ 1. Save debug snapshot
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
@@ -239,6 +280,18 @@ def process_webhook_data(data, subpath, headers, body):
             f.write(f"{k}: {v}\n")
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
+
+    # ✅ 5. Determine storage path (league id)
+    league_id = resolve_league_id(data, subpath)
+    if not league_id:
+        app.logger.error("No league_id found for webhook; skipping write.")
+        return  # Do not silently default, fail fast so you see the issue
+
+    # Keep a useful cache for later requests/routes
+    league_data["latest_league"] = league_id
+    league_data["league_id"] = league_id
+
+    print(f"📎 Using league_id: {league_id}")
 
     # 1️⃣ Determine batch type
     if "league" in subpath:
@@ -339,9 +392,6 @@ def process_webhook_data(data, subpath, headers, body):
     else:
         filename = f"{subpath.replace('/', '_')}.json"
 
-    # ✅ 5. Determine storage path
-    parts = subpath.split('/')
-    league_id = parts[1] if len(parts) > 1 else "unknown_league"
     season_index = data.get("seasonIndex") or data.get("season")
     week_index = data.get("weekIndex") or data.get("week")
 
@@ -361,8 +411,10 @@ def process_webhook_data(data, subpath, headers, body):
         if key in data and isinstance(data[key], list) and data[key]:
             first = data[key][0]
             if isinstance(first, dict):
-                season_index = season_index or first.get("seasonIndex") or first.get("season")
-                week_index = week_index or first.get("weekIndex") or first.get("week")
+                if not isinstance(season_index, int):
+                    season_index = first.get("seasonIndex") or first.get("season")
+                if not isinstance(week_index, int):
+                    week_index = first.get("weekIndex") or first.get("week")
             break
 
     # Manually set season/week for league-wide files
@@ -374,7 +426,6 @@ def process_webhook_data(data, subpath, headers, body):
         week_index = "global"
 
     # Try to parse weekIndex from subpath (e.g., "week/reg/1")
-    import re
     match = re.search(r'week/reg/(\d+)', subpath)
     if match:
         week_index = match.group(1)
@@ -438,6 +489,10 @@ def process_webhook_data(data, subpath, headers, body):
         parse_league_info_data(data, subpath, league_folder)
     elif "teamStandingInfoList" in data:
         parse_standings_data(data, subpath, league_folder)
+    elif "playerRushingStatInfoList" in data:
+        from parsers.rushing_parser import parse_rushing_stats
+        print(f"🐛 DEBUG: Detected rushing stats for season={season_index}, week={week_index}")
+        parse_rushing_stats(league_id, data, league_folder)
 
     # ✅ 7. Save in-memory reference
     league_data[subpath] = data
@@ -474,40 +529,49 @@ import json
 
 @app.route('/stats')
 def show_stats():
-    league = request.args.get("league")
-    season = request.args.get("season") or league_data.get("latest_season")
-    week = request.args.get("week") or league_data.get("latest_week")
+    # Get league/season/week from query or cache
+    league = request.args.get("league") or league_data.get("latest_league") or "17287266"
 
-    if not league or not season or not week:
-        return "Missing league, season, or week", 400
+    if not league_data.get("latest_season") or not league_data.get("latest_week"):
+        get_latest_season_week()
+
+    season = request.args.get("season") or league_data.get("latest_season") or "season_0"
+    week   = request.args.get("week")   or league_data.get("latest_week")   or "week_0"
+
+    # Normalize folder names
+    season = season if season.startswith("season_") else f"season_{season}"
+    week   = week   if week.startswith("week_")     else f"week_{week}"
 
     try:
-        # Build full path to passing.json
-        base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, f"season_{season}", f"week_{week}")
-        filepath = os.path.join(base_path, "passing.json")
+        base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, season, week)
+        filepath  = os.path.join(base_path, "passing.json")  # or "parsed_passing.json" if that's what you output
 
+        players = []
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
             players = data.get("playerPassingStatInfoList", [])
 
         # Load team_map.json for team name lookups
-        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
         teams = {}
+        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
         if os.path.exists(team_map_path):
             with open(team_map_path, "r", encoding="utf-8") as f:
                 teams = json.load(f)
 
-        # Inject team name into each player
+        # Inject team name
         for p in players:
             team_id = str(p.get("teamId"))
-            team_info = teams.get(team_id, {})
-            p["team"] = team_info.get("name", "Unknown")
+            p["team"] = teams.get(team_id, {}).get("name", "Unknown")
 
+    except FileNotFoundError:
+        app.logger.warning(f"Passing file not found: {filepath}")
+        players = []
     except Exception as e:
-        print(f"❌ Error loading stats: {e}")
+        app.logger.exception(f"❌ Error loading stats: {e}")
         players = []
 
-    return render_template("stats.html", players=players, season=season, week=week)
+    return render_template("stats.html", players=players, season=season, week=week, league=league)
+
 
 
 @app.route('/receiving')
@@ -557,6 +621,57 @@ def show_receiving_stats():
         players = []
 
     return render_template("receiving.html", players=players, season=season, week=week)
+
+
+@app.route('/rushing')
+def show_rushing_stats():
+    league = request.args.get("league")
+
+    if not league_data.get("latest_season") or not league_data.get("latest_week"):
+        get_latest_season_week()
+
+    season = request.args.get("season") or league_data.get("latest_season")
+    week = request.args.get("week") or league_data.get("latest_week")
+
+    # Normalize folder names
+    season = "season_" + season if not season.startswith("season_") else season
+    week = "week_" + week if not week.startswith("week_") else week
+
+    print(f"league: {league}")
+    print(f"season: {season}")
+    print(f"week: {week}")
+
+    if not league or not season or not week:
+        return "Missing league, season, or week", 400
+
+    try:
+        base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, season, week)
+        filepath = os.path.join(base_path, "parsed_rushing.json")
+
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            # works for both list and dict outputs:
+            players = data if isinstance(data, list) else data.get("playerRushingStatInfoList", [])
+
+        # Load team names
+        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
+        teams = {}
+        if os.path.exists(team_map_path):
+            with open(team_map_path, "r", encoding="utf-8") as f:
+                teams = json.load(f)
+
+        # Inject team name into each player
+        for p in players:
+            team_id = str(p.get("teamId"))
+            team_info = teams.get(team_id, {})
+            p["team"] = team_info.get("name", "Unknown")
+
+    except Exception as e:
+        print(f"❌ Error loading rushing stats: {e}")
+        players = []
+
+    return render_template("rushing.html", players=players, season=season, week=week)
+
 
 
 @app.route("/teams")

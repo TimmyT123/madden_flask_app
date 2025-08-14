@@ -37,12 +37,12 @@ def parse_passing_stats(subpath, data, upload_folder):
             "week": player.get("weekIndex"),
         })
 
-    # Save timestamped version
-    filename = f"parsed_{subpath.replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    output_path = os.path.join(upload_folder, filename)
-    with open(output_path, "w") as f:
-        json.dump(parsed, f, indent=2)
-    print(f"✅ Parsed passing stats saved to {output_path}")
+    # # Save timestamped version (DISABLED)
+    # filename = f"parsed_{subpath.replace('/', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    # output_path = os.path.join(upload_folder, filename)
+    # with open(output_path, "w") as f:
+    #     json.dump(parsed, f, indent=2)
+    # print(f"✅ Parsed passing stats saved to {output_path}")
 
     # Save shared version for website (/stats route)
     shared_path = os.path.join(upload_folder, "passing.json")
@@ -50,4 +50,4 @@ def parse_passing_stats(subpath, data, upload_folder):
         json.dump({"playerPassingStatInfoList": parsed}, f, indent=2)
     print(f"🌐 Shared passing stats updated at {shared_path}")
 
-    return output_path
+    return None  # output_path
