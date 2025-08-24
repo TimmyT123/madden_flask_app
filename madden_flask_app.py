@@ -753,16 +753,18 @@ def show_schedule():
         game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", str(game["homeTeamId"]))
         game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", str(game["awayTeamId"]))
 
-    # ➕ NEW: Calculate BYE week teams
-    all_team_ids = set(team_map.keys())
-    teams_played = set()
-
-    for game in parsed_schedule:
-        teams_played.add(str(game["homeTeamId"]))
-        teams_played.add(str(game["awayTeamId"]))
-
-    bye_team_ids = all_team_ids - teams_played
-    bye_teams = sorted([team_map[tid]["name"] for tid in bye_team_ids])
+        # Calculate BYE week teams only if week <= 18
+        bye_teams = []
+        try:
+            week_num = int(str(week).replace("week_", ""))
+            if week_num <= 18:
+                all_team_ids = set(team_map.keys())
+                teams_played = {str(game["homeTeamId"]) for game in parsed_schedule} | {str(game["awayTeamId"]) for game
+                                                                                        in parsed_schedule}
+                bye_team_ids = all_team_ids - teams_played
+                bye_teams = sorted([team_map[tid]["name"] for tid in bye_team_ids])
+        except ValueError:
+            print(f"⚠️ Could not parse week value: {week}")
 
     return render_template("schedule.html", schedule=parsed_schedule, season=season, week=week, bye_teams=bye_teams)
 
