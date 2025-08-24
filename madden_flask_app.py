@@ -472,6 +472,14 @@ def process_webhook_data(data, subpath, headers, body):
                 week_index = week_index or game.get("weekIndex")
                 break
 
+    # If still not found, try teamStandingInfoList
+    if "teamStandingInfoList" in data and isinstance(data["teamStandingInfoList"], list):
+        for t in data["teamStandingInfoList"]:
+            if isinstance(t, dict):
+                season_index = season_index or t.get("seasonIndex")
+                week_index = week_index or t.get("weekIndex")
+                break
+
     # Helper
     def to_int_or_none(v):
         try:
@@ -546,21 +554,6 @@ def process_webhook_data(data, subpath, headers, body):
 
     # ✅ 7. Save in-memory reference
     league_data[subpath] = data
-
-    # After you've collected season_index and week_index (ints or strings):
-    def to_int_or_none(v):
-        try:
-            return int(v)
-        except Exception:
-            return None
-
-    week_index_int_payload = to_int_or_none(week_index)
-    week_index_int_path = to_int_or_none(week_from_path)
-
-    # Prefer subpath if present; otherwise fallback to payload
-    raw_week_for_display = week_index_int_path if week_index_int_path is not None else week_index_int_payload
-
-    display_week = compute_display_week(phase, raw_week_for_display)
 
 
 @app.route('/debug', methods=['GET'])
