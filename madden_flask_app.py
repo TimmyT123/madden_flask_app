@@ -52,6 +52,35 @@ last_webhook_time = {
 }
 batch_timers = {}
 
+POST_ROUND_TO_WEEK = {
+    1: 19,  # Wild Card
+    2: 20,  # Divisional
+    3: 21,  # Conference Championship
+    4: 22,  # Super Bowl (some leagues may use 4 here)
+}
+
+
+def compute_display_week(phase: str | None, week_number: int | None) -> int | None:
+    """
+    Convert season phase + week_number into a single display week index.
+    REG: use week_number directly (1..18)
+    POST: map rounds to 19..22
+    PRE: return None (we don't display preseason in your UI)
+    """
+    if week_number is None:
+        return None
+    if not phase:
+        return week_number
+
+    phase_l = phase.lower()
+    if phase_l.startswith("reg"):
+        return week_number
+    if phase_l.startswith("post"):
+        return POST_ROUND_TO_WEEK.get(int(week_number), 18 + int(week_number))
+    # (Optional) if you ever want to handle preseason explicitly
+    # if phase_l.startswith("pre"):
+    #     return None
+    return week_number
 
 def get_default_season_week():
     league_id = league_data.get("latest_league", "17287266")
@@ -215,7 +244,8 @@ def get_latest_season_week():
                 latest_season = seasons[0]
                 weeks_path = os.path.join(league_path, latest_season)
                 weeks = [w for w in os.listdir(weeks_path) if w.startswith("week_")]
-                weeks.sort(reverse=True)
+                weeks.sort(key=lambda x: int(x.replace("week_", "")), reverse=True)
+
                 if weeks:
                     league_data["latest_league"] = league_id
                     league_data["latest_season"] = latest_season
@@ -426,9 +456,13 @@ def process_webhook_data(data, subpath, headers, body):
         week_index = "global"
 
     # Try to parse weekIndex from subpath (e.g., "week/reg/1")
-    match = re.search(r'week/reg/(\d+)', subpath)
-    if match:
-        week_index = match.group(1)
+    phase = None
+    week_from_path = None
+
+    m = re.search(r'week/(reg|post|pre)/(\d+)', subpath or "")
+    if m:
+        phase = m.group(1)  # "reg" | "post" | "pre"
+        week_from_path = int(m.group(2))
 
     # Try to extract season/week from gameScheduleInfoList
     if "gameScheduleInfoList" in data and isinstance(data["gameScheduleInfoList"], list):
@@ -438,29 +472,45 @@ def process_webhook_data(data, subpath, headers, body):
                 week_index = week_index or game.get("weekIndex")
                 break
 
-    # If still not found, try teamStandingInfoList
-    if "teamStandingInfoList" in data and isinstance(data["teamStandingInfoList"], list):
-        for team in data["teamStandingInfoList"]:
-            if isinstance(team, dict):
-                season_index = season_index or team.get("seasonIndex")
-                week_index = week_index or team.get("weekIndex")
-                break
+    # Helper
+    def to_int_or_none(v):
+        try:
+            return int(v)
+        except Exception:
+            return None
 
-    # ✅ Only update if both values are valid integers
-    if isinstance(season_index, int) and isinstance(week_index, int):
-        print(f"📌 Auto-updating default_week.json: season_{season_index}, week_{week_index}")
-        update_default_week(season_index, week_index)
+    # Normalize season/week from payload
+    season_index_int = to_int_or_none(season_index)
 
-    # Fallbacks
-    season_index = season_index if season_index is not None else "unknown_season"
-    week_index = week_index if week_index is not None else "unknown_week"
+    # Prefer week from URL path (reg/post/pre), else payload
+    week_index_int_payload = to_int_or_none(week_index)
+    week_index_int_path = to_int_or_none(week_from_path)
+    raw_week_for_display = week_index_int_path if week_index_int_path is not None else week_index_int_payload
 
-    # Global data override
+    # Map post rounds to 19..22
+    display_week = compute_display_week(phase, raw_week_for_display)
+
+    # Global data override (don’t create season/week folders for these)
     if "leagueteams" in subpath or "standings" in subpath:
-        season_index = "global"
-        week_index = "global"
+        season_dir = "season_global"
+        week_dir = "week_global"
+    else:
+        # Sensible fallbacks if we still don’t have ints
+        season_dir = f"season_{season_index_int if season_index_int is not None else 0}"
+        # Use display_week for folder naming; if None, fall back to payload week
+        effective_week = display_week if display_week is not None else (
+            week_index_int_payload if week_index_int_payload is not None else 0)
+        week_dir = f"week_{effective_week}"
 
-    league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, f"season_{season_index}", f"week_{week_index}")
+    # Update default_week.json only when we have good ints (and not a global data batch)
+    if season_dir != "season_global" and week_dir != "week_global":
+        si = to_int_or_none(season_dir.replace("season_", ""))
+        wi = to_int_or_none(week_dir.replace("week_", ""))
+        if si is not None and wi is not None:
+            print(f"📌 Auto-updating default_week.json: season_{si}, week_{wi}")
+            update_default_week(si, wi)
+
+    league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, season_dir, week_dir)
     os.makedirs(league_folder, exist_ok=True)
 
     if filename == "league.json":
@@ -496,6 +546,21 @@ def process_webhook_data(data, subpath, headers, body):
 
     # ✅ 7. Save in-memory reference
     league_data[subpath] = data
+
+    # After you've collected season_index and week_index (ints or strings):
+    def to_int_or_none(v):
+        try:
+            return int(v)
+        except Exception:
+            return None
+
+    week_index_int_payload = to_int_or_none(week_index)
+    week_index_int_path = to_int_or_none(week_from_path)
+
+    # Prefer subpath if present; otherwise fallback to payload
+    raw_week_for_display = week_index_int_path if week_index_int_path is not None else week_index_int_payload
+
+    display_week = compute_display_week(phase, raw_week_for_display)
 
 
 @app.route('/debug', methods=['GET'])
@@ -753,18 +818,18 @@ def show_schedule():
         game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", str(game["homeTeamId"]))
         game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", str(game["awayTeamId"]))
 
-        # Calculate BYE week teams only if week <= 18
-        bye_teams = []
-        try:
-            week_num = int(str(week).replace("week_", ""))
-            if week_num <= 18:
-                all_team_ids = set(team_map.keys())
-                teams_played = {str(game["homeTeamId"]) for game in parsed_schedule} | {str(game["awayTeamId"]) for game
-                                                                                        in parsed_schedule}
-                bye_team_ids = all_team_ids - teams_played
-                bye_teams = sorted([team_map[tid]["name"] for tid in bye_team_ids])
-        except ValueError:
-            print(f"⚠️ Could not parse week value: {week}")
+    # ✅ Compute BYE teams once (and hide in playoffs)
+    bye_teams = []
+    try:
+        week_num = int(str(week).replace("week_", ""))
+        if week_num <= 18:
+            all_team_ids = set(team_map.keys())
+            teams_played = {str(g["homeTeamId"]) for g in parsed_schedule} | {str(g["awayTeamId"]) for g in
+                                                                              parsed_schedule}
+            bye_team_ids = all_team_ids - teams_played
+            bye_teams = sorted([team_map[tid]["name"] for tid in bye_team_ids])
+    except ValueError:
+        print(f"⚠️ Could not parse week value: {week}")
 
     return render_template("schedule.html", schedule=parsed_schedule, season=season, week=week, bye_teams=bye_teams)
 
