@@ -28,12 +28,12 @@
         <tr>
             <td>{{ p.team }}</td>
             <td>{{ p.fullName }}</td>
-            <td>{{ p.rushAttempts }}</td>
+            <td>{{ p.rushAtt }}</td>
             <td>{{ p.rushYds }}</td>
             <td>{{ p.rushTDs }}</td>
-            <td>{{ p.rushFumbles }}</td>
+            <td>{{ p.rushFum }}</td>
             <td>{{ p.rushLongest }}</td>
-            <td>{{ "%.1f"|format(p.rushYdsPerAttempt or 0) }}</td>
+            <td>{{ "%.1f"|format(p.rushYdsPerAtt or 0) }}</td>
         </tr>
         {% endfor %}
     </tbody>
