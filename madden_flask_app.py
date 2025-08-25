@@ -447,10 +447,10 @@ def process_webhook_data(data, subpath, headers, body):
                     week_index = first.get("weekIndex") or first.get("week")
             break
 
-    # Manually set season/week for league-wide files
-    if "teamInfoList" in data:
-        season_index = season_index or "0"
-        week_index = week_index or "0"
+    # Manually set season/week for league-wide files  ➜ never touch default week
+    if "teamInfoList" in data or "leagueTeamInfoList" in data:
+        season_index = "global"
+        week_index = "global"
     elif "rosterInfoList" in data:
         season_index = "global"
         week_index = "global"
@@ -503,20 +503,25 @@ def process_webhook_data(data, subpath, headers, body):
         season_dir = "season_global"
         week_dir = "week_global"
     else:
-        # Sensible fallbacks if we still don’t have ints
-        season_dir = f"season_{season_index_int if season_index_int is not None else 0}"
-        # Use display_week for folder naming; if None, fall back to payload week
+        # Require a valid season index before creating folders or updating defaults
+        if season_index_int is None:
+            # We can't safely determine the season; skip default-week update and avoid season_0
+            print("⚠️ No valid season_index; skipping default_week update.")
+            return  # or, if you prefer, just set season_dir/ week_dir and continue writing file-free data
+        season_dir = f"season_{season_index_int}"
+
         effective_week = display_week if display_week is not None else (
-            week_index_int_payload if week_index_int_payload is not None else 0)
+            week_index_int_payload if week_index_int_payload is not None else None
+        )
+        if effective_week is None:
+            print("⚠️ No valid week; skipping default_week update.")
+            return
+
         week_dir = f"week_{effective_week}"
 
-    # Update default_week.json only when we have good ints (and not a global data batch)
-    if season_dir != "season_global" and week_dir != "week_global":
-        si = to_int_or_none(season_dir.replace("season_", ""))
-        wi = to_int_or_none(week_dir.replace("week_", ""))
-        if si is not None and wi is not None:
-            print(f"📌 Auto-updating default_week.json: season_{si}, week_{wi}")
-            update_default_week(si, wi)
+        # Safe update now that we have real ints
+        print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
+        update_default_week(season_index_int, effective_week)
 
     league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, season_dir, week_dir)
     os.makedirs(league_folder, exist_ok=True)
