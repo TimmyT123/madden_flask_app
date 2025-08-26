@@ -24,10 +24,14 @@
         }
 
         .content {
-            position: relative;
-            z-index: 1;
-            text-align: center;
-            padding: 40px 20px;
+          position: relative;
+          z-index: 1;
+          text-align: center;
+          padding: 16px 20px 24px; /* top, sides, bottom */
+        }
+
+        .content h1 {
+          margin: 8px 0 10px; /* was the default (larger) */
         }
 
         ul {
@@ -48,6 +52,42 @@
         a:hover {
             color: #e74c3c;
         }
+
+        .link-grid{
+          display:grid;
+          grid-template-columns: 1fr 1fr; /* two columns */
+          gap:24px;
+          margin-top: 18px;
+        }
+        .section h2{
+          margin: 0 0 8px 0;
+        }
+        .big-link{
+          display:block;
+          margin:10px 0;
+          padding:14px 16px;
+          border-radius:12px;
+          border:1px solid rgba(255,255,255,0.25);
+          background: rgba(0,0,0,0.35);
+          color:#fff;
+          text-decoration:none;
+          font-weight:700;
+          box-shadow: 0 2px 10px rgba(0,0,0,.25);
+        }
+        .big-link:hover{
+          background: rgba(0,0,0,0.5);
+          border-color: rgba(255,255,255,0.45);
+        }
+        /* Mobile: stack to one column */
+        @media (max-width: 860px){
+          .link-grid{ grid-template-columns: 1fr; }
+        }
+
+        .btn {
+          display: inline-block;   /* needed so margin-top takes effect on <a> */
+          margin-top: 14px;        /* adjust to taste: 12–24px */
+        }
+
     </style>
 </head>
 <body>
@@ -91,16 +131,25 @@
             </select>
         </form>
 
-        <a href="{{ url_for('streamers_hub', league=request.args.get('league') or league) }}" class="btn">🎥 Streamers</a>
+        <a href="{{ url_for('streamers_hub', league=latest_league) }}" class="btn">🎥 Streamers</a>
 
-        <ul>
-            <li><a href="#" id="statsLink" onclick="goToStats()">View Passing Stats</a></li>
-            <li><a href="#" onclick="goToReceiving()">View Receiving Stats</a></li>
-            <li><a href="#" onclick="goToRushing()">View Rushing Stats</a></li>
-            <li><a href="#" id="scheduleLink" onclick="goToSchedule()">View Schedule</a></li>
-            <li style="margin-top: 1.6rem;"><a href="/teams">View Teams</a></li>
-            <li><a href="#" id="standingsLink" onclick="goToStandings()">View Standings</a></li>
-        </ul>
+        <div class="link-grid">
+          <!-- Left column: Weekly Stats -->
+          <div class="section">
+            <h2>Weekly Stats</h2>
+            <a class="big-link" href="#" onclick="goToStats()">View Passing Stats</a>
+            <a class="big-link" href="#" onclick="goToReceiving()">View Receiving Stats</a>
+            <a class="big-link" href="#" onclick="goToRushing()">View Rushing Stats</a>
+          </div>
+
+          <!-- Right column: League -->
+          <div class="section">
+            <h2>League</h2>
+            <a class="big-link" href="#" onclick="goToSchedule()">View Schedule</a>
+            <a class="big-link" href="/teams?league={{ latest_league }}">View Teams</a>
+            <a class="big-link" href="/standings?league={{ latest_league }}">View Standings</a>
+          </div>
+        </div>
     </div>
 
     <script>
