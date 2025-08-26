@@ -91,6 +91,8 @@
             </select>
         </form>
 
+        <a href="{{ url_for('streamers_hub', league=request.args.get('league') or league) }}" class="btn">🎥 Streamers</a>
+
         <ul>
             <li><a href="#" id="statsLink" onclick="goToStats()">View Passing Stats</a></li>
             <li><a href="#" onclick="goToReceiving()">View Receiving Stats</a></li>

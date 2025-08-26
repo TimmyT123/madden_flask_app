@@ -19,6 +19,7 @@ from parsers.standings_parser import parse_standings_data
 
 
 from flask import render_template
+from urllib.parse import urlparse, parse_qs
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -954,6 +955,110 @@ def show_standings():
             error_text = traceback.format_exc()
             print("❌ Standings Error:\n", error_text)
             return f"<pre>{error_text}</pre>", 500
+
+# --- Streamers page ----------------------------------------------------------
+@app.route("/streamers")
+def streamers_hub():
+    league = (request.args.get("league") or "").strip()
+
+    # Try to recover from referrer (?league=... on the previous page)
+    if not league and request.referrer:
+        try:
+            qs = parse_qs(urlparse(request.referrer).query)
+            league = (qs.get("league", [None])[0] or "").strip()
+        except Exception:
+            pass
+
+    # If still missing, auto-pick if there's exactly one league folder
+    if not league:
+        root = app.config["UPLOAD_FOLDER"]
+        leagues = [d for d in os.listdir(root)
+                   if os.path.isdir(os.path.join(root, d)) and not d.startswith(".")]
+        if len(leagues) == 1:
+            league = leagues[0]
+        elif len(leagues) > 1:
+            # Simple chooser page
+            links = "".join(
+                f'<li><a href="{url_for("streamers_hub", league=d)}">{d}</a></li>'
+                for d in leagues
+            )
+            return f"<h2>Select league</h2><ul>{links}</ul>", 200
+
+    if not league:
+        return "Missing league", 400
+
+    base_league_path = os.path.join(app.config["UPLOAD_FOLDER"], league)
+    streamers_path   = os.path.join(base_league_path, "streamers.json")
+    team_map_path    = os.path.join(base_league_path, "team_map.json")
+
+    # (Optional) team name lookup
+    teams = {}
+    if os.path.exists(team_map_path):
+        with open(team_map_path, "r", encoding="utf-8") as f:
+            teams = json.load(f)
+
+    def build_embed_url(url: str, parent_domain: str):
+        """Return an embeddable URL or None if we can't safely embed."""
+        if not url:
+            return None
+
+        # Twitch channel → embed
+        if "twitch.tv" in url:
+            m = re.search(r"twitch\.tv/([^/?#]+)", url)
+            if m:
+                channel = m.group(1)
+                # parent must match the domain serving your Flask app
+                return f"https://player.twitch.tv/?channel={channel}&parent={parent_domain}&muted=true"
+            return None
+
+        # YouTube → embed
+        if "youtube.com" in url or "youtu.be" in url:
+            if "watch?v=" in url:                  # https://www.youtube.com/watch?v=VIDEOID
+                vid = url.split("watch?v=")[1].split("&")[0]
+                return f"https://www.youtube.com/embed/{vid}"
+            if "youtu.be/" in url:                 # https://youtu.be/VIDEOID
+                vid = url.split("youtu.be/")[1].split("?")[0]
+                return f"https://www.youtube.com/embed/{vid}"
+            if "/live/" in url:                    # https://www.youtube.com/live/VIDEOID
+                vid = url.split("/live/")[1].split("?")[0]
+                return f"https://www.youtube.com/embed/{vid}"
+            if "/channel/" in url:                 # channel page → live embed
+                channel_id = url.split("/channel/")[1].split("?")[0].strip("/")
+                return f"https://www.youtube.com/embed/live_stream?channel={channel_id}"
+            # Handles (@name) or other forms: can’t reliably embed → open button only
+            return None
+
+        return None
+
+    entries = []
+    parent_domain = request.host.split(":")[0]  # used by Twitch embed
+
+    if os.path.exists(streamers_path):
+        with open(streamers_path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+
+        for item in raw:
+            team_name = ""
+            team_id = str(item.get("teamId") or "")
+            if team_id and team_id in teams:
+                team_name = teams[team_id].get("name", "")
+
+            url = item.get("url", "")
+            embed_url = build_embed_url(url, parent_domain)
+
+            entries.append({
+                "name": item.get("name", "Unknown"),
+                "team": team_name or item.get("team", ""),
+                "platform": (item.get("platform") or
+                             ("twitch" if "twitch.tv" in url else "youtube" if "youtu" in url else "link")),
+                "url": url,
+                "embed_url": embed_url
+            })
+
+    return render_template("streamers.html",
+                           league=league,
+                           entries=entries,
+                           twitch_parent=parent_domain)
 
 
 import os

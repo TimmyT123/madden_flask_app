@@ -11,8 +11,15 @@ __pycache__/
 .venv/
 venv/
 
-# .gitignore
-uploads/
+# Ignore everything under uploads
+uploads/**
+
+# Re-allow directories so we can traverse
+!uploads/
+!uploads/**/
+
+# Keep any streamers.json anywhere under uploads
+!uploads/**/streamers.json
 
 # PyCharm
 .idea/

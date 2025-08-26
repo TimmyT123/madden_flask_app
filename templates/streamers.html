@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Streamers{% endblock %}
+
+{% block content %}
+<!-- Full-screen background layer -->
+<div class="streamers-bg" style="--bg: url('{{ url_for('static', filename='images/streamers_bg.jpg') }}')"></div>
+
+<h1 class="streamers-title">Our STREAMERS make it Fun!</h1>
+<p class="streamers-sub">Catch league games live — if an embed doesn’t load, tap “Open”.</p>
+
+{% if entries %}
+  <div class="grid">
+    {% for s in entries %}
+      <div class="card">
+        <div class="meta">
+          <strong>{{ s.name }}</strong>
+          {% if s.team %} · {{ s.team }}{% endif %}
+          <span> ({{ s.platform|capitalize }})</span>
+        </div>
+
+        {% if s.embed_url %}
+          <div class="embed-wrapper">
+            <iframe
+              src="{{ s.embed_url }}"
+              allow="autoplay; picture-in-picture"
+              allowfullscreen
+              loading="lazy">
+            </iframe>
+          </div>
+        {% else %}
+          <div class="placeholder">
+            <em>Embed not available for this link.</em>
+          </div>
+        {% endif %}
+
+        <div class="actions">
+          <a class="btn" href="{{ s.url }}" target="_blank" rel="noopener">Open</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>No streamers configured yet.</p>
+{% endif %}
+
+<style>
+/* === Background === */
+.streamers-bg{
+  position: fixed; inset: 0; z-index: -2;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(147,51,234,.35), transparent 60%),
+    linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.75)),
+    var(--bg) center/cover no-repeat;
+  filter: saturate(1.15) contrast(1.05) brightness(.9);
+}
+
+/* === Page chrome on dark bg === */
+.streamers-title{ color:#f8fafc; letter-spacing:.3px; margin: 0 0 6px 0; }
+.streamers-sub{ color:#cbd5e1; margin: 0 0 18px 0; }
+
+/* === Layout & Cards === */
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:16px; }
+.card{
+  background: rgba(17,24,39,.55); /* glassy */
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  padding: 12px;
+  color: #e5e7eb;
+  box-shadow: 0 8px 20px rgba(0,0,0,.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.meta{ margin-bottom:8px; color:#f3f4f6; }
+.meta span{ color:#cbd5e1; }
+
+/* === Embed box === */
+.embed-wrapper{ position:relative; width:100%; padding-top:56.25%; border-radius:10px; overflow:hidden; }
+.embed-wrapper iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+
+/* === Placeholder + Buttons === */
+.placeholder{
+  background: rgba(255,255,255,.06);
+  border:1px dashed rgba(255,255,255,.2);
+  border-radius:10px;
+  padding:24px; text-align:center; color:#e5e7eb;
+}
+.actions{ margin-top:10px; }
+.btn{
+  display:inline-block; padding:8px 12px; border-radius:10px;
+  border:1px solid rgba(255,255,255,.15);
+  text-decoration:none; color:#f8fafc;
+  background: linear-gradient(135deg, rgba(99,102,241,.2), rgba(147,51,234,.2));
+}
+.btn:hover{ border-color:rgba(255,255,255,.3); }
+</style>
+{% endblock %}
