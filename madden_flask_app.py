@@ -158,13 +158,17 @@ def home():
 
     print(f"latest_week passed to template: {latest_week}", flush=True)
 
+    # turn "week_19" into int 19
+    current_week = int(latest_week.replace("week_", ""))
+
     return render_template(
         'index.html',
         leagues=leagues,
         latest_league=latest_league_id,
         latest_season=latest_season,
         latest_week=latest_week,
-        latest_week_display=latest_week_display  # ✅ pass this to template
+        latest_week_display=latest_week_display,
+        current_week=current_week  # 👈 pass to template
     )
 
 

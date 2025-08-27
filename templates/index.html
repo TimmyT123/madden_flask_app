@@ -97,7 +97,21 @@
     <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
     <div style="font-size: 1.5rem; line-height: 1.5;">
         <h1>🏈 Welcome to WURD Madden Franchise!</h1>
-        <p style="margin-bottom: 0.2rem;"><strong>Current Week:</strong> {{ latest_week_display }}</p>
+        <p style="margin-bottom: 0.2rem;">
+          <strong>Current Week:</strong>
+          {% if current_week == 19 %}
+            Wildcard
+          {% elif current_week == 20 %}
+            Divisional
+          {% elif current_week == 21 %}
+            Conference
+          {% elif current_week == 22 %}
+            Super Bowl
+          {% else %}
+            Week {{ current_week }}
+          {% endif %}
+        </p>
+
         <h2 style="margin-top: 0; margin-bottom: 0;">Select Season and Week</h2>
 
         <form id="navForm" method="get" onsubmit="return false;">
