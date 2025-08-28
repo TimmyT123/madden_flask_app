@@ -62,6 +62,72 @@ POST_ROUND_TO_WEEK = {
     4: 22,  # Super Bowl (some leagues may use 4 here)
 }
 
+from hashlib import sha256
+from threading import Lock
+
+# --- Roster debounce state ---
+_roster_pending: dict[str, list] = {}   # {league_id: [ {data, raw, len} , ... ]}
+_roster_timers: dict[str, Timer] = {}   # {league_id: Timer}
+_roster_state: dict[str, dict] = {}     # {league_id: {"last_hash": str, "last_len": int}}
+_roster_lock = Lock()
+
+
+def _hash_bytes(b: bytes) -> str:
+    return sha256(b).hexdigest()
+
+
+def _queue_roster_write(league_id: str, data: dict, raw_body: bytes, output_dir: str):
+    """
+    Debounce roster writes for a league; after a short window, write only the largest payload.
+    Also avoids re-writing if content hash is unchanged.
+    """
+    with _roster_lock:
+        buf = _roster_pending.setdefault(league_id, [])
+        buf.append({
+            "data": data,
+            "raw": raw_body,
+            "len": len(
+                data.get("rosterInfoList")
+                or data.get("players")
+                or data.get("items")
+                or []
+            ),
+        })
+
+        # reset timer
+        t = _roster_timers.get(league_id)
+        if t:
+            t.cancel()
+
+        def _flush():
+            with _roster_lock:
+                entries = _roster_pending.pop(league_id, [])
+            if not entries:
+                return
+
+            best = max(entries, key=lambda e: e["len"])
+            new_hash = _hash_bytes(best["raw"])
+            st = _roster_state.get(league_id, {})
+
+            if st.get("last_hash") == new_hash:
+                print("🟡 Roster unchanged; skipping write.")
+                return
+
+            os.makedirs(output_dir, exist_ok=True)
+            out = os.path.join(output_dir, "rosters.json")
+            with open(out, "w", encoding="utf-8") as f:
+                json.dump(best["data"], f, indent=2)
+
+            print(f"✅ Roster written once after debounce → {out} (players={best['len']})")
+
+            # cache state, parse, and bust roster cache
+            _roster_state[league_id] = {"last_hash": new_hash, "last_len": best["len"]}
+            parse_rosters_data(best["data"], "roster", output_dir)
+            _roster_cache.pop(league_id, None)
+
+        _roster_timers[league_id] = Timer(2.0, _flush)  # 2s debounce window
+        _roster_timers[league_id].start()
+
 
 def compute_display_week(phase: str | None, week_number: int | None) -> int | None:
     """
@@ -355,7 +421,7 @@ def home():
     print(f"latest_week passed to template: {latest_week}", flush=True)
 
     # turn "week_19" into int 19
-    current_week = int(latest_week.replace("week_", ""))
+    current_week = int(latest_week.replace("week_", "")) if (latest_week and latest_week.startswith("week_") and latest_week[5:].isdigit()) else 0
 
     return render_template(
         'index.html',
@@ -512,19 +578,17 @@ def process_webhook_data(data, subpath, headers, body):
         f.write("\nBODY:\n")
         f.write(body.decode('utf-8', errors='replace'))
 
-    # ✅ 5. Determine storage path (league id)
+    # ✅ 2. Determine storage path (league id)
     league_id = resolve_league_id(data, subpath)
     if not league_id:
         app.logger.error("No league_id found for webhook; skipping write.")
-        return  # Do not silently default, fail fast so you see the issue
+        return
 
-    # Keep a useful cache for later requests/routes
     league_data["latest_league"] = league_id
     league_data["league_id"] = league_id
-
     print(f"📎 Using league_id: {league_id}")
 
-    # 1️⃣ Determine batch type
+    # 3) Classify batch for debug batching
     if "league" in subpath:
         batch_type = "league"
         filename = "webhook_debug_league.txt"
@@ -540,9 +604,8 @@ def process_webhook_data(data, subpath, headers, body):
 
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
-    # 🧠 Skip misc/other batches
+    # 4) Batch debug logs (unchanged behavior)
     if batch_type not in ["league", "stats", "roster"]:
-        # Write immediately for other types
         with open(debug_path, 'a') as f:
             f.write(f"\n===== NEW WEBHOOK: {subpath} =====\n")
             f.write("HEADERS:\n")
@@ -552,21 +615,16 @@ def process_webhook_data(data, subpath, headers, body):
             f.write(body.decode('utf-8', errors='replace'))
             f.write("\n\n")
     else:
-        # Store current time
         last_webhook_time[batch_type] = time()
-
-        # Buffer the data
         webhook_buffer[batch_type].append({
             "subpath": subpath,
             "headers": headers,
-            "body": body.decode('utf-8', errors='replace')
+            "body": body.decode('utf-8', errors='replace'),
         })
 
-        # Cancel any existing flush timer
-        if batch_type in batch_timers and batch_timers[batch_type]:
+        if batch_timers.get(batch_type):
             batch_timers[batch_type].cancel()
 
-        # Set new flush timer
         def flush_batch(bt=batch_type):
             debug_path = os.path.join(app.config['UPLOAD_FOLDER'], f'webhook_debug_{bt}.txt')
             with open(debug_path, 'w') as f:
@@ -581,11 +639,10 @@ def process_webhook_data(data, subpath, headers, body):
             print(f"✅ Flushed {bt} batch with {len(webhook_buffer[bt])} webhooks.")
             webhook_buffer[bt] = []
 
-        # Start or restart timer
         batch_timers[batch_type] = Timer(5.0, flush_batch)
         batch_timers[batch_type].start()
 
-    # ✅ 3. Check for Companion App error
+    # 5) Companion error?
     if 'error' in data:
         print(f"⚠️ Companion App Error: {data['error']}")
         error_filename = f"{subpath.replace('/', '_')}_error.json"
@@ -593,7 +650,7 @@ def process_webhook_data(data, subpath, headers, body):
             json.dump(data, f, indent=4)
         return
 
-    # ✅ 4. Determine filename
+    # 6) Determine type-specific handling
     if "playerPassingStatInfoList" in data:
         filename = "passing.json"
     elif "playerReceivingStatInfoList" in data:
@@ -601,49 +658,45 @@ def process_webhook_data(data, subpath, headers, body):
     elif "gameScheduleInfoList" in data:
         filename = "schedule.json"
     elif "rosterInfoList" in data:
-        filename = "rosters.json"
-        print("📥 Roster data received and saved!")
-        # make sure the roster goes to season_global/week_global later
-        season_index = "global"
-        week_index = "global"
-        # show latest on /rosters after write
-        _roster_cache.pop(league_id, None)
-        print("📥 Roster data received and saved!")
+        # Debounce & write once for the largest payload; do NOT fall through
+        if data.get("success") is False and not data.get("rosterInfoList"):
+            print("⚠️ Skipping roster write: export failed / empty list.")
+            return
+
+        print("📥 Roster data received; queuing for debounce write.")
+        output_dir = os.path.join(
+            app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global"
+        )
+        _queue_roster_write(league_id, data, body, output_dir)
+        return  # ← critical: prevents the generic writer from overwriting repeatedly
+
     elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         filename = "league.json"
         print("🏈 League Info received and saved!")
-
-        # Normalize key
         if "leagueTeamInfoList" in data and "teamInfoList" not in data:
             data["teamInfoList"] = data["leagueTeamInfoList"]
-
         if "teamInfoList" in data:
             league_data["teams"] = data["teamInfoList"]
-
     elif "teamStandingInfoList" in data:
         filename = "standings.json"
         print("📊 Standings data received and saved!")
-
-        # Don't touch league_data here — standings data doesn't contain team info
-
     else:
         filename = f"{subpath.replace('/', '_')}.json"
 
+    # 7) Work out season/week (unchanged for non-roster)
     season_index = data.get("seasonIndex") or data.get("season")
     week_index = data.get("weekIndex") or data.get("week")
 
-    # Prefer extracting from stat blocks (schedule first)
     stat_lists = [
-        "gameScheduleInfoList",  # ✅ Highest priority
+        "gameScheduleInfoList",
         "playerPassingStatInfoList",
         "playerReceivingStatInfoList",
         "playerRushingStatInfoList",
         "playerKickingStatInfoList",
         "playerPuntingStatInfoList",
         "playerDefensiveStatInfoList",
-        "teamStatInfoList"
+        "teamStatInfoList",
     ]
-
     for key in stat_lists:
         if key in data and isinstance(data[key], list) and data[key]:
             first = data[key][0]
@@ -654,24 +707,17 @@ def process_webhook_data(data, subpath, headers, body):
                     week_index = first.get("weekIndex") or first.get("week")
             break
 
-    # Manually set season/week for league-wide files  ➜ never touch default week
     if "teamInfoList" in data or "leagueTeamInfoList" in data:
         season_index = "global"
         week_index = "global"
-    elif "rosterInfoList" in data:
-        season_index = "global"
-        week_index = "global"
 
-    # Try to parse weekIndex from subpath (e.g., "week/reg/1")
     phase = None
     week_from_path = None
-
     m = re.search(r'week/(reg|post|pre)/(\d+)', subpath or "")
     if m:
-        phase = m.group(1)  # "reg" | "post" | "pre"
+        phase = m.group(1)
         week_from_path = int(m.group(2))
 
-    # Try to extract season/week from gameScheduleInfoList
     if "gameScheduleInfoList" in data and isinstance(data["gameScheduleInfoList"], list):
         for game in data["gameScheduleInfoList"]:
             if isinstance(game, dict):
@@ -679,7 +725,6 @@ def process_webhook_data(data, subpath, headers, body):
                 week_index = week_index or game.get("weekIndex")
                 break
 
-    # If still not found, try teamStandingInfoList
     if "teamStandingInfoList" in data and isinstance(data["teamStandingInfoList"], list):
         for t in data["teamStandingInfoList"]:
             if isinstance(t, dict):
@@ -687,94 +732,57 @@ def process_webhook_data(data, subpath, headers, body):
                 week_index = week_index or t.get("weekIndex")
                 break
 
-    # Helper
     def to_int_or_none(v):
         try:
             return int(v)
         except Exception:
             return None
 
-    # Normalize season/week from payload
     season_index_int = to_int_or_none(season_index)
-
-    # Prefer week from URL path (reg/post/pre), else payload
     week_index_int_payload = to_int_or_none(week_index)
     week_index_int_path = to_int_or_none(week_from_path)
     raw_week_for_display = week_index_int_path if week_index_int_path is not None else week_index_int_payload
-
-    # Map post rounds to 19..22
     display_week = compute_display_week(phase, raw_week_for_display)
 
-    # Global data override (don’t create season/week folders for these)
-    if "leagueteams" in subpath or "standings" in subpath:
+    # 8) Destination folder (non-roster)
+    if (season_index == "global" and week_index == "global") or \
+       ("leagueteams" in (subpath or "")) or \
+       ("standings" in (subpath or "")):
         season_dir = "season_global"
         week_dir = "week_global"
     else:
-        # Require a valid season index before creating folders or updating defaults
         if season_index_int is None:
-            # We can't safely determine the season; skip default-week update and avoid season_0
             print("⚠️ No valid season_index; skipping default_week update.")
-            return  # or, if you prefer, just set season_dir/ week_dir and continue writing file-free data
+            return
         season_dir = f"season_{season_index_int}"
 
-        effective_week = display_week if display_week is not None else (
-            week_index_int_payload if week_index_int_payload is not None else None
-        )
+        effective_week = display_week if display_week is not None else week_index_int_payload
         if effective_week is None:
             print("⚠️ No valid week; skipping default_week update.")
             return
 
         week_dir = f"week_{effective_week}"
-
-        # Safe update now that we have real ints
         print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
         update_default_week(season_index_int, effective_week)
 
     league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, season_dir, week_dir)
     os.makedirs(league_folder, exist_ok=True)
 
+    # 9) Write + parse (non-roster)
     if filename == "league.json":
         parse_league_info_data(data, subpath, league_folder)
 
     output_path = os.path.join(league_folder, filename)
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
-
-    # Global data override for league-wide files (league, standings, rosters)
-    if (season_index == "global" and week_index == "global") or \
-            ("leagueteams" in (subpath or "")) or \
-            ("standings" in (subpath or "")) or \
-            ("roster" in (subpath or "")):
-        season_dir = "season_global"
-        week_dir = "week_global"
-    else:
-        # Require a valid season index before creating folders or updating defaults
-        if season_index_int is None:
-            print("⚠️ No valid season_index; skipping default_week update.")
-            return
-        season_dir = f"season_{season_index_int}"
-
-        effective_week = display_week if display_week is not None else (
-            week_index_int_payload if week_index_int_payload is not None else None
-        )
-        if effective_week is None:
-            print("⚠️ No valid week; skipping default_week update.")
-            return
-
-        week_dir = f"week_{effective_week}"
-        print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
-        update_default_week(season_index_int, effective_week)
-
     print(f"✅ Data saved to {output_path}")
 
-    # ✅ 6. Parse based on data type
+    # Type-specific parse
     if "playerPassingStatInfoList" in data:
         parse_passing_stats(league_id, data, league_folder)
     elif "gameScheduleInfoList" in data:
         parse_schedule_data(data, subpath, league_folder)
-    elif "rosterInfoList" in data:
-        parse_rosters_data(data, subpath, league_folder)
-    elif "teamInfoList" in data:
+    elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         parse_league_info_data(data, subpath, league_folder)
     elif "teamStandingInfoList" in data:
         parse_standings_data(data, subpath, league_folder)
@@ -783,7 +791,7 @@ def process_webhook_data(data, subpath, headers, body):
         print(f"🐛 DEBUG: Detected rushing stats for season={season_index}, week={week_index}")
         parse_rushing_stats(league_id, data, league_folder)
 
-    # ✅ 7. Save in-memory reference
+    # 10) Cache copy
     league_data[subpath] = data
 
 
@@ -1029,44 +1037,63 @@ def _normalize_player(p: dict) -> dict:
     team_id = str(g("teamId", "teamID", "team", default=""))
     pos     = g("position", "pos", default="UNK")
 
-    # ratings (names vary by dump/version; we check multiple)
-    ovr = g("overallRating", "ovr", "overall", default=0)
+    # ratings — include Companion synonyms
+    ovr = g("overallRating", "ovr", "overall", "playerBestOvr", "playerSchemeOvr", default=0)
+
     age = g("age", default=None)
     dev = g("devTrait", "developmentTrait", "dev", default=None)
 
     speed = g("speedRating", "spd", "speed", default=None)
-    acc   = g("accelerationRating", "acc", "acceleration", default=None)
+    acc   = g("accelerationRating", "accelRating", "acc", default=None)
     agi   = g("agilityRating", "agi", "agility", default=None)
     strn  = g("strengthRating", "str", "strength", default=None)
-    awa   = g("awarenessRating", "awr", "awareness", default=None)
-    thp   = g("throwPower", "throwPowerRating", default=None)
-    tha   = g("throwAccuracyShort", "throwAccuracyMid", "throwAccuracyDeep", default=None)
-    cat   = g("catching", "catchingRating", default=None)
-    cit   = g("catchInTraffic", "catchInTrafficRating", default=None)
-    spc   = g("spectacularCatch", "spectacularCatchRating", default=None)
-    car   = g("carrying", "carryingRating", default=None)
+    awa   = g("awarenessRating", "awareRating", "awr", default=None)
+
+    thp   = g("throwPowerRating", "throwPower", default=None)
+    # prefer single rating; else use short/mid/deep if present
+    tha   = g("throwAccRating", "throwAccuracy", "throwAccuracyShort",
+              "throwAccShortRating", "throwAccMidRating", "throwAccDeepRating",
+              "throwAccShort", "throwAccMid", "throwAccDeep", default=None)
+
+    cat   = g("catching", "catchRating", "catchingRating", default=None)
+    cit   = g("catchInTraffic", "cITRating", "catchInTrafficRating", default=None)
+    spc   = g("spectacularCatch", "specCatchRating", "spectacularCatchRating", default=None)
+    car   = g("carrying", "carryRating", "carryingRating", default=None)
     btk   = g("breakTackleRating", "breakTackle", default=None)
+
     tak   = g("tackleRating", "tackle", default=None)
-    bsh   = g("blockSheddingRating", "blockShed", default=None)
+    bsh   = g("blockSheddingRating", "blockShedRating", "blockShed", default=None)
     pmv   = g("powerMovesRating", "powerMoves", default=None)
     fmv   = g("finesseMovesRating", "finesseMoves", default=None)
-    prc   = g("playRecognitionRating", "playRec", default=None)
-    mcv   = g("manCoverageRating", "man", default=None)
-    zcv   = g("zoneCoverageRating", "zone", default=None)
+    prc   = g("playRecognitionRating", "playRecRating", "playRec", default=None)
+    mcv   = g("manCoverageRating", "manCoverRating", "man", default=None)
+    zcv   = g("zoneCoverageRating", "zoneCoverRating", "zone", default=None)
     prs   = g("pressRating", "press", default=None)
-    pbk   = g("passBlockRating", "pbk", default=None)
-    rbk   = g("runBlockRating", "rbk", default=None)
-    ibl   = g("impactBlocking", "impactBlock", default=None)
+
+    pbk   = g("passBlockRating", "passBlockPowerRating", "passBlockFinesseRating", "pbk", default=None)
+    rbk   = g("runBlockRating", "runBlockPowerRating", "runBlockFinesseRating", "rbk", default=None)
+    ibl   = g("impactBlocking", "impactBlockRating", "impactBlock", default=None)
+
+    kpw   = g("kickPowerRating", "kickPower", "kpw", default=None)
+    kac   = g("kickAccRating", "kickAccuracy", "kac", default=None)
+
+    # make sure OVR is an int if possible
+    try:
+        ovr = int(ovr)
+    except Exception:
+        ovr = ovr or 0
 
     return {
-        "name": name, "teamId": team_id, "pos": pos, "ovr": int(ovr) if str(ovr).isdigit() else (ovr or 0),
+        "name": name, "teamId": team_id, "pos": pos, "ovr": ovr,
         "age": age, "dev": dev,
         "spd": speed, "acc": acc, "agi": agi, "str": strn, "awr": awa,
         "thp": thp, "tha": tha, "cth": cat, "cit": cit, "spc": spc,
         "car": car, "btk": btk,
         "tak": tak, "bsh": bsh, "pmv": pmv, "fmv": fmv, "prc": prc, "mcv": mcv, "zcv": zcv, "prs": prs,
         "pbk": pbk, "rbk": rbk, "ibl": ibl,
+        "kpw": kpw, "kac": kac,
     }
+
 
 def load_roster_index(league_id: str) -> dict:
     """
@@ -1156,6 +1183,7 @@ def rosters():
     # load players + positions
     idx = load_roster_index(league)
     players = idx["players"]
+    print(f"🧮 rosters page: total players available={len(players)}")
     positions = sorted(list(idx["positions"]))
     positions = ["ALL"] + positions  # first option
 
