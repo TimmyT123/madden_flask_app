@@ -15,8 +15,9 @@ def load_json(path):
 
 def load_team_map(root_dir, season_name=None):
     """
-    Return {int(teamId): "Label"} where Label prefers Nickname, else Abbr, else City.
-    Looks for a team map in many shapes, else rebuilds from league files.
+    READ-ONLY. Returns {int(teamId): { ...full team obj... }}.
+    Supports your team_map.json shape:
+      { "759955486": {"abbr":"BAL","name":"Ravens", ...}, ... }
     """
     import os, json
 
@@ -24,153 +25,38 @@ def load_team_map(root_dir, season_name=None):
         with open(p, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def pick_label(t):
-        nickname = (t.get("teamNickName") or t.get("nickname") or
-                    t.get("displayName") or t.get("teamName") or t.get("name") or "")
-        abbr = t.get("teamAbbr") or t.get("abbr") or ""
-        city = t.get("teamName") or t.get("city") or ""
-        label = (nickname or abbr or city or "").strip()
-        return label
-
-    def coerce_map(obj):
-        """
-        Try many common shapes and return {int(teamId): label} or {}.
-        Supported:
-          - {"1":"Eagles", "2":"Bears"}  (simple dict)
-          - {"team_map": {...}} or {"mapping": {...}}
-          - [{"teamId":1,"teamNickName":"Eagles"}, ...]
-          - {"teams":[...]} or {"leagueTeamInfoList":[...]}
-          - [[1,"Eagles"],[2,"Bears"]] (list of pairs)
-        """
-        m = {}
-
-        # simple dict (id -> label)
-        if isinstance(obj, dict):
-            # unwrap common wrappers
-            for wrap_key in ("team_map", "mapping", "map", "data"):
-                if wrap_key in obj and isinstance(obj[wrap_key], (dict, list)):
-                    inner = coerce_map(obj[wrap_key])
-                    if inner:
-                        return inner
-
-            # If values are scalars (not list/dict), treat as id->label
-            if obj and all(not isinstance(v, (list, dict)) for v in obj.values()):
-                for k, v in obj.items():
-                    try:
-                        m[int(k)] = str(v).strip()
-                    except Exception:
-                        pass
-                if m:
-                    return m
-
-            # teams in arrays under known keys
-            for key in ("teams", "leagueTeamInfoList", "team_list", "items"):
-                if key in obj and isinstance(obj[key], list):
-                    for t in obj[key]:
-                        if not isinstance(t, dict):
-                            continue
-                        tid = (t.get("teamId") or t.get("teamID") or t.get("id"))
-                        try:
-                            tid = int(tid)
-                        except Exception:
-                            continue
-                        label = pick_label(t) or f"Team{tid}"
-                        m[tid] = label
-                    if m:
-                        return m
-
-        # list of dicts or list of pairs
-        if isinstance(obj, list):
-            # list of dicts with teamId
-            for t in obj:
-                if isinstance(t, dict) and any(k in t for k in ("teamId", "teamID", "id")):
-                    tid = (t.get("teamId") or t.get("teamID") or t.get("id"))
-                    try:
-                        tid = int(tid)
-                    except Exception:
-                        continue
-                    label = pick_label(t) or f"Team{tid}"
-                    m[tid] = label
-            if m:
-                return m
-
-            # list of [id, label] pairs
-            for item in obj:
-                if isinstance(item, (list, tuple)) and len(item) >= 2:
-                    tid, label = item[0], item[1]
-                    try:
-                        tid = int(tid)
-                        m[tid] = str(label).strip()
-                    except Exception:
-                        pass
-            if m:
-                return m
-
-        return {}
-
-    # 1) Try common team_map.json locations
-    tried = []
+    # Look in root, then in season folder (but do NOT write anything)
     candidates = [os.path.join(root_dir, "team_map.json")]
     if season_name:
         candidates.append(os.path.join(root_dir, season_name, "team_map.json"))
 
+    last_err = None
     for p in candidates:
-        tried.append(p)
-        if os.path.exists(p):
-            data = load_json(p)
-            mapping = coerce_map(data)
-            if mapping:
-                print(f"✔ Using team map from: {p}")
-                return mapping
-            else:
-                print(f"⚠ team_map.json found at {p} but format wasn’t recognized; will try league files.")
-
-    # 2) Rebuild from league files (season_global then root)
-    league_candidates = [
-        os.path.join(root_dir, "season_global", "week_global", "parsed_league_info.json"),
-        os.path.join(root_dir, "season_global", "week_global", "league.json"),
-        os.path.join(root_dir, "league.json"),
-    ]
-    teams_list = None
-    for p in league_candidates:
-        if os.path.exists(p):
-            data = load_json(p)
-            # accept either leagueTeamInfoList or teams
-            teams_list = (data.get("leagueTeamInfoList") if isinstance(data, dict) else None) \
-                         or (data.get("teams") if isinstance(data, dict) else None)
-            if teams_list:
-                break
-
-    if not teams_list:
-        raise FileNotFoundError(
-            "team_map.json not found or unrecognized, and couldn’t build from league files.\n"
-            "Tried team map at: " + " | ".join(tried) + "\n" +
-            "Tried league files at: " + " | ".join(league_candidates)
-        )
-
-    mapping = {}
-    for t in teams_list:
-        if not isinstance(t, dict):
-            continue
-        tid = t.get("teamId") or t.get("teamID") or t.get("id")
         try:
-            tid = int(tid)
-        except Exception:
-            continue
-        label = pick_label(t) or f"Team{tid}"
-        mapping[tid] = label
+            if os.path.exists(p):
+                raw = load_json(p)
+                mapping = {}
+                # Expect dict of id->dict
+                if isinstance(raw, dict):
+                    for k, v in raw.items():
+                        try:
+                            tid = int(k)
+                        except Exception:
+                            continue
+                        if isinstance(v, dict):
+                            mapping[tid] = v
+                if mapping:
+                    print(f"✔ Loaded team_map.json from {p} (read-only)")
+                    return mapping
+        except Exception as e:
+            last_err = e
 
-    print("✔ Built team map from league files")
-    # Optionally write a normalized team_map.json at root for next time
-    try:
-        out_path = os.path.join(root_dir, "team_map.json")
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(mapping, f, ensure_ascii=False, indent=2)
-        print(f"✔ Wrote normalized team_map.json to {out_path}")
-    except Exception as e:
-        print(f"⚠ Couldn’t write normalized team_map.json: {e}")
-
-    return mapping
+    # If we get here, we couldn't load/recognize it
+    raise FileNotFoundError(
+        "Could not load a valid team_map.json. Looked at: "
+        + " | ".join(candidates)
+        + (f" | Last error: {last_err}" if last_err else "")
+    )
 
 def iter_week_dirs(season_dir):
     """
@@ -242,13 +128,31 @@ def get_int(value, default=None):
     except Exception:
         return default
 
-def label_for_team(team_id, team_map):
-    return team_map.get(team_id, f"Team{team_id}")
+def label_for_team(team_id, team_map, prefer="name"):
+    """
+    Build a display label from your rich team objects.
+    prefer can be: 'name', 'abbr', or 'name+abbr'
+    """
+    t = team_map.get(team_id)
+    if not isinstance(t, dict):
+        return f"Team{team_id}"
+
+    name = (t.get("name") or "").strip()
+    abbr = (t.get("abbr") or "").strip()
+
+    if prefer == "name+abbr" and (name or abbr):
+        if name and abbr:
+            return f"{name} ({abbr})"
+        return name or abbr
+    if prefer == "abbr":
+        return abbr or name or f"Team{team_id}"
+    # default: prefer name
+    return name or abbr or f"Team{team_id}"
 
 def build_weekly_lineups(root_dir, season_name="season_4"):
     """
     Scans weeks, extracts REG-season games for weeks 1..18, returns OrderedDict:
-      {week:int -> [(HomeLabel, AwayLabel), ...]}
+      {week:int -> [(AwayLabel, HomeLabel), ...]}
     """
     team_map = load_team_map(root_dir, season_name)
     season_dir = os.path.join(root_dir, season_name)
@@ -290,7 +194,7 @@ def build_weekly_lineups(root_dir, season_name="season_4"):
     ordered = OrderedDict()
     for w in range(1, 19):
         games = weeks.get(w, [])
-        games.sort(key=lambda p: (p[0], p[1]))
+        #games.sort(key=lambda p: (p[0], p[1]))  # This will sort your games
         ordered[w] = games
     return ordered
 
