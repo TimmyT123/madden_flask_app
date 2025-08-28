@@ -53,6 +53,20 @@
             color: #e74c3c;
         }
 
+        .links {
+          display: flex;
+          flex-direction: column;  /* stack vertically */
+          align-items: center;     /* keep centered */
+          margin-top: 14px;        /* space from Season/Week above */
+          gap: 6px;                /* even space between Champions & Streamers */
+        }
+
+        .links a {
+          font-weight: bold;
+          text-decoration: none;
+          color: #fff; /* or your accent color */
+        }
+
         .link-grid{
           display:grid;
           grid-template-columns: 1fr 1fr; /* two columns */
@@ -112,8 +126,6 @@
           {% endif %}
         </p>
 
-        <h2 style="margin-top: 0; margin-bottom: 0;">Select Season and Week</h2>
-
         <form id="navForm" method="get" onsubmit="return false;">
             <label for="season">Season:</label>
             <select name="season" id="season">
@@ -145,7 +157,10 @@
             </select>
         </form>
 
-        <a href="{{ url_for('streamers_hub', league=latest_league) }}" class="btn">🎥 Streamers</a>
+        <div class="links">
+          <a href="{{ url_for('wurd_champions') }}">👑 Champions</a>
+          <a href="{{ url_for('streamers_hub', league=latest_league) }}" class="btn">🎥 Streamers</a>
+        </div>
 
         <div class="link-grid">
           <!-- Left column: Weekly Stats -->

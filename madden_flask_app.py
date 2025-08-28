@@ -21,6 +21,8 @@ from parsers.standings_parser import parse_standings_data
 from flask import render_template
 from urllib.parse import urlparse, parse_qs
 
+from collections import Counter, defaultdict
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -164,6 +166,127 @@ def make_label_with_record(team_id_str: str, team_map: dict, records: dict, pref
         if w is not None and l is not None:
             return f"{base}({w}-{l}-{t})" if t and t > 0 else f"{base}({w}-{l})"
     return base
+
+
+# --- helpers ---
+def _read_json_from_app_root(filename, default=None):
+    path = os.path.join(app.root_path, filename)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return default if default is not None else []
+
+def _normalize(records):
+    """Map mixed keys to a consistent shape for templates/leaderboards."""
+    out = []
+    for r in records or []:
+        year = int(r.get("year", 0))
+        team = r.get("team", "")
+        uid = r.get("id") or r.get("discord_id")  # prefer numeric id if present
+        handle = r.get("handle")
+        alias = r.get("alias", "")
+        out.append({"year": year, "team": team, "id": uid, "handle": handle, "alias": alias})
+    # sort ascending by year for sections
+    out.sort(key=lambda x: x["year"])
+    return out
+
+def build_leaderboards(champions, members=None):
+    from collections import Counter
+    members = members or {}
+
+    # team leaderboard
+    team_counts = Counter(c["team"] for c in champions if c.get("team"))
+
+    # user key: prefer numeric id; else handle
+    def user_key(c):
+        return c.get("id") or (f"@{c['handle']}" if c.get("handle") else None)
+
+    user_counts = Counter(k for c in champions if (k := user_key(c)))
+
+    user_rows = []
+    for key, titles in user_counts.most_common():
+        if key.startswith("@"):                 # handle-only user
+            display_name = key[1:]              # strip '@'
+            mention_text = f"@{display_name}"   # readable as text
+            alias = next((c.get("alias","") for c in champions if user_key(c) == key and c.get("alias")), "")
+        else:                                   # numeric id user
+            display_name = members.get(str(key))  # look up from discord_members.json
+            mention_text = f"<@{key}>"            # raw mention text for fallback/tooltip
+            alias = next((c.get("alias","") for c in champions if c.get("id") == key and c.get("alias")), "")
+
+        user_rows.append({
+            "display_name": display_name,  # preferred
+            "mention": mention_text,       # fallback / tooltip
+            "alias": alias,
+            "titles": titles,
+        })
+
+    team_rows = [{"team": t, "titles": n} for t, n in team_counts.most_common()]
+    return team_rows, user_rows
+
+def enrich_with_names(records, members):
+    """Add c['name'] from members[id] so templates can show a friendly name."""
+    if not members:
+        return records
+    for c in records:
+        uid = c.get("id")
+        if uid is not None:
+            c["name"] = members.get(str(uid))  # members keys are strings
+    return records
+
+
+# --- end helpers ---
+
+CHAMPIONS_PATH = os.path.join(app.root_path, "wurd_champions_m25.json")
+
+def load_wurd_champions():
+    # keep your existing API fallback logic for m25
+    if os.path.exists(CHAMPIONS_PATH):
+        with open(CHAMPIONS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = [
+            { "year": 2024, "team": "Detroit Lions",         "discord_id": "1221155508799668275" },
+            { "year": 2025, "team": "Tampa Bay Buccaneers",  "discord_id": "960385056776527955" },
+            { "year": 2026, "team": "Tampa Bay Buccaneers",  "discord_id": "960385056776527955" },
+            { "year": 2027, "team": "Tampa Bay Buccaneers",  "discord_id": "960385056776527955" },
+            { "year": 2028, "team": "Washington Commanders", "discord_id": "1274884416187007110", "alias": "dttmkammo" },
+            { "year": 2029, "team": "Tampa Bay Buccaneers",  "discord_id": "960385056776527955" },
+            { "year": 2030, "team": "Tampa Bay Buccaneers",  "discord_id": "960385056776527955" }
+        ]
+    # normalize keys for consistency
+    for c in data:
+        c["year"] = int(c["year"])
+        # expose "id" so templates/leaderboards can use it
+        if c.get("discord_id") and not c.get("id"):
+            c["id"] = c["discord_id"]
+    data.sort(key=lambda x: x["year"], reverse=True)
+    return data
+
+@app.route("/wurd_champions")
+def wurd_champions():
+    m24_raw = _read_json_from_app_root("wurd_champions_m24.json", [])
+    m25_raw = _read_json_from_app_root("wurd_champions_m25.json", [])
+
+    m24 = _normalize(m24_raw)
+    m25 = _normalize(m25_raw)
+
+    members = _read_json_from_app_root("discord_members.json", {})  # {"123...": "Display Name"}
+
+    # ✅ add names to the era lists too
+    m24 = enrich_with_names(m24, members)
+    m25 = enrich_with_names(m25, members)
+
+    team_rows, user_rows = build_leaderboards(m24 + m25, members)
+
+    return render_template("champions.html",
+                           m24=m24, m25=m25,
+                           team_rows=team_rows, user_rows=user_rows)
+
+# Optional: JSON API (kept as your m25 endpoint)
+@app.route("/api/wurd/champions")
+def wurd_champions_api():
+    return jsonify(load_wurd_champions())
 
 
 @app.route('/')
@@ -917,8 +1040,6 @@ def show_schedule():
 
     return render_template("schedule.html", schedule=parsed_schedule, season=season, week=week, bye_teams=bye_teams)
 
-
-from collections import defaultdict
 
 @app.route("/standings")
 def show_standings():
