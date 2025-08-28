@@ -603,6 +603,12 @@ def process_webhook_data(data, subpath, headers, body):
     elif "rosterInfoList" in data:
         filename = "rosters.json"
         print("📥 Roster data received and saved!")
+        # make sure the roster goes to season_global/week_global later
+        season_index = "global"
+        week_index = "global"
+        # show latest on /rosters after write
+        _roster_cache.pop(league_id, None)
+        print("📥 Roster data received and saved!")
     elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         filename = "league.json"
         print("🏈 League Info received and saved!")
@@ -734,11 +740,30 @@ def process_webhook_data(data, subpath, headers, body):
     with open(output_path, 'w') as f:
         json.dump(data, f, indent=4)
 
-    # Only store flat files in root for global data
-    if season_index == "global" and week_index == "global":
-        latest_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, filename)
-        with open(latest_path, 'w') as f:
-            json.dump(data, f, indent=4)
+    # Global data override for league-wide files (league, standings, rosters)
+    if (season_index == "global" and week_index == "global") or \
+            ("leagueteams" in (subpath or "")) or \
+            ("standings" in (subpath or "")) or \
+            ("roster" in (subpath or "")):
+        season_dir = "season_global"
+        week_dir = "week_global"
+    else:
+        # Require a valid season index before creating folders or updating defaults
+        if season_index_int is None:
+            print("⚠️ No valid season_index; skipping default_week update.")
+            return
+        season_dir = f"season_{season_index_int}"
+
+        effective_week = display_week if display_week is not None else (
+            week_index_int_payload if week_index_int_payload is not None else None
+        )
+        if effective_week is None:
+            print("⚠️ No valid week; skipping default_week update.")
+            return
+
+        week_dir = f"week_{effective_week}"
+        print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
+        update_default_week(season_index_int, effective_week)
 
     print(f"✅ Data saved to {output_path}")
 
@@ -982,6 +1007,199 @@ def format_cap(value):
         return f"{round(int(value)/1_000_000, 1)} M"
     except:
         return "N/A"
+
+
+# ===== ROSTERS =====
+
+# cache to avoid re-parsing huge files on every request
+_roster_cache = {}  # {league_id: {"mtime": float, "players": [...], "positions": set()}}
+
+def _normalize_player(p: dict) -> dict:
+    """Return a compact player record with common keys; tolerate missing fields."""
+    def g(*keys, default=None):
+        for k in keys:
+            if k in p and p[k] is not None:
+                return p[k]
+        return default
+
+    first = g("firstName", "first_name", default="")
+    last  = g("lastName", "last_name", default="")
+    name  = (first + " " + last).strip() or g("fullName", "name", default="Unknown")
+
+    team_id = str(g("teamId", "teamID", "team", default=""))
+    pos     = g("position", "pos", default="UNK")
+
+    # ratings (names vary by dump/version; we check multiple)
+    ovr = g("overallRating", "ovr", "overall", default=0)
+    age = g("age", default=None)
+    dev = g("devTrait", "developmentTrait", "dev", default=None)
+
+    speed = g("speedRating", "spd", "speed", default=None)
+    acc   = g("accelerationRating", "acc", "acceleration", default=None)
+    agi   = g("agilityRating", "agi", "agility", default=None)
+    strn  = g("strengthRating", "str", "strength", default=None)
+    awa   = g("awarenessRating", "awr", "awareness", default=None)
+    thp   = g("throwPower", "throwPowerRating", default=None)
+    tha   = g("throwAccuracyShort", "throwAccuracyMid", "throwAccuracyDeep", default=None)
+    cat   = g("catching", "catchingRating", default=None)
+    cit   = g("catchInTraffic", "catchInTrafficRating", default=None)
+    spc   = g("spectacularCatch", "spectacularCatchRating", default=None)
+    car   = g("carrying", "carryingRating", default=None)
+    btk   = g("breakTackleRating", "breakTackle", default=None)
+    tak   = g("tackleRating", "tackle", default=None)
+    bsh   = g("blockSheddingRating", "blockShed", default=None)
+    pmv   = g("powerMovesRating", "powerMoves", default=None)
+    fmv   = g("finesseMovesRating", "finesseMoves", default=None)
+    prc   = g("playRecognitionRating", "playRec", default=None)
+    mcv   = g("manCoverageRating", "man", default=None)
+    zcv   = g("zoneCoverageRating", "zone", default=None)
+    prs   = g("pressRating", "press", default=None)
+    pbk   = g("passBlockRating", "pbk", default=None)
+    rbk   = g("runBlockRating", "rbk", default=None)
+    ibl   = g("impactBlocking", "impactBlock", default=None)
+
+    return {
+        "name": name, "teamId": team_id, "pos": pos, "ovr": int(ovr) if str(ovr).isdigit() else (ovr or 0),
+        "age": age, "dev": dev,
+        "spd": speed, "acc": acc, "agi": agi, "str": strn, "awr": awa,
+        "thp": thp, "tha": tha, "cth": cat, "cit": cit, "spc": spc,
+        "car": car, "btk": btk,
+        "tak": tak, "bsh": bsh, "pmv": pmv, "fmv": fmv, "prc": prc, "mcv": mcv, "zcv": zcv, "prs": prs,
+        "pbk": pbk, "rbk": rbk, "ibl": ibl,
+    }
+
+def load_roster_index(league_id: str) -> dict:
+    """
+    Reads uploads/<league>/season_global/week_global/rosters.json (or parsed one),
+    normalizes to a compact list and caches it.
+    Returns {"players": [...], "positions": set([...])}
+    """
+    base = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
+    path_candidates = [
+        os.path.join(base, "parsed_rosters.json"),
+        os.path.join(base, "rosters.json")
+    ]
+    roster_path = next((p for p in path_candidates if os.path.exists(p)), None)
+    if not roster_path:
+        return {"players": [], "positions": set()}
+
+    mtime = os.path.getmtime(roster_path)
+    cached = _roster_cache.get(league_id)
+    if cached and cached["mtime"] == mtime:
+        return cached
+
+    # load and normalize
+    with open(roster_path, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+
+    # Support either the Companion raw shape or your parsed shape
+    if isinstance(raw, dict):
+        players_raw = raw.get("rosterInfoList") or raw.get("players") or raw.get("items") or []
+    elif isinstance(raw, list):
+        players_raw = raw
+    else:
+        players_raw = []
+
+    players = [_normalize_player(p) for p in players_raw]
+    positions = {p["pos"] for p in players if p.get("pos")}
+    out = {"players": players, "positions": positions, "mtime": mtime}
+    _roster_cache[league_id] = out
+    return out
+
+# Position → columns to show (tweak freely)
+POSITION_COLUMNS = {
+    "QB":  ["name","pos","ovr","age","dev","thp","tha","awr","spd","acc"],
+    "HB":  ["name","pos","ovr","age","dev","spd","acc","agi","car","btk","cth"],
+    "FB":  ["name","pos","ovr","age","dev","spd","str","car","ibl","rbk"],
+    "WR":  ["name","pos","ovr","age","dev","spd","acc","agi","cth","cit","spc"],
+    "TE":  ["name","pos","ovr","age","dev","spd","str","cth","cit","rbk","ibl"],
+    "LT":  ["name","pos","ovr","age","dev","str","pbk","rbk","ibl","awr"],
+    "LG":  ["name","pos","ovr","age","dev","str","pbk","rbk","ibl","awr"],
+    "C":   ["name","pos","ovr","age","dev","str","pbk","rbk","ibl","awr"],
+    "RG":  ["name","pos","ovr","age","dev","str","pbk","rbk","ibl","awr"],
+    "RT":  ["name","pos","ovr","age","dev","str","pbk","rbk","ibl","awr"],
+    "LE":  ["name","pos","ovr","age","dev","spd","pmv","fmv","bsh","prc"],
+    "RE":  ["name","pos","ovr","age","dev","spd","pmv","fmv","bsh","prc"],
+    "DT":  ["name","pos","ovr","age","dev","str","pmv","fmv","bsh","prc"],
+    "LOLB":["name","pos","ovr","age","dev","spd","pmv","fmv","bsh","prc","tak"],
+    "MLB": ["name","pos","ovr","age","dev","spd","tak","prc","bsh","awr"],
+    "ROLB":["name","pos","ovr","age","dev","spd","pmv","fmv","bsh","prc","tak"],
+    "CB":  ["name","pos","ovr","age","dev","spd","mcv","zcv","prs","prc"],
+    "FS":  ["name","pos","ovr","age","dev","spd","zcv","mcv","prc","tak"],
+    "SS":  ["name","pos","ovr","age","dev","spd","zcv","mcv","prc","tak"],
+    "K":   ["name","pos","ovr","age","dev","kpw","kac"],   # if you later add keys
+    "P":   ["name","pos","ovr","age","dev","kpw","kac"],
+}
+
+# default when "Overall" is selected
+OVERALL_COLUMNS = ["name","pos","ovr","age","dev","spd","acc","agi","str","awr"]
+
+# human labels for the table header
+COLUMN_LABELS = {
+    "name":"Player", "pos":"Pos", "ovr":"OVR", "age":"Age", "dev":"Dev",
+    "spd":"SPD","acc":"ACC","agi":"AGI","str":"STR","awr":"AWR",
+    "thp":"THP","tha":"THA","cth":"CTH","cit":"CIT","spc":"SPC",
+    "car":"CAR","btk":"BTK","tak":"TAK","bsh":"BSH","pmv":"PMV","fmv":"FMV",
+    "prc":"PRC","mcv":"MCV","zcv":"ZCV","prs":"PRS","pbk":"PBK","rbk":"RBK","ibl":"IBL",
+    "kpw":"KPW","kac":"KAC"
+}
+
+@app.route("/rosters")
+def rosters():
+    # defaults
+    league = request.args.get("league") or league_data.get("latest_league") or "17287266"
+    team   = request.args.get("team", "NFL")     # "NFL" = all teams
+    pos    = request.args.get("pos", "ALL")      # "ALL" = Overall view
+    page   = max(int(request.args.get("page", 1)), 1)
+    per    = max(int(request.args.get("per", 50)), 10)
+
+    # load players + positions
+    idx = load_roster_index(league)
+    players = idx["players"]
+    positions = sorted(list(idx["positions"]))
+    positions = ["ALL"] + positions  # first option
+
+    # team list from team_map.json
+    team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
+    teams = {}
+    if os.path.exists(team_map_path):
+        with open(team_map_path, "r", encoding="utf-8") as f:
+            teams = json.load(f)
+    team_options = [{"id": "NFL", "name": "NFL (All Teams)"}] + \
+                   [{"id": tid, "name": info.get("name","")} for tid, info in sorted(teams.items(), key=lambda x: x[1].get("name",""))]
+
+    # filter by team
+    if team and team != "NFL":
+        players = [p for p in players if p.get("teamId") == str(team)]
+
+    # filter by position
+    if pos and pos != "ALL":
+        players = [p for p in players if p.get("pos") == pos]
+
+    # sort (overall first)
+    players.sort(key=lambda p: (p.get("ovr") or 0, p.get("spd") or 0), reverse=True)
+
+    # columns for this view
+    columns = OVERALL_COLUMNS if pos == "ALL" else POSITION_COLUMNS.get(pos, OVERALL_COLUMNS)
+
+    # pagination for huge leagues
+    total = len(players)
+    start = (page - 1) * per
+    end   = start + per
+    page_players = players[start:end]
+
+    return render_template(
+        "rosters.html",
+        league=league,
+        team=team,
+        pos=pos,
+        positions=positions,
+        teams=team_options,
+        columns=columns,
+        column_labels=COLUMN_LABELS,
+        players=page_players,
+        total=total, page=page, per=per
+    )
 
 
 @app.route('/schedule')

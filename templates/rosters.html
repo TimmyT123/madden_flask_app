@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Rosters</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+      .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;   /* centers the Home button */
+      gap: 12px;
+      padding: 10px 16px;
+      background: linear-gradient(to bottom, rgba(15,18,33,0.9), rgba(15,18,33,0.6));
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .homebtn {
+      display: inline-block;
+      text-decoration: none;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgba(255,213,74,0.12);
+      color: var(--accent, #ffd54a);
+      font-weight: 700;
+      box-shadow: 0 0 0 1px rgba(255,213,74,0.25);
+    }
+    .homebtn:hover {
+      box-shadow: 0 0 0 2px rgba(255,213,74,0.35);
+    }
+
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#fff; background:#0f1221; }
+    .wrap { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+    .controls { display:flex; gap:12px; align-items:center; justify-content:center; margin-bottom:16px; }
+    select, button { padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.15); background:#171a2c; color:#fff; }
+    table { width:100%; border-collapse:collapse; background:#171a2c; border-radius:14px; overflow:hidden; }
+    th, td { padding:10px; border-bottom:1px solid rgba(255,255,255,0.06); text-align:left; }
+    th { color:#aab2d5; font-weight:600; }
+    .pager { margin-top:12px; display:flex; justify-content:center; gap:8px; }
+    .chip { display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(255,213,74,.12); color:#ffd54a; font-weight:700; }
+  </style>
+</head>
+<body>
+
+<nav class="topbar">
+<a class="homebtn" href="/">🏠 Home</a>
+</nav>
+
+<div class="wrap">
+  <h2>🏈 Rosters</h2>
+
+  <form class="controls" method="get" action="{{ url_for('rosters') }}">
+    <input type="hidden" name="league" value="{{ league }}">
+    <!-- Dropdown 1: NFL / Team -->
+    <label>Team:
+      <select name="team" onchange="this.form.submit()">
+        {% for t in teams %}
+          <option value="{{ t.id }}" {% if team == t.id %}selected{% endif %}>{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <!-- Dropdown 2: Roster / Position -->
+    <label>View:
+      <select name="pos" onchange="this.form.submit()">
+        {% for p in positions %}
+          <option value="{{ p }}" {% if pos == p %}selected{% endif %}>{{ 'Overall' if p=='ALL' else p }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <!-- Optional page size -->
+    <label>Per page:
+      <select name="per" onchange="this.form.submit()">
+        {% for n in [25,50,100,200] %}
+          <option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        {% for c in columns %}
+          <th>{{ column_labels.get(c, c|upper) }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in players %}
+        <tr>
+          {% for c in columns %}
+            {% set v = p.get(c) %}
+            <td>
+              {% if c == 'ovr' and v is not none %}
+                <span class="chip">{{ v }}</span>
+              {% else %}
+                {{ v if v is not none else '' }}
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      {% if players|length == 0 %}
+        <tr><td colspan="{{ columns|length }}">No players found for this filter.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <div class="pager">
+    {% set total_pages = (total + per - 1) // per %}
+    {% if page > 1 %}
+      <a href="{{ url_for('rosters', league=league, team=team, pos=pos, per=per, page=page-1) }}">⬅ Prev</a>
+    {% endif %}
+    <span>Page {{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}
+      <a href="{{ url_for('rosters', league=league, team=team, pos=pos, per=per, page=page+1) }}">Next ➡</a>
+    {% endif %}
+  </div>
+</div>
+</body>
+</html>
