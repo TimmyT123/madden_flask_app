@@ -93,6 +93,79 @@ def get_default_season_week():
     except:
         return "season_0", "week_0"
 
+def _load_json(p):
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def load_team_records(root_dir: str) -> dict[str, tuple[int,int,int]]:
+    """
+    Returns {teamId(str): (wins, losses, ties)}.
+    Looks in uploads/<league_id>/season_global/week_global for parsed_standings.json or standings.json.
+    Robust to several common shapes.
+    """
+    candidates = [
+        os.path.join(root_dir, "season_global", "week_global", "parsed_standings.json"),
+        os.path.join(root_dir, "season_global", "week_global", "standings.json"),
+    ]
+    records: dict[str, tuple[int,int,int]] = {}
+
+    def coerce_int(x, default=0):
+        try: return int(x)
+        except: return default
+
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            data = _load_json(path)
+        except Exception:
+            continue
+
+        lists_to_scan = []
+        if isinstance(data, dict):
+            for k in ("parsed_standings","standings","teams","teamStandingsInfoList","items"):
+                if isinstance(data.get(k), list):
+                    lists_to_scan.append(data[k])
+        if isinstance(data, list):
+            lists_to_scan.append(data)
+
+        for lst in lists_to_scan:
+            for item in lst:
+                if not isinstance(item, dict):
+                    continue
+                tid = item.get("teamId") or item.get("teamID") or item.get("id")
+                if tid is None:
+                    continue
+                tid = str(tid)
+
+                w = item.get("wins") or item.get("overallWins") or item.get("totalWins") or 0
+                l = item.get("losses") or item.get("overallLosses") or item.get("totalLosses") or 0
+                t = item.get("ties") or item.get("overallTies") or item.get("totalTies") or 0
+                records[tid] = (coerce_int(w), coerce_int(l), coerce_int(t))
+
+        if records:
+            break  # first file that yields data wins
+
+    return records
+
+def make_label_with_record(team_id_str: str, team_map: dict, records: dict, prefer="name") -> str:
+    """
+    Build 'Name(W-L)' or 'Name(W-L-T)' if ties > 0.
+    prefer: 'name' (default) or 'abbr'
+    """
+    tm = team_map.get(team_id_str, {})
+    name = (tm.get("name") or "").strip() if isinstance(tm, dict) else ""
+    abbr = (tm.get("abbr") or "").strip() if isinstance(tm, dict) else ""
+    base = (name if prefer=="name" else abbr) or name or abbr or f"Team{team_id_str}"
+
+    wlt = records.get(team_id_str)
+    if isinstance(wlt, tuple) and len(wlt) == 3:
+        w,l,t = wlt
+        if w is not None and l is not None:
+            return f"{base}({w}-{l}-{t})" if t and t > 0 else f"{base}({w}-{l})"
+    return base
+
+
 @app.route('/')
 def home():
     base_path = app.config['UPLOAD_FOLDER']
@@ -804,33 +877,41 @@ def show_schedule():
             "parsed_schedule.json"
         )
         if os.path.exists(schedule_path):
-            with open(schedule_path) as f:
-                try:
+            try:
+                with open(schedule_path, encoding="utf-8") as f:
                     parsed_schedule = json.load(f)
-                except json.JSONDecodeError:
-                    print("❌ Failed to parse JSON in schedule file.")
+            except json.JSONDecodeError:
+                print("❌ Failed to parse JSON in schedule file.")
 
-    # Load team_map.json
+    # Load team_map.json (rich structure: id -> {abbr,name,user,...})
     team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "team_map.json")
     team_map = {}
     if os.path.exists(team_map_path):
-        with open(team_map_path) as f:
+        with open(team_map_path, encoding="utf-8") as f:
             team_map = json.load(f)
 
-    for game in parsed_schedule:
-        game["homeName"] = team_map.get(str(game["homeTeamId"]), {}).get("name", str(game["homeTeamId"]))
-        game["awayName"] = team_map.get(str(game["awayTeamId"]), {}).get("name", str(game["awayTeamId"]))
+    # Load records once (from season_global/week_global)
+    root_dir = os.path.join(app.config['UPLOAD_FOLDER'], league_id)
+    records = load_team_records(root_dir)
 
-    # ✅ Compute BYE teams once (and hide in playoffs)
+    # Decorate labels (visitor first); choose 'name' or switch to 'abbr'
+    prefer = "name"  # change to "abbr" if you want e.g., MIA(15-1)
+    for game in parsed_schedule:
+        away_id = str(game.get("awayTeamId") or game.get("awayTeam") or game.get("awayId"))
+        home_id = str(game.get("homeTeamId") or game.get("homeTeam") or game.get("homeId"))
+
+        game["awayName"] = make_label_with_record(away_id, team_map, records, prefer=prefer)
+        game["homeName"] = make_label_with_record(home_id, team_map, records, prefer=prefer)
+
+    # ✅ Compute BYE teams once (and hide in playoffs). Include record in BYE label too.
     bye_teams = []
     try:
         week_num = int(str(week).replace("week_", ""))
         if week_num <= 18:
-            all_team_ids = set(team_map.keys())
-            teams_played = {str(g["homeTeamId"]) for g in parsed_schedule} | {str(g["awayTeamId"]) for g in
-                                                                              parsed_schedule}
+            all_team_ids = set(team_map.keys())  # keys are strings
+            teams_played = {str(g.get("homeTeamId")) for g in parsed_schedule} | {str(g.get("awayTeamId")) for g in parsed_schedule}
             bye_team_ids = all_team_ids - teams_played
-            bye_teams = sorted([team_map[tid]["name"] for tid in bye_team_ids])
+            bye_teams = sorted([make_label_with_record(tid, team_map, records, prefer=prefer) for tid in bye_team_ids])
     except ValueError:
         print(f"⚠️ Could not parse week value: {week}")
 
