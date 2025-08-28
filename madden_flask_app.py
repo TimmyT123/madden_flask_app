@@ -1171,6 +1171,10 @@ COLUMN_LABELS = {
     "kpw":"KPW","kac":"KAC"
 }
 
+
+# dev trait template
+DEV_LABELS = {0: "Normal", 1: "Star", 2: "Superstar", 3: "X-Factor"}
+
 @app.route("/rosters")
 def rosters():
     # defaults
@@ -1216,6 +1220,15 @@ def rosters():
     end   = start + per
     page_players = players[start:end]
 
+    def _dev_to_label(v):
+        try:
+            return DEV_LABELS.get(int(v), v)
+        except (TypeError, ValueError):
+            return v or ""
+
+    # make a UI-only copy with 'dev' replaced by its label
+    page_players_ui = [{**p, "dev": _dev_to_label(p.get("dev"))} for p in page_players]
+
     return render_template(
         "rosters.html",
         league=league,
@@ -1225,7 +1238,7 @@ def rosters():
         teams=team_options,
         columns=columns,
         column_labels=COLUMN_LABELS,
-        players=page_players,
+        players=page_players_ui,
         total=total, page=page, per=per
     )
 
