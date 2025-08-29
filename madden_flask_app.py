@@ -6,6 +6,8 @@ import os
 import json
 import requests
 from threading import Timer
+from hashlib import sha256
+from threading import Lock
 from time import time
 import re
 
@@ -37,6 +39,9 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 league_data = {}
 
+ROSTER_DEBOUNCE_SEC = 8.0   # try 8s; tweak to 10–12s if needed
+_roster_acc = {}            # {league_id: {"players_by_key": {}, "timer": Timer | None}}
+
 batch_written = {
     "league": False,
     "stats": False,
@@ -61,9 +66,6 @@ POST_ROUND_TO_WEEK = {
     3: 21,  # Conference Championship
     4: 22,  # Super Bowl (some leagues may use 4 here)
 }
-
-from hashlib import sha256
-from threading import Lock
 
 # --- Roster debounce state ---
 _roster_pending: dict[str, list] = {}   # {league_id: [ {data, raw, len} , ... ]}
@@ -176,6 +178,83 @@ def _upsert_rosters(league_folder: str, incoming: list[dict]) -> list[dict]:
 
     print(f"🧩 Upserted rosters: had {len(current)}, added/updated {len(incoming or [])}, now {len(merged)}")
     return merged
+
+def _player_key(p: dict) -> str:
+    """Stable key for merging players from many team payloads."""
+    for k in ("rosterId", "playerId", "id", "personaId", "uniqueId"):
+        v = p.get(k)
+        if v not in (None, "", 0):
+            return str(v)
+    # fallback if exporter doesn’t provide an id
+    first = p.get("firstName") or p.get("first_name") or ""
+    last  = p.get("lastName")  or p.get("last_name")  or ""
+    pos   = p.get("position")  or p.get("pos")        or ""
+    team  = p.get("teamId")    or p.get("teamID")     or p.get("team") or ""
+    return f"{first}.{last}.{pos}.{team}".lower()
+
+def _get_roster_acc(league_id: str) -> dict:
+    acc = _roster_acc.get(league_id)
+    if not acc:
+        acc = {"players_by_key": {}, "timer": None}
+        _roster_acc[league_id] = acc
+    return acc
+
+def _add_roster_chunk(league_id: str, players: list[dict]) -> tuple[int, int]:
+    acc = _get_roster_acc(league_id)
+    pbk = acc["players_by_key"]
+    added = 0
+    for p in players or []:
+        k = _player_key(p)
+        if not k:
+            continue
+        pbk[k] = p
+        added += 1
+    return added, len(pbk)
+
+def _flush_roster(league_id: str, dest_folder: str):
+    """Debounce flush → write merged rosters.json and parsed_rosters.json."""
+    acc = _roster_acc.get(league_id)
+    if not acc:
+        return
+    merged_map = acc["players_by_key"]
+    merged = list(merged_map.values())
+
+    # Union with previous parsed_rosters to avoid shrinking on partial cycles
+    parsed_path = os.path.join(dest_folder, "parsed_rosters.json")
+    if os.path.exists(parsed_path):
+        try:
+            with open(parsed_path, "r", encoding="utf-8") as f:
+                prev = json.load(f)
+            if isinstance(prev, list):
+                for p in prev:
+                    k = _player_key(p)
+                    if k not in merged_map:
+                        merged.append(p)
+        except Exception as e:
+            print(f"⚠️ Couldn’t union previous parsed_rosters.json: {e}")
+
+    # Write a raw-style rosters.json and then run the parser on the merged data
+    out_raw = {"rosterInfoList": merged}
+    os.makedirs(dest_folder, exist_ok=True)
+    raw_path = os.path.join(dest_folder, "rosters.json")
+    with open(raw_path, "w", encoding="utf-8") as f:
+        json.dump(out_raw, f, indent=2)
+    print(f"✅ Roster merged → {raw_path} (players={len(merged)})")
+
+    # Drive the existing parser (keeps rosters.html reading parsed_rosters.json)
+    parse_rosters_data(out_raw, "debounced/merge", dest_folder)
+
+    # Helpful per-team log
+    team_counts = Counter(str(p.get("teamId") or p.get("team") or 0) for p in merged)
+    non_fa = {tid: c for tid, c in team_counts.items() if tid != "0"}
+    print(f"📊 Roster coverage: teams={len(non_fa)} + FA={team_counts.get('0', 0)} players")
+    if non_fa:
+        top = sorted(non_fa.items(), key=lambda kv: kv[1], reverse=True)[:10]
+        print("   top teams:", ", ".join(f"{tid}:{cnt}" for tid, cnt in top))
+
+    # reset accumulator
+    merged_map.clear()
+    acc["timer"] = None
 
 def compute_display_week(phase: str | None, week_number: int | None) -> int | None:
     """
@@ -706,18 +785,28 @@ def process_webhook_data(data, subpath, headers, body):
     elif "gameScheduleInfoList" in data:
         filename = "schedule.json"
     elif "rosterInfoList" in data:
-        # Debounce & write once for the largest payload; do NOT fall through
+        # Skip failed/empty exports so you don't overwrite a good file
         if data.get("success") is False and not data.get("rosterInfoList"):
             print("⚠️ Skipping roster write: export failed / empty list.")
             return
 
-        print("📥 Roster data received; queuing for debounce write.")
-        output_dir = os.path.join(
-            app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global"
-        )
-        _queue_roster_write(league_id, data, body, output_dir)
-        return  # ← critical: prevents the generic writer from overwriting repeatedly
+        # Always store rosters in global folder
+        league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
+        os.makedirs(league_folder, exist_ok=True)
 
+        roster_list = data.get("rosterInfoList") or []
+        added, total = _add_roster_chunk(league_id, roster_list)
+        print(f"📥 Roster chunk received ({len(roster_list)}); merged so far={total} (added={added}).")
+
+        # debounce
+        acc = _get_roster_acc(league_id)
+        if acc["timer"]:
+            acc["timer"].cancel()
+        acc["timer"] = Timer(ROSTER_DEBOUNCE_SEC, _flush_roster, args=[league_id, league_folder])
+        acc["timer"].start()
+
+        # short-circuit so the generic writer doesn’t overwrite with a partial chunk
+        return
     elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         filename = "league.json"
         print("🏈 League Info received and saved!")
