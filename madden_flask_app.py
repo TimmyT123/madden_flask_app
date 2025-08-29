@@ -128,6 +128,54 @@ def _queue_roster_write(league_id: str, data: dict, raw_body: bytes, output_dir:
         _roster_timers[league_id] = Timer(2.0, _flush)  # 2s debounce window
         _roster_timers[league_id].start()
 
+import tempfile
+
+def _atomic_write_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(suffix=".json", dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(obj, f, indent=2)
+        os.replace(tmp, path)
+    except Exception:
+        try: os.remove(tmp)
+        except: pass
+        raise
+
+def _upsert_rosters(league_folder: str, incoming: list[dict]) -> list[dict]:
+    """Merge incoming roster batch with existing league-wide rosters.json."""
+    path = os.path.join(league_folder, "rosters.json")
+
+    # 1) load current
+    current: list[dict] = []
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            current = (raw.get("rosterInfoList") if isinstance(raw, dict) else raw) or []
+        except Exception:
+            current = []
+
+    # 2) index by a stable key (prefer rosterId, fallback to playerId, else composite)
+    def key(p):
+        return str(
+            p.get("rosterId")
+            or p.get("playerId")
+            or f"{p.get('teamId')}_{p.get('jerseyNum')}_{p.get('lastName')}_{p.get('firstName')}"
+        )
+
+    by_id = {key(p): p for p in current}
+    for p in incoming or []:
+        by_id[key(p)] = p   # last write wins per player
+
+    merged = list(by_id.values())
+
+    # 3) write back atomically
+    payload = {"success": True, "rosterInfoList": merged}
+    _atomic_write_json(path, payload)
+
+    print(f"🧩 Upserted rosters: had {len(current)}, added/updated {len(incoming or [])}, now {len(merged)}")
+    return merged
 
 def compute_display_week(phase: str | None, week_number: int | None) -> int | None:
     """
@@ -772,8 +820,18 @@ def process_webhook_data(data, subpath, headers, body):
     if filename == "league.json":
         parse_league_info_data(data, subpath, league_folder)
 
+    # Special handling for roster chunks: merge instead of overwrite
+    if filename == "rosters.json":
+        merged_players = _upsert_rosters(league_folder, data.get("rosterInfoList") or [])
+        # Build a dict for the parser so it sees rosterInfoList (no code change needed there)
+        parse_rosters_data({"rosterInfoList": merged_players}, subpath, league_folder)
+        # Update cache key and return early to avoid writing the small chunk over the merged file
+        league_data[subpath] = {"success": True, "rosterInfoList": merged_players}
+        return
+
+    # Generic write for non-roster payloads
     output_path = os.path.join(league_folder, filename)
-    with open(output_path, 'w') as f:
+    with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4)
     print(f"✅ Data saved to {output_path}")
 
