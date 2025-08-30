@@ -25,6 +25,9 @@ from urllib.parse import urlparse, parse_qs
 
 from collections import Counter, defaultdict
 
+from pathlib import Path
+from datetime import datetime
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -786,15 +789,29 @@ def process_webhook_data(data, subpath, headers, body):
         filename = "schedule.json"
     elif "rosterInfoList" in data:
         # ✳️ Debug FA payloads specifically
-        if "freeagents" in (subpath or ""):
-            print(f"🧲 Free Agents payload: success={data.get('success')} "
-                  f"count={len(data.get('rosterInfoList') or [])}")
+        if "freeagents" in (subpath or "").lower():
+            fa_count = len(data.get("rosterInfoList") or [])
+            print(
+                f"🧲 Free Agents payload: success={data.get('success')} "
+                f"count={fa_count} "
+                f"message={data.get('message') or data.get('error')}"
+            )
+
+            dump_root = Path(app.config["UPLOAD_FOLDER"])
+            dump_dir = dump_root / str(league_id) / "season_global" / "week_global"
+            dump_dir.mkdir(parents=True, exist_ok=True)
+
+            ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+            raw_path = dump_dir / f"freeagents_raw_{ts}.json"
+            with raw_path.open("w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+            print(f"🧲 Free Agents payload: saved raw to {raw_path}")
 
         # Skip failed/empty exports so you don't overwrite a good file
         if data.get("success") is False and not data.get("rosterInfoList"):
             print("⚠️ Skipping roster write: export failed / empty list.")
             return
-
         # Always store rosters in global folder
         league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
         os.makedirs(league_folder, exist_ok=True)
