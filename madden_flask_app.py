@@ -259,6 +259,115 @@ def _flush_roster(league_id: str, dest_folder: str):
     merged_map.clear()
     acc["timer"] = None
 
+def _load_team_map(league_id):
+    p = os.path.join(app.config['UPLOAD_FOLDER'], str(league_id), 'team_map.json')
+    try:
+        with open(p, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def team_logo(team_id):
+    """Return /static/logos/<TeamName>.png (fallback to wurd_logo.png)."""
+    league_id = league_data.get("latest_league")
+    name = None
+
+    try:
+        tm_path = Path(app.config["UPLOAD_FOLDER"]) / str(league_id) / "team_map.json"
+        if tm_path.exists():
+            data = json.loads(tm_path.read_text(encoding="utf-8"))
+            entry = (
+                data.get(str(team_id))
+                if isinstance(data, dict)
+                else next((t for t in data if str(t.get("teamId")) == str(team_id)), None)
+            )
+            if entry:
+                name = entry.get("teamName") or entry.get("displayName") or entry.get("name")
+    except Exception:
+        pass
+
+    if not name:
+        return url_for("static", filename="images/wurd_logo.png")
+
+    # make a safe candidate like "NewYorkGiants" -> "NewYorkGiants.png"
+    safe = re.sub(r"[^A-Za-z0-9]", "", name)
+
+    # pick the first file that exists (case-sensitive on Linux)
+    logo_dir = Path(app.root_path) / "static" / "logos"
+    for candidate in (f"{name}.png", f"{safe}.png"):
+        if (logo_dir / candidate).exists():
+            return url_for("static", filename=f"logos/{candidate}")
+
+    return url_for("static", filename="images/wurd_logo.png")
+
+# Make jersey_num usable in Jinja
+@app.template_global()
+def jersey_num(player):
+    """
+    Return a player's jersey number as a string.
+    Checks top-level first, then player['_raw'], then shallow-deep search.
+    Keeps '0' valid, treats -1/None/'' as missing.
+    """
+    KEYS = ("jerseyNum", "uniformNumber", "jerseyNumber", "jersey", "number")
+
+    def _get(obj, k):
+        if isinstance(obj, dict):
+            return obj.get(k)
+        return getattr(obj, k, None)
+
+    def pick_from(obj):
+        if not obj:
+            return None
+        for k in KEYS:
+            v = _get(obj, k)
+            if v is not None and str(v).strip() != "":
+                return v
+        return None
+
+    # 1) top-level
+    found = pick_from(player)
+
+    # 2) _raw payload (if you attach it to your row)
+    raw = _get(player, "_raw")
+    if found is None:
+        found = pick_from(raw)
+
+    # 3) last resort: shallow-deep scan across player and _raw
+    if found in (None, ""):
+        stack = []
+        if isinstance(player, (dict, list, tuple)):
+            stack.append(player)
+        if isinstance(raw, (dict, list, tuple)) and raw is not player:
+            stack.append(raw)
+        while stack:
+            cur = stack.pop()
+            if isinstance(cur, dict):
+                for k, v in cur.items():
+                    if k in KEYS and v not in (None, "", -1):
+                        found = v
+                        stack.clear()
+                        break
+                    if isinstance(v, (dict, list, tuple)):
+                        stack.append(v)
+            elif isinstance(cur, (list, tuple)):
+                stack.extend(cur)
+
+    # Debug (safe)
+    if app.config.get("DEBUG_JERSEYS"):
+        name = _get(player, "playerName") or _get(player, "name") or _get(player, "displayName") or ""
+        print(f"[jersey_num] {name!r} -> {found!r}")
+
+    if found in (None, "", -1):
+        return ""
+    try:
+        return str(int(str(found).strip()))  # normalize 12/"12"/" 12 "
+    except Exception:
+        return str(found).strip()
+
+# Jinja globals
+app.jinja_env.globals.update(jersey_num=jersey_num, team_logo=team_logo)
+
+
 def compute_display_week(phase: str | None, week_number: int | None) -> int | None:
     """
     Convert season phase + week_number into a single display week index.
@@ -1213,7 +1322,6 @@ def format_cap(value):
 _roster_cache = {}  # {league_id: {"mtime": float, "players": [...], "positions": set()}}
 
 def _normalize_player(p: dict) -> dict:
-    """Return a compact player record with common keys; tolerate missing fields."""
     def g(*keys, default=None):
         for k in keys:
             if k in p and p[k] is not None:
@@ -1227,9 +1335,9 @@ def _normalize_player(p: dict) -> dict:
     team_id = str(g("teamId", "teamID", "team", default=""))
     pos     = g("position", "pos", default="UNK")
 
-    # ratings — include Companion synonyms
-    ovr = g("overallRating", "ovr", "overall", "playerBestOvr", "playerSchemeOvr", default=0)
+    jersey  = g("jerseyNum", "uniformNumber", "jerseyNumber", "jersey", "number", default=None)
 
+    ovr = g("overallRating", "ovr", "overall", "playerBestOvr", "playerSchemeOvr", default=0)
     age = g("age", default=None)
     dev = g("devTrait", "developmentTrait", "dev", default=None)
 
@@ -1240,7 +1348,6 @@ def _normalize_player(p: dict) -> dict:
     awa   = g("awarenessRating", "awareRating", "awr", default=None)
 
     thp   = g("throwPowerRating", "throwPower", default=None)
-    # prefer single rating; else use short/mid/deep if present
     tha   = g("throwAccRating", "throwAccuracy", "throwAccuracyShort",
               "throwAccShortRating", "throwAccMidRating", "throwAccDeepRating",
               "throwAccShort", "throwAccMid", "throwAccDeep", default=None)
@@ -1267,14 +1374,17 @@ def _normalize_player(p: dict) -> dict:
     kpw   = g("kickPowerRating", "kickPower", "kpw", default=None)
     kac   = g("kickAccRating", "kickAccuracy", "kac", default=None)
 
-    # make sure OVR is an int if possible
     try:
         ovr = int(ovr)
     except Exception:
         ovr = ovr or 0
 
+    # ✅ include jersey + keep raw dict for robust fallbacks
     return {
         "name": name, "teamId": team_id, "pos": pos, "ovr": ovr,
+        "jerseyNum": jersey,              # ← add this
+        "_raw": p,                        # ← and this
+
         "age": age, "dev": dev,
         "spd": speed, "acc": acc, "agi": agi, "str": strn, "awr": awa,
         "thp": thp, "tha": tha, "cth": cat, "cit": cit, "spc": spc,

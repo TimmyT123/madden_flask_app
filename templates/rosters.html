@@ -42,6 +42,12 @@
     th { color:#aab2d5; font-weight:600; }
     .pager { margin-top:12px; display:flex; justify-content:center; gap:8px; }
     .chip { display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(255,213,74,.12); color:#ffd54a; font-weight:700; }
+
+    .playercell{display:flex;align-items:center;gap:8px}
+    .playercell .logo{width:22px;height:22px;object-fit:contain}
+    .playercell .number{font-weight:700;min-width:2.2ch;opacity:.9}
+    .playercell .name{white-space:nowrap}
+
   </style>
 </head>
 <body>
@@ -98,12 +104,22 @@
           {% for c in columns %}
             {% set v = p.get(c) %}
             <td>
-              {% if c == 'ovr' and v is not none %}
-                <span class="chip">{{ v }}</span>
-              {% else %}
-                {{ v if v is not none else '' }}
-              {% endif %}
-            </td>
+            {% set is_name_col = c in ('name','playerName','player','displayName','fullName') or loop.first %}
+            {% if is_name_col %}
+              {% set jn = jersey_num(p) %}
+              <div class="playercell overall">
+                {% if p.teamId is not none %}
+                  <img class="logo" src="{{ team_logo(p.teamId) }}" alt="">
+                {% endif %}
+                {% if jn %}<span class="number">#{{ jn }}</span>{% endif %}
+                <span class="name">{{ p.playerName or p.name }}</span>
+              </div>
+            {% elif c == 'ovr' and v is not none %}
+              <span class="chip">{{ v }}</span>
+            {% else %}
+              {{ v if v is not none else '' }}
+            {% endif %}
+          </td>
           {% endfor %}
         </tr>
       {% endfor %}
@@ -127,7 +143,13 @@
           {% for c in columns %}
             {% set v = p.get(c) %}
             <td>
-              {% if c == 'ovr' and v is not none %}
+              {% set is_name_col = c in ('name','playerName','player','displayName','fullName') or loop.first %}
+              {% if is_name_col %}
+                <div class="playercell team">
+                  <span class="number">#{{ jersey_num(p) }}</span>
+                  <span class="name">{{ p.playerName or p.name }}</span>
+                </div>
+              {% elif c == 'ovr' and v is not none %}
                 <span class="chip">{{ v }}</span>
               {% else %}
                 {{ v if v is not none else '' }}
@@ -158,12 +180,19 @@
             {% for c in columns %}
               {% set v = p.get(c) %}
               <td>
-                {% if c == 'ovr' and v is not none %}
-                  <span class="chip">{{ v }}</span>
-                {% else %}
-                  {{ v if v is not none else '' }}
-                {% endif %}
-              </td>
+              {% set is_name_col = c in ('name','playerName','player','displayName','fullName') or loop.first %}
+              {% if is_name_col %}
+                {% set jn = jersey_num(p) %}
+                <div class="playercell team">
+                  {% if jn %}<span class="number">#{{ jn }}</span>{% endif %}
+                  <span class="name">{{ p.playerName or p.name }}</span>
+                </div>
+              {% elif c == 'ovr' and v is not none %}
+                <span class="chip">{{ v }}</span>
+              {% else %}
+                {{ v if v is not none else '' }}
+              {% endif %}
+            </td>
             {% endfor %}
           </tr>
         {% endfor %}
@@ -172,6 +201,7 @@
   {% endfor %}
 
 {% else %}
+  {% set single_is_overall = (not team) or (team|string in ['ALL','all','0']) %}
   <!-- Your existing single-table view for filtered pages -->
   <table>
     <thead>
@@ -187,7 +217,16 @@
           {% for c in columns %}
             {% set v = p.get(c) %}
             <td>
-              {% if c == 'ovr' and v is not none %}
+              {% set is_name_col = c in ('name','playerName','player','displayName','fullName') or loop.first %}
+              {% if is_name_col %}
+                <div class="playercell {{ 'overall' if single_is_overall else 'team' }}">
+                  {% if single_is_overall and p.teamId is not none %}
+                    <img class="logo" src="{{ team_logo(p.teamId) }}" alt="">
+                  {% endif %}
+                  <span class="number">#{{ jersey_num(p) }}</span>
+                  <span class="name">{{ p.playerName or p.name }}</span>
+                </div>
+              {% elif c == 'ovr' and v is not none %}
                 <span class="chip">{{ v }}</span>
               {% else %}
                 {{ v if v is not none else '' }}
