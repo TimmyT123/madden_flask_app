@@ -457,7 +457,7 @@ def load_team_records(root_dir: str) -> dict[str, tuple[int,int,int]]:
 
 def make_label_with_record(team_id_str: str, team_map: dict, records: dict, prefer="name") -> str:
     """
-    Build 'Name(W-L)' or 'Name(W-L-T)' if ties > 0.
+    Build 'Name (W-L)' or 'Name (W-L-T)' if ties > 0.
     prefer: 'name' (default) or 'abbr'
     """
     tm = team_map.get(team_id_str, {})
@@ -469,7 +469,7 @@ def make_label_with_record(team_id_str: str, team_map: dict, records: dict, pref
     if isinstance(wlt, tuple) and len(wlt) == 3:
         w,l,t = wlt
         if w is not None and l is not None:
-            return f"{base}({w}-{l}-{t})" if t and t > 0 else f"{base}({w}-{l})"
+            return f"{base} ({w}-{l}-{t})" if t and t > 0 else f"{base} ({w}-{l})"
     return base
 
 
