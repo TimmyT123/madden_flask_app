@@ -801,12 +801,12 @@ def process_webhook_data(data, subpath, headers, body):
             dump_dir = dump_root / str(league_id) / "season_global" / "week_global"
             dump_dir.mkdir(parents=True, exist_ok=True)
 
-            ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-            raw_path = dump_dir / f"freeagents_raw_{ts}.json"
+            # 🔁 Always overwrite the same file
+            raw_path = dump_dir / "freeagents_last_raw.json"
             with raw_path.open("w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
-            print(f"🧲 Free Agents payload: saved raw to {raw_path}")
+            print(f"🧲 Free Agents payload: wrote → {raw_path}")
 
         # Skip failed/empty exports so you don't overwrite a good file
         if data.get("success") is False and not data.get("rosterInfoList"):
