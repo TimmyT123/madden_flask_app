@@ -83,6 +83,96 @@
     </label>
   </form>
 
+  {% if show_sections %}
+  <!-- Overall -->
+  <h3 style="margin-top:16px;">Overall</h3>
+  <table>
+    <thead>
+      <tr>
+        {% for c in columns %}<th>{{ column_labels.get(c, c|upper) }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in overall_players %}
+        <tr>
+          {% for c in columns %}
+            {% set v = p.get(c) %}
+            <td>
+              {% if c == 'ovr' and v is not none %}
+                <span class="chip">{{ v }}</span>
+              {% else %}
+                {{ v if v is not none else '' }}
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      {% if overall_players|length == 0 %}
+        <tr><td colspan="{{ columns|length }}">No players in Overall.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <!-- Free Agents -->
+  <h3 style="margin-top:28px;">Free Agents</h3>
+  <table>
+    <thead>
+      <tr>
+        {% for c in columns %}<th>{{ column_labels.get(c, c|upper) }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in free_agents %}
+        <tr>
+          {% for c in columns %}
+            {% set v = p.get(c) %}
+            <td>
+              {% if c == 'ovr' and v is not none %}
+                <span class="chip">{{ v }}</span>
+              {% else %}
+                {{ v if v is not none else '' }}
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      {% if free_agents|length == 0 %}
+        <tr><td colspan="{{ columns|length }}">No free agents found.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <!-- Teams -->
+  <h3 style="margin-top:28px;">Teams</h3>
+  {% for t in teams_block %}
+    <h4 style="margin:14px 0 6px 0;">{{ t.teamName }}</h4>
+    <table>
+      <thead>
+        <tr>
+          {% for c in columns %}<th>{{ column_labels.get(c, c|upper) }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in t.players %}
+          <tr>
+            {% for c in columns %}
+              {% set v = p.get(c) %}
+              <td>
+                {% if c == 'ovr' and v is not none %}
+                  <span class="chip">{{ v }}</span>
+                {% else %}
+                  {{ v if v is not none else '' }}
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endfor %}
+
+{% else %}
+  <!-- Your existing single-table view for filtered pages -->
   <table>
     <thead>
       <tr>
@@ -111,7 +201,10 @@
       {% endif %}
     </tbody>
   </table>
+{% endif %}
 
+
+  {% if not show_sections %}
   <div class="pager">
     {% set total_pages = (total + per - 1) // per %}
     {% if page > 1 %}
@@ -122,6 +215,8 @@
       <a href="{{ url_for('rosters', league=league, team=team, pos=pos, per=per, page=page+1) }}">Next ➡</a>
     {% endif %}
   </div>
+  {% endif %}
+
 </div>
 </body>
 </html>

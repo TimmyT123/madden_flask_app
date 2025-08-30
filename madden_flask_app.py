@@ -39,7 +39,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 league_data = {}
 
-ROSTER_DEBOUNCE_SEC = 8.0   # try 8s; tweak to 10–12s if needed
+ROSTER_DEBOUNCE_SEC = 10.0   # try 8s; tweak to 10–12s if needed
 _roster_acc = {}            # {league_id: {"players_by_key": {}, "timer": Timer | None}}
 
 batch_written = {
@@ -785,6 +785,11 @@ def process_webhook_data(data, subpath, headers, body):
     elif "gameScheduleInfoList" in data:
         filename = "schedule.json"
     elif "rosterInfoList" in data:
+        # ✳️ Debug FA payloads specifically
+        if "freeagents" in (subpath or ""):
+            print(f"🧲 Free Agents payload: success={data.get('success')} "
+                  f"count={len(data.get('rosterInfoList') or [])}")
+
         # Skip failed/empty exports so you don't overwrite a good file
         if data.get("success") is False and not data.get("rosterInfoList"):
             print("⚠️ Skipping roster write: export failed / empty list.")
@@ -969,7 +974,28 @@ def post_highlight_to_discord(message, file_path=None):
         print(f"❌ Failed to post to Discord: {response.status_code} {response.text}")
 
 
-import json
+FA_IDS = {"0", "32", "-1", "1000"}        #
+FA_NAMES = {"free agents", "fa", "free-agents", "freeagents"}
+
+def is_free_agent(p, valid_team_ids):
+    tid = str(p.get("teamId") or "").strip()
+    if tid in FA_IDS:
+        return True
+    tname = (p.get("teamName") or "").strip().lower()
+    if ("free" in tname) and ("agent" in tname):
+        return True
+    return tid not in valid_team_ids
+
+def sort_key(p):
+    # same sort you use below (OVR then SPD)
+    return (int(p.get("ovr") or 0), int(p.get("spd") or 0))
+
+def ui_player(p, _dev_to_label):
+    # apply your dev-label mapping for consistent UI
+    q = dict(p)
+    q["dev"] = _dev_to_label(p.get("dev"))
+    return q
+
 
 @app.route('/stats')
 def show_stats():
@@ -1324,69 +1350,85 @@ DEV_LABELS = {0: "Normal", 1: "Star", 2: "Superstar", 3: "X-Factor"}
 
 @app.route("/rosters")
 def rosters():
-    # defaults
     league = request.args.get("league") or league_data.get("latest_league") or "17287266"
-    team   = request.args.get("team", "NFL")     # "NFL" = all teams
-    pos    = request.args.get("pos", "ALL")      # "ALL" = Overall view
+    team   = request.args.get("team", "NFL")
+    pos    = request.args.get("pos", "ALL")
     page   = max(int(request.args.get("page", 1)), 1)
     per    = max(int(request.args.get("per", 50)), 10)
 
     # load players + positions
     idx = load_roster_index(league)
-    players = idx["players"]
-    print(f"🧮 rosters page: total players available={len(players)}")
-    positions = sorted(list(idx["positions"]))
-    positions = ["ALL"] + positions  # first option
+    all_players = idx["players"]
+    positions = ["ALL"] + sorted(list(idx["positions"]))
 
-    # team list from team_map.json
+    # --- build valid ids first ---
     team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
     teams = {}
     if os.path.exists(team_map_path):
         with open(team_map_path, "r", encoding="utf-8") as f:
             teams = json.load(f)
-    team_options = [{"id": "NFL", "name": "NFL (All Teams)"}] + \
-                   [{"id": tid, "name": info.get("name","")} for tid, info in sorted(teams.items(), key=lambda x: x[1].get("name",""))]
 
-    # filter by team
+    valid_team_ids = {str(k) for k in teams.keys()} | {str(i) for i in range(32)}
+
+    # now define the wrapper (bind the set at definition time)
+    def is_fa(p, _valid_ids=valid_team_ids):
+        return is_free_agent(p, _valid_ids)
+
+    # debug after is_fa exists and valid_team_ids is bound
+    fa_buckets = Counter(str(p.get("teamId")) for p in all_players if is_fa(p))
+    print("🔎 FA teamId buckets:", fa_buckets)
+    print("🔎 Total FAs:", sum(fa_buckets.values()))
+
+    # UI options
+    team_options = (
+        [{"id": "NFL", "name": "NFL (All Teams)"}, {"id": "FA", "name": "Free Agents"}] +
+        [{"id": tid, "name": info.get("name","")} for tid, info in sorted(teams.items(), key=lambda x: x[1].get("name",""))]
+    )
+
+    # filtering/sorting/pagination...
+    players = list(all_players)
     if team and team != "NFL":
-        players = [p for p in players if p.get("teamId") == str(team)]
-
-    # filter by position
+        players = [p for p in players if is_fa(p)] if team == "FA" else [p for p in players if str(p.get("teamId")) == str(team)]
     if pos and pos != "ALL":
         players = [p for p in players if p.get("pos") == pos]
+    players.sort(key=sort_key, reverse=True)
 
-    # sort (overall first)
-    players.sort(key=lambda p: (p.get("ovr") or 0, p.get("spd") or 0), reverse=True)
-
-    # columns for this view
     columns = OVERALL_COLUMNS if pos == "ALL" else POSITION_COLUMNS.get(pos, OVERALL_COLUMNS)
-
-    # pagination for huge leagues
-    total = len(players)
-    start = (page - 1) * per
-    end   = start + per
-    page_players = players[start:end]
-
+    total = len(players); start = (page - 1) * per; end = start + per
     def _dev_to_label(v):
-        try:
-            return DEV_LABELS.get(int(v), v)
-        except (TypeError, ValueError):
-            return v or ""
+        try: return DEV_LABELS.get(int(v), v)
+        except (TypeError, ValueError): return v or ""
+    page_players_ui = [ui_player(p, _dev_to_label) for p in players[start:end]]
 
-    # make a UI-only copy with 'dev' replaced by its label
-    page_players_ui = [{**p, "dev": _dev_to_label(p.get("dev"))} for p in page_players]
+    show_sections = (team == "NFL" and pos == "ALL")
+    overall_players_ui = []; free_agents_ui = []; teams_block = []
+    if show_sections:
+        overall_players_ui = [ui_player(p, _dev_to_label) for p in sorted(all_players, key=sort_key, reverse=True)[:100]]
+        fa_list = sorted([p for p in all_players if is_fa(p)], key=sort_key, reverse=True)
+        free_agents_ui = [ui_player(p, _dev_to_label) for p in fa_list]
+
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        for p in all_players:
+            if not is_fa(p):
+                grouped[str(p.get("teamId"))].append(p)
+        for tid, plist in grouped.items():
+            plist.sort(key=sort_key, reverse=True)
+            tname = teams.get(tid, {}).get("name", f"Team {tid}")
+            teams_block.append({"teamId": tid, "teamName": tname,
+                                "players": [ui_player(p, _dev_to_label) for p in plist]})
+        teams_block.sort(key=lambda t: (t["players"][0].get("ovr") or 0) if t["players"] else 0, reverse=True)
 
     return render_template(
         "rosters.html",
-        league=league,
-        team=team,
-        pos=pos,
-        positions=positions,
-        teams=team_options,
-        columns=columns,
-        column_labels=COLUMN_LABELS,
-        players=page_players_ui,
-        total=total, page=page, per=per
+        league=league, team=team, pos=pos,
+        positions=positions, teams=team_options,
+        columns=columns, column_labels=COLUMN_LABELS,
+        players=page_players_ui, total=total, page=page, per=per,
+        show_sections=show_sections,
+        overall_players=overall_players_ui,
+        free_agents=free_agents_ui,
+        teams_block=teams_block
     )
 
 
