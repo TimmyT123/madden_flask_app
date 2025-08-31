@@ -1481,7 +1481,7 @@ def rosters():
     team   = request.args.get("team", "NFL")
     pos    = request.args.get("pos", "ALL")
     page   = max(int(request.args.get("page", 1)), 1)
-    per    = max(int(request.args.get("per", 50)), 10)
+    per    = max(int(request.args.get("per", 100)), 10)
 
     # load players + positions
     idx = load_roster_index(league)
@@ -1527,6 +1527,9 @@ def rosters():
         except (TypeError, ValueError): return v or ""
     page_players_ui = [ui_player(p, _dev_to_label) for p in players[start:end]]
 
+    for row in page_players_ui:
+        row["teamLogo"] = team_logo(row.get("teamId"))
+
     show_sections = (team == "NFL" and pos == "ALL")
     overall_players_ui = []; free_agents_ui = []; teams_block = []
     if show_sections:
@@ -1546,6 +1549,8 @@ def rosters():
                                 "players": [ui_player(p, _dev_to_label) for p in plist]})
         teams_block.sort(key=lambda t: (t["players"][0].get("ovr") or 0) if t["players"] else 0, reverse=True)
 
+    show_team_logos = (team == "NFL")
+
     return render_template(
         "rosters.html",
         league=league, team=team, pos=pos,
@@ -1555,7 +1560,8 @@ def rosters():
         show_sections=show_sections,
         overall_players=overall_players_ui,
         free_agents=free_agents_ui,
-        teams_block=teams_block
+        teams_block=teams_block,
+        show_team_logos=show_team_logos
     )
 
 

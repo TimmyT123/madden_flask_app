@@ -48,6 +48,13 @@
     .playercell .number{font-weight:700;min-width:2.2ch;opacity:.9}
     .playercell .name{white-space:nowrap}
 
+    .team-logo {
+      height: 24px;
+      width: auto;
+      display: block;
+    }
+
+
   </style>
 </head>
 <body>
@@ -201,7 +208,7 @@
   {% endfor %}
 
 {% else %}
-  {% set single_is_overall = (not team) or (team|string in ['ALL','all','0']) %}
+  {% set show_team_logos = (team|string == 'NFL') %}
   <!-- Your existing single-table view for filtered pages -->
   <table>
     <thead>
@@ -219,8 +226,8 @@
             <td>
               {% set is_name_col = c in ('name','playerName','player','displayName','fullName') or loop.first %}
               {% if is_name_col %}
-                <div class="playercell {{ 'overall' if single_is_overall else 'team' }}">
-                  {% if single_is_overall and p.teamId is not none %}
+                <div class="playercell {{ 'overall' if show_team_logos else 'team' }}">
+                  {% if show_team_logos and p.teamId is not none %}
                     <img class="logo" src="{{ team_logo(p.teamId) }}" alt="">
                   {% endif %}
                   <span class="number">#{{ jersey_num(p) }}</span>
