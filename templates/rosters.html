@@ -64,7 +64,16 @@
     }
     .team-meta .dim{opacity:.7}
   </style>
-
+  <style>
+    .searchwrap { display:flex; justify-content:center; margin:10px 0 14px; }
+    .searchwrap input[type="text"]{
+      width: min(560px, 90%);
+      padding: 10px 12px; border-radius: 12px;
+      border:1px solid rgba(255,255,255,.15); background:#171a2c; color:#fff;
+      outline: none;
+    }
+    .row-hit { outline: 2px solid rgba(255,213,74,.45); outline-offset: -2px; }
+  </style>
 </head>
 <body>
 
@@ -105,6 +114,19 @@
     </label>
   </form>
 
+  {% if show_search %}
+    <div class="searchwrap">
+      <input id="playerSearch" type="text"
+             placeholder="Search players… (type to filter)"
+             list="playerNames" autocomplete="off">
+      <datalist id="playerNames">
+        {% for p in search_index %}
+          <option value="{{ p.name }}"></option>
+        {% endfor %}
+      </datalist>
+    </div>
+  {% endif %}
+
   {% if team_total_count is not none %}
     <div class="team-meta" style="text-align:center; margin: 6px 0 12px 0;">
       <span class="badge">{{ team_total_count }}</span> players on the {{ team_name }}
@@ -117,7 +139,7 @@
   {% if show_sections %}
   <!-- Overall -->
   <h3 style="margin-top:16px;">Overall</h3>
-  <table>
+  <table id="overallTable">
     <thead>
       <tr>
         {% for c in columns %}<th>{{ column_labels.get(c, c|upper) }}</th>{% endfor %}
@@ -282,5 +304,46 @@
   {% endif %}
 
 </div>
+{% if show_search %}
+<script>
+(function(){
+  const input = document.getElementById('playerSearch');
+  if (!input) return;
+
+  // Grab ALL roster rows on the page (Overall + Free Agents + every Team block)
+  const allRows = Array.from(document.querySelectorAll('table tbody tr'));
+
+  function norm(s){ return (s || '').toLowerCase().trim(); }
+
+  function rowName(tr){
+    const nameEl = tr.querySelector('.playercell .name');
+    return norm(nameEl ? nameEl.textContent : '');
+  }
+
+  input.addEventListener('input', () => {
+    const q = norm(input.value);
+    let anyShown = false;
+
+    // Show/hide rows based on match
+    allRows.forEach(tr => {
+      const name = rowName(tr);
+      const match = !q || name.includes(q);
+      tr.style.display = match ? '' : 'none';
+      tr.classList.toggle('row-hit', match && q.length >= 2);
+      if (match) anyShown = true;
+    });
+
+    // Optionally hide team tables that have no visible rows
+    document.querySelectorAll('table').forEach(tbl => {
+      const visibleRows = tbl.querySelectorAll('tbody tr:not([style*="display: none"])').length;
+      // keep headers; only hide table if it has a body and zero visible rows
+      if (tbl.querySelector('tbody')) {
+        tbl.style.display = (q && visibleRows === 0) ? 'none' : '';
+      }
+    });
+  });
+})();
+</script>
+{% endif %}
 </body>
 </html>

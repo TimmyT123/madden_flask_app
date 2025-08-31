@@ -1556,6 +1556,16 @@ def rosters():
                                 "players": [ui_player(p, _dev_to_label) for p in plist]})
         teams_block.sort(key=lambda t: (t["players"][0].get("ovr") or 0) if t["players"] else 0, reverse=True)
 
+    # show search only on NFL + Overall
+    show_search = (team == "NFL" and pos == "ALL")
+
+    # minimal search index (names only is enough for a friendly typeahead)
+    search_index = []
+    if show_search:
+        def _pname(p): return p.get("playerName") or p.get("name") or ""
+
+        search_index = [{"name": _pname(p)} for p in all_players if _pname(p)]
+
     show_team_logos = (team == "NFL")
 
     return render_template(
@@ -1570,7 +1580,9 @@ def rosters():
         teams_block=teams_block,
         team_total_count=team_total_count,
         team_name=team_name,
-        show_team_logos=show_team_logos
+        show_team_logos=show_team_logos,
+        show_search=show_search,
+        search_index=search_index,
     )
 
 
