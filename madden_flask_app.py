@@ -1495,6 +1495,13 @@ def rosters():
         with open(team_map_path, "r", encoding="utf-8") as f:
             teams = json.load(f)
 
+    team_name = None
+    team_total_count = None
+
+    if team not in ("NFL", "FA"):
+        team_name = teams.get(str(team), {}).get("name", f"Team {team}")
+        team_total_count = sum(1 for p in all_players if str(p.get("teamId")) == str(team))
+
     valid_team_ids = {str(k) for k in teams.keys()} | {str(i) for i in range(32)}
 
     # now define the wrapper (bind the set at definition time)
@@ -1561,6 +1568,8 @@ def rosters():
         overall_players=overall_players_ui,
         free_agents=free_agents_ui,
         teams_block=teams_block,
+        team_total_count=team_total_count,
+        team_name=team_name,
         show_team_logos=show_team_logos
     )
 

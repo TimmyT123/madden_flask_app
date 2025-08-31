@@ -56,6 +56,15 @@
 
 
   </style>
+  <style>
+    .team-meta .badge{
+      display:inline-block; padding:2px 8px; border-radius:999px;
+      background:rgba(255,213,74,.12); color:#ffd54a; font-weight:700;
+      margin-right:6px;
+    }
+    .team-meta .dim{opacity:.7}
+  </style>
+
 </head>
 <body>
 
@@ -95,6 +104,15 @@
       </select>
     </label>
   </form>
+
+  {% if team_total_count is not none %}
+    <div class="team-meta" style="text-align:center; margin: 6px 0 12px 0;">
+      <span class="badge">{{ team_total_count }}</span> players on the {{ team_name }}
+      {% if pos != 'ALL' %}
+        <span class="dim"> • {{ total }} shown in this view</span>
+      {% endif %}
+    </div>
+  {% endif %}
 
   {% if show_sections %}
   <!-- Overall -->
