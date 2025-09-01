@@ -1433,6 +1433,41 @@ def load_roster_index(league_id: str) -> dict:
     _roster_cache[league_id] = out
     return out
 
+def load_team_ovr_by_id(league_id: str) -> dict[str, int]:
+    """
+    Returns {teamId(str): teamOvr(int)} from parsed_league_info.json.
+    Falls back gracefully if the file/keys don't exist.
+    """
+    base = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
+    path = os.path.join(base, "parsed_league_info.json")
+    ovr_map: dict[str, int] = {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f) or {}
+        teams = (
+            data.get("leagueTeamInfoList")
+            or data.get("teamInfoList")
+            or data.get("teams")
+            or []
+        )
+        for t in teams:
+            tid = str(t.get("teamId") or t.get("id") or "")
+            ovr = (
+                t.get("teamOvr")
+                or t.get("teamOverall")
+                or t.get("ovr")
+                or t.get("overall")
+            )
+            if tid:
+                try:
+                    ovr_map[tid] = int(ovr)
+                except Exception:
+                    # keep as-is if it can't be coerced
+                    ovr_map[tid] = ovr
+    except Exception as e:
+        print("⚠️ load_team_ovr_by_id: couldn't read parsed_league_info.json:", e)
+    return ovr_map
+
 # Position → columns to show (tweak freely)
 POSITION_COLUMNS = {
     "QB":  ["name","pos","ovr","age","dev","thp","tha","awr","spd","acc"],
@@ -1497,6 +1532,12 @@ def rosters():
 
     team_name = None
     team_total_count = None
+
+    team_ovr_by_id = load_team_ovr_by_id(league)
+
+    team_ovr = None
+    if team not in ("NFL", "FA"):
+        team_ovr = team_ovr_by_id.get(str(team))
 
     if team not in ("NFL", "FA"):
         team_name = teams.get(str(team), {}).get("name", f"Team {team}")
@@ -1583,6 +1624,7 @@ def rosters():
         show_team_logos=show_team_logos,
         show_search=show_search,
         search_index=search_index,
+        team_ovr=team_ovr,
     )
 
 
