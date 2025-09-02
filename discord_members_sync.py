@@ -18,10 +18,17 @@ client = discord.Client(intents=intents)
 @client.event
 async def on_ready():
     guild = client.get_guild(GUILD_ID)
-    members = {str(m.id): m.display_name for m in guild.members}
+    members = {
+        str(m.id): {
+            "nickname": m.display_name,   # server nickname
+            "username": str(m)            # username#discriminator (or @handle if updated)
+        }
+        for m in guild.members
+    }
     with open("discord_members.json", "w", encoding="utf-8") as f:
         json.dump(members, f, indent=2)
-    print("✅ Member mapping saved")
+    print("✅ Member mapping (nickname + username) saved")
     await client.close()
 
 asyncio.run(client.start(TOKEN))
+

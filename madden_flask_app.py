@@ -495,6 +495,18 @@ def _normalize(records):
     out.sort(key=lambda x: x["year"])
     return out
 
+def _format_member_name(members: dict, user_id: str) -> str:
+    info = members.get(user_id)
+    if isinstance(info, dict):
+        nick = info.get("nickname") or info.get("display_name") or info.get("username") or ""
+        user = info.get("username") or ""
+        if user and user != nick:
+            return f"{nick} ({user})"
+        return nick or user or user_id
+    if isinstance(info, str):
+        return info
+    return user_id
+
 def build_leaderboards(champions, members=None):
     from collections import Counter
     members = members or {}
@@ -510,18 +522,18 @@ def build_leaderboards(champions, members=None):
 
     user_rows = []
     for key, titles in user_counts.most_common():
-        if key.startswith("@"):                 # handle-only user
-            display_name = key[1:]              # strip '@'
-            mention_text = f"@{display_name}"   # readable as text
+        if key.startswith("@"):  # handle-only user
+            display_name = key[1:]
+            mention_text = f"@{display_name}"
             alias = next((c.get("alias","") for c in champions if user_key(c) == key and c.get("alias")), "")
-        else:                                   # numeric id user
-            display_name = members.get(str(key))  # look up from discord_members.json
-            mention_text = f"<@{key}>"            # raw mention text for fallback/tooltip
+        else:  # numeric id user
+            display_name = _format_member_name(members, str(key))
+            mention_text = f"<@{key}>"
             alias = next((c.get("alias","") for c in champions if c.get("id") == key and c.get("alias")), "")
 
         user_rows.append({
-            "display_name": display_name,  # preferred
-            "mention": mention_text,       # fallback / tooltip
+            "display_name": display_name,  # now "Nickname (username)" when available
+            "mention": mention_text,
             "alias": alias,
             "titles": titles,
         })
@@ -530,13 +542,13 @@ def build_leaderboards(champions, members=None):
     return team_rows, user_rows
 
 def enrich_with_names(records, members):
-    """Add c['name'] from members[id] so templates can show a friendly name."""
+    """Add c['name'] = 'nickname (username)' so templates print a string, not a dict."""
     if not members:
         return records
     for c in records:
-        uid = c.get("id")
-        if uid is not None:
-            c["name"] = members.get(str(uid))  # members keys are strings
+        uid = c.get("id") or c.get("discord_id")
+        if uid:
+            c["name"] = _format_member_name(members, str(uid))
     return records
 
 
