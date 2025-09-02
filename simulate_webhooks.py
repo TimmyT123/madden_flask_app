@@ -13,14 +13,18 @@ UPLOAD_FOLDER = "uploads"
 debug_files = {
     os.path.join(UPLOAD_FOLDER, "webhook_debug_league.txt"): "league",
     os.path.join(UPLOAD_FOLDER, "webhook_debug_roster.txt"): "roster",
-    os.path.join(UPLOAD_FOLDER, "webhook_debug_stats.txt"): "stats"
+    os.path.join(UPLOAD_FOLDER, "webhook_debug_stats.txt"):  "stats",
+    # add one of these (or both) based on your app’s classifier:
+    os.path.join(UPLOAD_FOLDER, "webhook_debug_standings.txt"): "standings",
+    # os.path.join(UPLOAD_FOLDER, "webhook_debug_misc.txt"): "standings",
 }
+
 
 def extract_jsons_from_debug(file_path):
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
-        pattern = r"===== NEW WEBHOOK:.*?BODY:\n(.*?)(?=\n===== NEW WEBHOOK:|\Z)"
+        pattern = r"(?:={5}|-{5})\s*NEW WEBHOOK:.*?BODY:\n(.*?)(?=\n(?:={5}|-{5})\s*NEW WEBHOOK:|\Z)"
         matches = re.findall(pattern, content, flags=re.DOTALL)
 
         json_blocks = []
@@ -62,7 +66,7 @@ def extract_league_id(d: dict) -> str | None:
 def send_to_webhook(full_subpath, data):
     try:
         url = f"{WEBHOOK_URL}/{full_subpath}"
-        response = requests.post(url, json=data)
+        response = requests.post(url, json=data, headers={"X-Replay": "1"})
         print(f"✅ POST {url} — {response.status_code}")
         if response.status_code != 200:
             print("⚠️ Response:", response.text)
@@ -70,19 +74,28 @@ def send_to_webhook(full_subpath, data):
         print(f"❌ Error sending to webhook {full_subpath}: {e}")
 
 def simulate_all():
+    # 1) Snapshot all payloads up-front
+    replay = []  # list of (endpoint, league_id, payload)
     for file_path, _ in debug_files.items():
-        json_blocks = extract_jsons_from_debug(file_path)
-        if not json_blocks:
+        blocks = extract_jsons_from_debug(file_path)
+        if not blocks:
             print(f"⚠️ Skipped {file_path} (no data)")
             continue
-
-        print(f"📦 Found {len(json_blocks)} webhook(s) in {file_path}")
-        for i, data in enumerate(json_blocks, 1):
-            endpoint = endpoint_for_payload(data)
+        for data in blocks:
+            endpoint  = endpoint_for_payload(data)  # league/roster/passing/...
             league_id = extract_league_id(data) or DEFAULT_LEAGUE_ID
-            full_subpath = f"{PLATFORM}/{league_id}/{endpoint}"
-            print(f"➡️ Sending {endpoint} webhook #{i} → {full_subpath}")
-            send_to_webhook(full_subpath, data)
+            replay.append((endpoint, league_id, data))
+
+    if not replay:
+        print("No payloads to replay.")
+        return
+
+    # 2) Replay from the snapshot (files can change now—no effect)
+    print(f"📦 Replaying {len(replay)} payload(s)")
+    for i, (endpoint, league_id, data) in enumerate(replay, 1):
+        full_subpath = f"{PLATFORM}/{league_id}/{endpoint}"
+        print(f"➡️ [{i}/{len(replay)}] {endpoint} → {full_subpath}")
+        send_to_webhook(full_subpath, data)
 
 if __name__ == "__main__":
     simulate_all()

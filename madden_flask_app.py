@@ -820,14 +820,18 @@ def resolve_league_id(payload: dict, subpath: str | None = None) -> str | None:
 
 
 def process_webhook_data(data, subpath, headers, body):
-    # ✅ 1. Save debug snapshot
-    debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
-    with open(debug_path, 'w') as f:
-        f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
-        for k, v in headers.items():
-            f.write(f"{k}: {v}\n")
-        f.write("\nBODY:\n")
-        f.write(body.decode('utf-8', errors='replace'))
+    # ✅ detect simulator replays (headers dict is passed in from the request)
+    is_replay = (headers.get("X-Replay") == "1" or headers.get("x-replay") == "1")
+
+    # ✅ 1. Save debug snapshot (skip for replays so we don't rewrite during sims)
+    if not is_replay:
+        debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
+        with open(debug_path, 'w', encoding='utf-8') as f:
+            f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
+            for k, v in headers.items():
+                f.write(f"{k}: {v}\n")
+            f.write("\nBODY:\n")
+            f.write(body.decode('utf-8', errors='replace'))
 
     # ✅ 2. Determine storage path (league id)
     league_id = resolve_league_id(data, subpath)
@@ -839,25 +843,31 @@ def process_webhook_data(data, subpath, headers, body):
     league_data["league_id"] = league_id
     print(f"📎 Using league_id: {league_id}")
 
-    # 3) Classify batch for debug batching
-    if "league" in subpath:
+    # 3) Classify batch for debug batching (kept as-is: based on subpath)
+    if "league" in (subpath or ""):
         batch_type = "league"
         filename = "webhook_debug_league.txt"
-    elif any(x in subpath for x in ["passing", "kicking", "rushing", "receiving", "defense"]):
+    elif any(x in (subpath or "") for x in ["passing", "kicking", "rushing", "receiving", "defense"]):
         batch_type = "stats"
         filename = "webhook_debug_stats.txt"
-    elif "roster" in subpath:
+    elif "roster" in (subpath or ""):
         batch_type = "roster"
         filename = "webhook_debug_roster.txt"
     else:
         batch_type = "other"
         filename = "webhook_debug_misc.txt"
 
+    # If this is a replay, redirect logs to a separate *_replay.txt file
+    if is_replay:
+        base, ext = os.path.splitext(filename)
+        filename = f"{base}_replay{ext}"
+
     debug_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
-    # 4) Batch debug logs (unchanged behavior)
+    # 4) Debug logging
     if batch_type not in ["league", "stats", "roster"]:
-        with open(debug_path, 'a') as f:
+        # non-batched logs → just append (replay or normal)
+        with open(debug_path, 'a', encoding='utf-8') as f:
             f.write(f"\n===== NEW WEBHOOK: {subpath} =====\n")
             f.write("HEADERS:\n")
             for k, v in headers.items():
@@ -866,38 +876,51 @@ def process_webhook_data(data, subpath, headers, body):
             f.write(body.decode('utf-8', errors='replace'))
             f.write("\n\n")
     else:
-        last_webhook_time[batch_type] = time()
-        webhook_buffer[batch_type].append({
-            "subpath": subpath,
-            "headers": headers,
-            "body": body.decode('utf-8', errors='replace'),
-        })
+        if is_replay:
+            # For replays, write immediately to *_replay.txt (no batching/timers)
+            with open(debug_path, 'a', encoding='utf-8') as f:
+                f.write(f"\n===== NEW WEBHOOK: {subpath} =====\n")
+                f.write("HEADERS:\n")
+                for k, v in headers.items():
+                    f.write(f"{k}: {v}\n")
+                f.write("\nBODY:\n")
+                f.write(body.decode('utf-8', errors='replace'))
+                f.write("\n\n")
+        else:
+            # Normal path: buffered batching with timer
+            last_webhook_time[batch_type] = time()
+            webhook_buffer[batch_type].append({
+                "subpath": subpath,
+                "headers": headers,
+                "body": body.decode('utf-8', errors='replace'),
+            })
 
-        if batch_timers.get(batch_type):
-            batch_timers[batch_type].cancel()
+            if batch_timers.get(batch_type):
+                batch_timers[batch_type].cancel()
 
-        def flush_batch(bt=batch_type):
-            debug_path = os.path.join(app.config['UPLOAD_FOLDER'], f'webhook_debug_{bt}.txt')
-            with open(debug_path, 'w') as f:
-                for entry in webhook_buffer[bt]:
-                    f.write(f"\n===== NEW WEBHOOK: {entry['subpath']} =====\n")
-                    f.write("HEADERS:\n")
-                    for k, v in entry['headers'].items():
-                        f.write(f"{k}: {v}\n")
-                    f.write("\nBODY:\n")
-                    f.write(entry['body'])
-                    f.write("\n\n")
-            print(f"✅ Flushed {bt} batch with {len(webhook_buffer[bt])} webhooks.")
-            webhook_buffer[bt] = []
+            def flush_batch(bt=batch_type):
+                debug_path_flush = os.path.join(app.config['UPLOAD_FOLDER'], f'webhook_debug_{bt}.txt')
+                # NOTE: this still overwrites on each flush; switch to 'a' to append history
+                with open(debug_path_flush, 'w', encoding='utf-8') as f:
+                    for entry in webhook_buffer[bt]:
+                        f.write(f"\n===== NEW WEBHOOK: {entry['subpath']} =====\n")
+                        f.write("HEADERS:\n")
+                        for k, v in entry['headers'].items():
+                            f.write(f"{k}: {v}\n")
+                        f.write("\nBODY:\n")
+                        f.write(entry['body'])
+                        f.write("\n\n")
+                print(f"✅ Flushed {bt} batch with {len(webhook_buffer[bt])} webhooks.")
+                webhook_buffer[bt] = []
 
-        batch_timers[batch_type] = Timer(5.0, flush_batch)
-        batch_timers[batch_type].start()
+            batch_timers[batch_type] = Timer(5.0, flush_batch)
+            batch_timers[batch_type].start()
 
     # 5) Companion error?
     if 'error' in data:
         print(f"⚠️ Companion App Error: {data['error']}")
         error_filename = f"{subpath.replace('/', '_')}_error.json"
-        with open(os.path.join(app.config['UPLOAD_FOLDER'], error_filename), 'w') as f:
+        with open(os.path.join(app.config['UPLOAD_FOLDER'], error_filename), 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4)
         return
 
@@ -922,18 +945,16 @@ def process_webhook_data(data, subpath, headers, body):
             dump_dir = dump_root / str(league_id) / "season_global" / "week_global"
             dump_dir.mkdir(parents=True, exist_ok=True)
 
-            # 🔁 Always overwrite the same file
             raw_path = dump_dir / "freeagents_last_raw.json"
             with raw_path.open("w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             print(f"🧲 Free Agents payload: wrote → {raw_path}")
 
-        # Skip failed/empty exports so you don't overwrite a good file
         if data.get("success") is False and not data.get("rosterInfoList"):
             print("⚠️ Skipping roster write: export failed / empty list.")
             return
-        # Always store rosters in global folder
+
         league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
         os.makedirs(league_folder, exist_ok=True)
 
@@ -941,14 +962,12 @@ def process_webhook_data(data, subpath, headers, body):
         added, total = _add_roster_chunk(league_id, roster_list)
         print(f"📥 Roster chunk received ({len(roster_list)}); merged so far={total} (added={added}).")
 
-        # debounce
         acc = _get_roster_acc(league_id)
         if acc["timer"]:
             acc["timer"].cancel()
         acc["timer"] = Timer(ROSTER_DEBOUNCE_SEC, _flush_roster, args=[league_id, league_folder])
         acc["timer"].start()
 
-        # short-circuit so the generic writer doesn’t overwrite with a partial chunk
         return
     elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         filename = "league.json"
@@ -1055,9 +1074,7 @@ def process_webhook_data(data, subpath, headers, body):
     # Special handling for roster chunks: merge instead of overwrite
     if filename == "rosters.json":
         merged_players = _upsert_rosters(league_folder, data.get("rosterInfoList") or [])
-        # Build a dict for the parser so it sees rosterInfoList (no code change needed there)
         parse_rosters_data({"rosterInfoList": merged_players}, subpath, league_folder)
-        # Update cache key and return early to avoid writing the small chunk over the merged file
         league_data[subpath] = {"success": True, "rosterInfoList": merged_players}
         return
 
@@ -1280,7 +1297,91 @@ def show_rushing_stats():
 
     return render_template("rushing.html", players=players, season=season, week=week)
 
+def _load_json_safe(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
+def load_standings_map(league_id: str) -> dict[str, dict]:
+    """
+    Merge raw standings.json (rich fields) with parsed_standings.json (your summary).
+    Raw adds fields like offPassYdsRank/defTotalYdsRank/tODiff, parsed adds wins/seed/etc.
+    """
+    base = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
+
+    def _load(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    def _index_items(data):
+        if not data:
+            return {}
+        if isinstance(data, dict):
+            items = (data.get("standings") or
+                     data.get("teamStandingInfoList") or
+                     data.get("teams") or
+                     data.get("items") or [])
+        elif isinstance(data, list):
+            items = data
+        else:
+            items = []
+        out = {}
+        for it in items:
+            if isinstance(it, dict):
+                tid = str(it.get("teamId") or it.get("id") or "")
+                if tid:
+                    out[tid] = it
+        return out
+
+    raw_path    = os.path.join(base, "standings.json")
+    parsed_path = os.path.join(base, "parsed_standings.json")
+
+    raw_idx    = _index_items(_load(raw_path))       # has off*/def*/pts*Rank/tODiff/etc
+    parsed_idx = _index_items(_load(parsed_path))    # has wins/losses/pct/seed/rank/etc
+
+    if not raw_idx and not parsed_idx:
+        # last-ditch: also check league files if someone saved teamStandingInfoList there
+        for fn in ("parsed_league_info.json", "league.json"):
+            fall_idx = _index_items(_load(os.path.join(base, fn)))
+            if fall_idx:
+                return fall_idx
+        return {}
+
+    # Prefer parsed as the base (keeps your simplified fields), then enrich with raw
+    merged = dict(parsed_idx)
+    for tid, raw_row in raw_idx.items():
+        if tid in merged:
+            merged[tid] = {**raw_row, **merged[tid]}  # raw brings extra keys, parsed can override basics
+        else:
+            merged[tid] = raw_row
+
+    return merged
+
+def fmt_cap(v):
+    try:
+        return f"{int(v)/1_000_000:.1f} M"
+    except Exception:
+        return "N/A"
+
+def _fix_overflow_cap(v):
+    # handle occasional unsigned overflow coming from exports
+    try:
+        iv = int(str(v))
+        return iv - 4_294_967_296 if iv > 2_000_000_000 else iv
+    except Exception:
+        return v
+
+def fmt_signed(n):
+    try:
+        v = int(n)
+        return f"+{v}" if v > 0 else str(v)
+    except Exception:
+        return "—"
 
 @app.route("/teams")
 def show_teams():
@@ -1288,7 +1389,7 @@ def show_teams():
     path = f"uploads/{league_id}/season_global/week_global/parsed_league_info.json"
 
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
         print(f"⚠️ Error loading league info: {e}")
@@ -1297,23 +1398,93 @@ def show_teams():
     calendar_year = data.get("calendarYear", "Unknown")
     teams = data.get("leagueTeamInfoList", [])
 
+    # standings map for ranks/yards/TO diff, etc.
+    standings = load_standings_map(league_id)
+
+    # Load team_map.json (id → {name,userName,ownerName,displayName,discord_id,...})
+    team_map_path = os.path.join("uploads", league_id, "team_map.json")
+    team_map = {}
+    if os.path.exists(team_map_path):
+        with open(team_map_path, "r", encoding="utf-8") as f:
+            team_map = json.load(f)
+
+    # Enrich each team row with cap + standings + user fields
     for team in teams:
-        raw_cap = team.get("capAvailable", "0")
+        tid = str(team.get("teamId") or team.get("id") or "")
+        # Primary: match by teamId
+        S = standings.get(tid)
 
-        try:
-            # Parse the cap as int
-            cap = int(str(raw_cap).strip())
+        # Fallbacks when IDs don't match across files
+        if not S:
+            name = (team.get("name") or team.get("teamName") or "").strip().lower()
+            abbr = (team.get("abbr") or team.get("teamAbbr") or "").strip().lower()
 
-            # Detect and fix unsigned overflow
-            if cap > 2_000_000_000:
-                cap -= 4_294_967_296  # Fix for 32-bit signed overflow
+            # try exact name match
+            S = next(
+                (row for row in standings.values()
+                 if (str(row.get("teamName") or row.get("name") or "").strip().lower() == name)),
+                None
+            ) or next(
+                # try abbr match if available
+                (row for row in standings.values()
+                 if (str(row.get("teamAbbr") or row.get("abbr") or "").strip().lower() == abbr and abbr)),
+                None
+            )
 
-            team["capAvailableFormatted"] = f"{cap / 1_000_000:.1f} M"
-        except Exception as e:
-            print(f"⚠️ Cap formatting error for {team.get('name')}: {e}")
-            team["capAvailableFormatted"] = "0.0 M"
+        if not S:
+            S = {}  # keep the rest of your code working
 
-    # ✅ Sort by teamOvr (highest first)
+        info = team_map.get(tid, {}) if isinstance(team_map, dict) else {}
+
+        # Cap formatting: prefer league row, fall back to standings (S)
+        capRoom_raw = team.get("capRoom")
+        capAvailable_raw = team.get("capAvailable")
+        capSpent_raw = team.get("capSpent")
+
+        if capRoom_raw in (None, "", "N/A"):      capRoom_raw = S.get("capRoom")
+        if capAvailable_raw in (None, "", "N/A"): capAvailable_raw = S.get("capAvailable")
+        if capSpent_raw in (None, "", "N/A"):     capSpent_raw = S.get("capSpent")
+
+        capRoom = _fix_overflow_cap(capRoom_raw)
+        capAvailable = _fix_overflow_cap(capAvailable_raw)
+        capSpent = _fix_overflow_cap(capSpent_raw)
+
+        team["capRoomFormatted"] = fmt_cap(capRoom)
+        team["capAvailableFormatted"] = fmt_cap(capAvailable)
+        team["capSpentFormatted"] = fmt_cap(capSpent)
+
+        # ✅ User/Owner from team_map.json (not from league row)
+        team["user"] = (
+            info.get("userName")
+            or info.get("ownerName")
+            or info.get("displayName")
+            or info.get("user")         # extra fallback
+            or "CPU"
+        )
+
+        # Ranks / yards / points / TO diff from standings
+        for k in (
+                "defPassYds", "defPassYdsRank",
+                "defRushYds", "defRushYdsRank",
+                "defTotalYds", "defTotalYdsRank",
+                "offPassYds", "offPassYdsRank",
+                "offRushYds", "offRushYdsRank",
+                "offTotalYds", "offTotalYdsRank",
+                "ptsAgainstRank", "ptsForRank",
+                "tODiff"
+        ):
+            team[k] = S.get(k)
+
+        team["tODiffPretty"] = fmt_signed(team.get("tODiff"))
+
+        # # debug print statements for the keys
+        # if tid not in standings and S:
+        #     print(f"ℹ️ ID mismatch resolved by name/abbr: {team.get('name')} (league tid={tid}) "
+        #           f"→ standings tid={S.get('teamId')}")
+        # if S:
+        #     print("Sample standings keys:", sorted(S.keys()))
+
+    # Sort by teamOvr (highest first)
     try:
         teams.sort(key=lambda x: int(x.get("teamOvr", 0)), reverse=True)
     except Exception as e:

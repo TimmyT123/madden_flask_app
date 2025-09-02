@@ -5,28 +5,62 @@
 {% block content %}
 <h2>Teams - {{ calendar_year }}</h2>
 
-<table>
+<table class="table">
   <thead>
     <tr>
-      <th>Team Name</th>
-      <th>User Name</th>
+      <th>Team</th>
+      <th>User</th>
       <th>OVR</th>
-      <th>Cap Available</th>
+      <th>Cap Room</th>
+      <th>Cap Spent</th>
+      <th>Cap Avail</th>
+
+      <th>OFF Pass Yds</th>
+      <th>OFF Pass Rank</th>
+      <th>OFF Rush Yds</th>
+      <th>OFF Rush Rank</th>
+      <th>OFF Total Yds</th>
+      <th>OFF Total Rank</th>
+
+      <th>DEF Pass Yds</th>
+      <th>DEF Pass Rank</th>
+      <th>DEF Rush Yds</th>
+      <th>DEF Rush Rank</th>
+      <th>DEF Total Yds</th>
+      <th>DEF Total Rank</th>
+
+      <th>PF Rank</th>
+      <th>PA Rank</th>
+      <th>TO Diff</th>
     </tr>
   </thead>
   <tbody>
     {% for team in teams %}
     <tr>
-      <td>{{ team.name or "Unknown" }}</td>
-      <td>{{ team.user or "CPU" }}</td>
-      <td>{{ team.teamOvr or "N/A" }}</td>
-      <td>
-        {% if team.capAvailableFormatted %}
-          {{ team.capAvailableFormatted }}
-        {% else %}
-          N/A
-        {% endif %}
-      </td>
+      <td>{{ team.name }}</td>
+      <td>{{ team.user }}</td>
+      <td>{{ team.teamOvr }}</td>
+      <td>{{ team.capRoomFormatted }}</td>
+      <td>{{ team.capSpentFormatted }}</td>
+      <td>{{ team.capAvailableFormatted }}</td>
+
+      <td>{{ team.offPassYds or "—" }}</td>
+      <td>{{ team.offPassYdsRank or "—" }}</td>
+      <td>{{ team.offRushYds or "—" }}</td>
+      <td>{{ team.offRushYdsRank or "—" }}</td>
+      <td>{{ team.offTotalYds or "—" }}</td>
+      <td>{{ team.offTotalYdsRank or "—" }}</td>
+
+      <td>{{ team.defPassYds or "—" }}</td>
+      <td>{{ team.defPassYdsRank or "—" }}</td>
+      <td>{{ team.defRushYds or "—" }}</td>
+      <td>{{ team.defRushYdsRank or "—" }}</td>
+      <td>{{ team.defTotalYds or "—" }}</td>
+      <td>{{ team.defTotalYdsRank or "—" }}</td>
+
+      <td>{{ team.ptsForRank or "—" }}</td>
+      <td>{{ team.ptsAgainstRank or "—" }}</td>
+      <td>{{ team.tODiffPretty }}</td>
     </tr>
     {% endfor %}
   </tbody>
