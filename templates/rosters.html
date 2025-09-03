@@ -205,13 +205,15 @@
                 {% if jn %}<span class="number">#{{ jn }}</span>{% endif %}
                 <span class="name">{{ p.playerName or p.name }}</span>
                 {% if p.isInjured %}
-                  <span class="injury-badge">
-                    <img src="{{ url_for('static', filename='icons/injury.png') }}"
-                         alt="Injured"
-                         class="injury-icon"
-                         title="{{ injury_name(p.injuryType) }}">
-                    <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
-                  </span>
+                    {% if p.injuryType !=97 %} <!-- *** FIX THIS WHEN YOU FIND OUT WHAT 97 IS -->
+                      <span class="injury-badge">
+                        <img src="{{ url_for('static', filename='icons/injury.png') }}"
+                             alt="Injured"
+                             class="injury-icon"
+                             title="{{ injury_name(p.injuryType) }}">
+                        <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
+                      </span>
+                    {% endif %}
                 {% endif %}
               </div>
             {% elif c == 'ovr' and v is not none %}
@@ -287,13 +289,15 @@
                   {% if jn %}<span class="number">#{{ jn }}</span>{% endif %}
                   <span class="name">{{ p.playerName or p.name }}</span>
                   {% if p.isInjured %}
-                    <span class="injury-badge">
-                      <img src="{{ url_for('static', filename='icons/injury.png') }}"
-                           alt="Injured"
-                           class="injury-icon"
-                           title="{{ injury_name(p.injuryType) }}">
-                      <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
-                    </span>
+                    {% if p.injuryType !=97 %} <!-- *** FIX THIS WHEN YOU FIND OUT WHAT 97 IS -->
+                      <span class="injury-badge">
+                        <img src="{{ url_for('static', filename='icons/injury.png') }}"
+                             alt="Injured"
+                             class="injury-icon"
+                             title="{{ injury_name(p.injuryType) }}">
+                        <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
+                      </span>
+                    {% endif %}
                   {% endif %}
                 </div>
               {% elif c == 'ovr' and v is not none %}
@@ -335,13 +339,15 @@
                   <span class="number">#{{ jersey_num(p) }}</span>
                   <span class="name">{{ p.playerName or p.name }}</span>
                   {% if p.isInjured %}
-                    <span class="injury-badge">
-                      <img src="{{ url_for('static', filename='icons/injury.png') }}"
-                           alt="Injured"
-                           class="injury-icon"
-                           title="{{ injury_name(p.injuryType) }}">
-                      <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
-                    </span>
+                    {% if p.injuryType !=97 %} <!-- *** FIX THIS WHEN YOU FIND OUT WHAT 97 IS -->
+                      <span class="injury-badge">
+                        <img src="{{ url_for('static', filename='icons/injury.png') }}"
+                             alt="Injured"
+                             class="injury-icon"
+                             title="{{ injury_name(p.injuryType) }}">
+                        <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
+                      </span>
+                    {% endif %}
                   {% endif %}
                 </div>
               {% elif c == 'ovr' and v is not none %}
