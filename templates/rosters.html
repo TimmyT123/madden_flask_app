@@ -95,6 +95,25 @@
       .team-head{grid-template-columns:1fr; grid-auto-rows:auto}
       .team-meta{grid-column:1; justify-self:center; margin-top:6px}
     }
+    .injury-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      margin-left: .5rem;
+      font-size: .8rem;
+    }
+
+    .injury-icon {
+      width: 16px;
+      height: 16px;
+      cursor: help; /* indicates tooltip available */
+    }
+
+    .injury-weeks {
+      font-size: .75rem;
+      color: #e6bebe;
+    }
+
   </style>
 </head>
 <body>
@@ -185,6 +204,15 @@
                 {% endif %}
                 {% if jn %}<span class="number">#{{ jn }}</span>{% endif %}
                 <span class="name">{{ p.playerName or p.name }}</span>
+                {% if p.isInjured %}
+                  <span class="injury-badge">
+                    <img src="{{ url_for('static', filename='icons/injury.png') }}"
+                         alt="Injured"
+                         class="injury-icon"
+                         title="{{ injury_name(p.injuryType) }}">
+                    <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
+                  </span>
+                {% endif %}
               </div>
             {% elif c == 'ovr' and v is not none %}
               <span class="chip">{{ v }}</span>
@@ -258,6 +286,15 @@
                 <div class="playercell team">
                   {% if jn %}<span class="number">#{{ jn }}</span>{% endif %}
                   <span class="name">{{ p.playerName or p.name }}</span>
+                  {% if p.isInjured %}
+                    <span class="injury-badge">
+                      <img src="{{ url_for('static', filename='icons/injury.png') }}"
+                           alt="Injured"
+                           class="injury-icon"
+                           title="{{ injury_name(p.injuryType) }}">
+                      <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
+                    </span>
+                  {% endif %}
                 </div>
               {% elif c == 'ovr' and v is not none %}
                 <span class="chip">{{ v }}</span>
@@ -297,6 +334,15 @@
                   {% endif %}
                   <span class="number">#{{ jersey_num(p) }}</span>
                   <span class="name">{{ p.playerName or p.name }}</span>
+                  {% if p.isInjured %}
+                    <span class="injury-badge">
+                      <img src="{{ url_for('static', filename='icons/injury.png') }}"
+                           alt="Injured"
+                           class="injury-icon"
+                           title="{{ injury_name(p.injuryType) }}">
+                      <span class="injury-weeks">{{ 'Wk' if p.injuryLength == 1 else 'Wks' }} {{ p.injuryLength }}</span>
+                    </span>
+                  {% endif %}
                 </div>
               {% elif c == 'ovr' and v is not none %}
                 <span class="chip">{{ v }}</span>

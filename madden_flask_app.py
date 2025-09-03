@@ -1546,6 +1546,28 @@ def format_cap(value):
 
 # ===== ROSTERS =====
 
+INJURY_TYPES = {
+    0: "Healthy",
+    31: "Foot Fracture",
+    59: "Dislocated Knee",
+    79: "Broken Tibia",
+    85: "Broken Ribs",
+    86: "Broken Collarbone",
+    87: "Torn Pectoral",
+    # …add more as needed, Madden uses a bunch of IDs
+}
+
+@app.template_global()
+def injury_name(code):
+    try:
+        code_int = int(code)
+    except Exception:
+        return str(code) if code is not None else "Injured"
+
+    # ✅ Return mapped name if available, else the raw number
+    return INJURY_TYPES.get(code_int, str(code_int))
+
+
 # cache to avoid re-parsing huge files on every request
 _roster_cache = {}  # {league_id: {"mtime": float, "players": [...], "positions": set()}}
 
@@ -1607,11 +1629,18 @@ def _normalize_player(p: dict) -> dict:
     except Exception:
         ovr = ovr or 0
 
-    # ✅ include jersey + keep raw dict for robust fallbacks
+    # 🩹 Injury fields (various possible keys from Companion exports)
+    inj_len = g("injuryLength", "injuryWeeks", "injury_len", "injury_weeks", default=0)
+    inj_type = g("injuryType", "injury", "injuryDesc", "injury_desc", default=None)
+    try:
+        inj_len_int = int(str(inj_len).strip())
+    except Exception:
+        inj_len_int = 0
+
     return {
         "name": name, "teamId": team_id, "pos": pos, "ovr": ovr,
-        "jerseyNum": jersey,              # ← add this
-        "_raw": p,                        # ← and this
+        "jerseyNum": jersey,
+        "_raw": p,
 
         "age": age, "dev": dev,
         "spd": speed, "acc": acc, "agi": agi, "str": strn, "awr": awa,
@@ -1620,6 +1649,10 @@ def _normalize_player(p: dict) -> dict:
         "tak": tak, "bsh": bsh, "pmv": pmv, "fmv": fmv, "prc": prc, "mcv": mcv, "zcv": zcv, "prs": prs,
         "pbk": pbk, "rbk": rbk, "ibl": ibl,
         "kpw": kpw, "kac": kac,
+
+        "injuryLength": inj_len_int,  # integer weeks
+        "injuryType": inj_type,  # text if present
+        "isInjured": inj_len_int > 0,  # handy boolean for templates
     }
 
 
