@@ -101,7 +101,48 @@
           display: inline-block;   /* needed so margin-top takes effect on <a> */
           margin-top: 14px;        /* adjust to taste: 12–24px */
         }
+        /* Outer span: stroke/outline only */
+        .wurd-stroke{
+          -webkit-text-stroke: 1px #c0c0c0;   /* thin silver outline */
+          /* fallback solid text if inner fails completely */
+          color: #5a6470;
+          font-size: 3.2rem;
+        }
 
+        /* Inner span: animated gradient fill */
+        .wurd-fill{
+          display:inline-block;
+          font-weight:900;
+
+          /* kill the global body text-shadow so it doesn't “fill” the letters black */
+          text-shadow:none;
+
+          /* animated gradient */
+          background-image: linear-gradient(90deg, #041E42, #869397, #FFFFFF, #041E42);
+          background-size: 200% 100%;
+          background-position: 0% 50%;
+          background-repeat: no-repeat;
+          animation: wurd-cowboys 6s linear infinite;
+
+          /* show gradient inside the text */
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: transparent; /* safety */
+
+          /* if you want a slightly slower, smoother look, try: animation-duration: 10s; */
+        }
+
+        @keyframes wurd-cowboys{
+          0%   { background-position: 0% 50%; }
+          50%  { background-position:100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+
+        /* Optional: respect reduced-motion settings */
+        @media (prefers-reduced-motion: reduce){
+          .wurd-fill{ animation: none; background-position: 50% 50%; }
+        }
     </style>
 </head>
 <body>
@@ -110,7 +151,7 @@
 
     <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
     <div style="font-size: 1.5rem; line-height: 1.5;">
-        <h1>🏈 Welcome to WURD Madden Franchise!</h1>
+        <h1>🏈 Welcome to <span class="wurd-stroke"><span class="wurd-fill">WURD</span></span> Madden Franchise!</h1>
         <p style="margin-bottom: 0.2rem;">
           <strong>Current Week:</strong>
           {% if current_week == 19 %}
