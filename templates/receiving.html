@@ -3,6 +3,24 @@
 {% block title %}Receiving Stats{% endblock %}
 
 {% block content %}
+
+<style>
+  .week-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:20px 0 14px}
+  .week-nav .arrow{font-size:22px;text-decoration:none;padding:2px 10px;border:1px solid #ccc;border-radius:8px}
+  .week-nav .arrow.disabled{opacity:.35;pointer-events:none;border-color:transparent}
+  .week-nav .wk{font-weight:600}
+</style>
+
+<div class="week-nav">
+  {% if prev_week %}
+    <a class="arrow" href="{{ url_for('show_receiving_stats', league=league, season=season, week=prev_week) }}">&larr;</a>
+  {% else %}<span class="arrow disabled">&larr;</span>{% endif %}
+  <span class="wk">Week {{ week.replace('week_', '') }}</span>
+  {% if next_week %}
+    <a class="arrow" href="{{ url_for('show_receiving_stats', league=league, season=season, week=next_week) }}">&rarr;</a>
+  {% else %}<span class="arrow disabled">&rarr;</span>{% endif %}
+</div>
+
 <h1>Receiving Stats</h1>
 
 <div style="margin-bottom: 20px; font-size: 1.2em; font-weight: bold;">

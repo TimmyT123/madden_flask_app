@@ -455,6 +455,23 @@ def load_team_records(root_dir: str) -> dict[str, tuple[int,int,int]]:
 
     return records
 
+def get_prev_next_week(league_id: str, season: str, week: str) -> tuple[str|None, str|None]:
+    """
+    Return ('week_<prev>', 'week_<next>') that actually exist on disk
+    for the given league/season, or None when at the boundary.
+    """
+    try:
+        season_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(league_id), season)
+        weeks = [w for w in os.listdir(season_dir) if re.match(r'^week_\d+$', w)]
+        nums = sorted(int(w[5:]) for w in weeks)
+        cur = int(str(week).replace("week_", ""))
+        prev_num = max((n for n in nums if n < cur), default=None)
+        next_num = min((n for n in nums if n > cur), default=None)
+        return (f"week_{prev_num}" if prev_num is not None else None,
+                f"week_{next_num}" if next_num is not None else None)
+    except Exception:
+        return (None, None)
+
 def make_label_with_record(team_id_str: str, team_map: dict, records: dict, prefer="name") -> str:
     """
     Build 'Name (W-L)' or 'Name (W-L-T)' if ties > 0.
@@ -1195,7 +1212,17 @@ def show_stats():
         app.logger.exception(f"❌ Error loading stats: {e}")
         players = []
 
-    return render_template("stats.html", players=players, season=season, week=week, league=league)
+    #  week nav
+    prev_week, next_week = get_prev_next_week(league, season, week)
+
+    return render_template("stats.html",
+                           players=players,
+                           season=season,
+                           week=week,
+                           league=league,
+                           prev_week=prev_week,
+                           next_week=next_week
+                           )
 
 
 
@@ -1245,7 +1272,16 @@ def show_receiving_stats():
         print(f"❌ Error loading receiving stats: {e}")
         players = []
 
-    return render_template("receiving.html", players=players, season=season, week=week)
+    prev_week, next_week = get_prev_next_week(league, season, week)
+
+    return render_template("receiving.html",
+                           players=players,
+                           season=season,
+                           week=week,
+                           league=league,
+                           prev_week=prev_week,
+                           next_week=next_week
+                           )
 
 
 @app.route('/rushing')
@@ -1295,7 +1331,16 @@ def show_rushing_stats():
         print(f"❌ Error loading rushing stats: {e}")
         players = []
 
-    return render_template("rushing.html", players=players, season=season, week=week)
+    prev_week, next_week = get_prev_next_week(league, season, week)
+
+    return render_template("rushing.html",
+                           players=players,
+                           season=season,
+                           week=week,
+                           league=league,
+                           prev_week=prev_week,
+                           next_week=next_week
+                           )
 
 def _load_json_safe(path):
     try:
@@ -1865,7 +1910,17 @@ def show_schedule():
     except ValueError:
         print(f"⚠️ Could not parse week value: {week}")
 
-    return render_template("schedule.html", schedule=parsed_schedule, season=season, week=week, bye_teams=bye_teams)
+    prev_week, next_week = get_prev_next_week(league_id, season, week)
+
+    return render_template("schedule.html",
+                           schedule=parsed_schedule,
+                           season=season,
+                           week=week,
+                           bye_teams=bye_teams,
+                           league=league_id,
+                           prev_week=prev_week,
+                           next_week=next_week,
+                           )
 
 
 @app.route("/standings")
