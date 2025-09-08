@@ -32,7 +32,7 @@ import csv
 from html import escape
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).with_name(".env"), override=True)
 
 
 print("🚀 Running Madden Flask App!")
