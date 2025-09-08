@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WURD Registration</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0b1020;color:#e6e9ef;margin:0}
+    .wrap{max-width:720px;margin:40px auto;padding:24px}
+    .card{background:#141a33;border:1px solid #2a355f;border-radius:12px;padding:24px}
+    .ok{color:#34d399}
+    .err{color:#ffb4b4}
+    .btn{display:inline-block;margin-top:16px;padding:10px 14px;border-radius:10px;background:#3b82f6;color:#fff;text-decoration:none;border:0;cursor:pointer}
+    .btn:hover{filter:brightness(1.05)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      {% if success %}
+        <h2 class="ok">Application received ✅</h2>
+        <p>{{ message }}</p>
+      {% else %}
+        <h2 class="err">We hit a snag</h2>
+        <p>{{ message }}</p>
+      {% endif %}
+
+      <!-- Close tab (tries window.close; if blocked, sends them home) -->
+      <button class="btn" type="button" onclick="closeOrLeave()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    function closeOrLeave() {
+      // Try to close (works if the tab was opened by a script)
+      window.close();
+      // Fallback after a brief tick: send them somewhere safe that isn't the form
+      setTimeout(function () {
+        window.location.href = "{{ url_for('home') }}";
+      }, 150);
+    }
+  </script>
+</body>
+</html>

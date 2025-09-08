@@ -28,6 +28,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from datetime import datetime
 
+import csv
+from html import escape
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -266,6 +269,123 @@ def _load_team_map(league_id):
             return json.load(f)
     except Exception:
         return {}
+
+NEW_RECRUITS_WEBHOOK_URL = os.getenv("NEW_RECRUITS_WEBHOOK_URL") or DISCORD_WEBHOOK_URL
+
+PHONE_RE = re.compile(r"^[+\d][\d\s().-]{6,}$")
+TIMEZONES = ["PT", "AZ", "MT", "CT", "ET"]
+
+def _clean_field(v: str, max_len: int = 120) -> str:
+    if v is None:
+        return ""
+    v = str(v).strip()
+    return v[:max_len]
+
+def _validate_payload(form: dict):
+    """Return (clean, errors)."""
+    errors = {}
+    clean = {
+        "first_name": _clean_field(form.get("first_name"), 60),
+        "last_name": _clean_field(form.get("last_name"), 60),
+        "phone": _clean_field(form.get("phone"), 40),
+        "timezone": _clean_field(form.get("timezone"), 8).upper(),
+        "platform_id": _clean_field(form.get("platform_id"), 60),
+        "ea_id": _clean_field(form.get("ea_id"), 60),
+        "favorite_teams": _clean_field(form.get("favorite_teams"), 200),
+        "madden_experience": _clean_field(form.get("madden_experience"), 80),  # NEW
+        "referrer": _clean_field(form.get("referrer"), 100),
+        "website": _clean_field(form.get("website"), 60),  # honeypot
+    }
+
+    if not clean["first_name"]:
+        errors["first_name"] = "First name is required."
+    if not clean["last_name"]:
+        errors["last_name"] = "Last name is required."
+    if clean["phone"] and not PHONE_RE.match(clean["phone"]):
+        errors["phone"] = "Phone number looks invalid."
+    if clean["timezone"] not in TIMEZONES:
+        errors["timezone"] = "Please pick a valid time zone (PT/AZ/MT/CT/ET)."
+    if not clean["platform_id"]:
+        errors["platform_id"] = "PS/Xbox ID is required."
+    if not clean["ea_id"]:
+        errors["ea_id"] = "EA ID is required."
+
+    if clean["website"]:
+        errors["__spam__"] = "Spam detected."
+
+    return clean, errors
+
+def _post_new_recruit_to_discord(clean: dict):
+    """Send to Discord (same thread), with a visible separator before each applicant."""
+    if not NEW_RECRUITS_WEBHOOK_URL:
+        return False, "Missing NEW_RECRUITS_WEBHOOK_URL"
+
+    # A bold, readable separator line (code block so it stands out)
+    SEP = "```\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n```"
+
+    lines = [
+        SEP,  # <-- separator first so it appears between applicants
+        "**New Recruit Application**",
+        f"**Name:** {escape(clean['first_name'])} {escape(clean['last_name'])}",
+        f"**Phone:** {escape(clean['phone']) or '—'}",
+        f"**Time Zone:** {escape(clean['timezone'])}",
+        f"**PS/Xbox ID:** {escape(clean['platform_id'])}",
+        f"**EA ID:** {escape(clean['ea_id'])}",
+        f"**Favorite Teams:** {escape(clean['favorite_teams']) or '—'}",
+        f"**Madden Experience:** {escape(clean['madden_experience']) or '—'}",
+        f"**Referrer:** {escape(clean['referrer']) or '—'}",
+        ""  # trailing newline for breathing room
+    ]
+    content = "\n".join(lines)
+
+    # If you’re already posting into a single thread, keep it simple:
+    params = {"wait": "true"}          # do NOT include thread_name here
+    payload = {"content": content, "allowed_mentions": {"parse": []}}
+
+    try:
+        r = requests.post(NEW_RECRUITS_WEBHOOK_URL, params=params, json=payload, timeout=15)
+        if r.status_code in (200, 204):
+            return True, ""
+        return False, f"Discord webhook error: {r.status_code} {r.text[:300]}"
+    except Exception as e:
+        return False, str(e)
+
+def _append_registration_csv(clean: dict):
+    league_id = league_data.get("latest_league", "new")
+    folder = os.path.join(app.config['UPLOAD_FOLDER'], str(league_id))
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, "new_recruits.csv")
+    new_row = [
+        datetime.utcnow().isoformat(timespec='seconds') + "Z",
+        clean["first_name"], clean["last_name"], clean["phone"], clean["timezone"],
+        clean["platform_id"], clean["ea_id"], clean["favorite_teams"],
+        clean["madden_experience"],  # NEW
+        clean["referrer"],
+    ]
+    header = [
+        "submitted_at","first_name","last_name","phone","timezone",
+        "platform_id","ea_id","favorite_teams","madden_experience","referrer"  # NEW header column
+    ]
+    write_header = not os.path.exists(path)
+    with open(path, "a", newline='', encoding="utf-8") as f:
+        w = csv.writer(f)
+        if write_header:
+            w.writerow(header)
+        w.writerow(new_row)
+
+
+@app.route("/recruits/new", methods=["GET", "POST"])
+def new_recruit():
+    if request.method == "POST":
+        clean, errors = _validate_payload(request.form)
+        if errors:
+            return render_template("register.html", tz_list=TIMEZONES, errors=errors, data=clean), 400
+        _append_registration_csv(clean)
+        ok, err = _post_new_recruit_to_discord(clean)
+        if not ok:
+            return render_template("register_result.html", success=False, message=err), 502
+        return render_template("register_result.html", success=True, message="Thanks! Our admins will review and contact you soon.")
+    return render_template("register.html", tz_list=TIMEZONES, errors={}, data={})
 
 def team_logo(team_id):
     """Return /static/logos/<TeamName>.png (fallback to wurd_logo.png)."""

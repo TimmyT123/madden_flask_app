@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WURD New Recruit Registration</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0b1020;color:#e6e9ef;margin:0}
+    .wrap{max-width:840px;margin:40px auto;padding:24px}
+    h1{margin:0 0 16px;font-size:28px}
+    p.lead{opacity:.9;margin:0 0 24px}
+    form{background:#141a33;border:1px solid #2a355f;border-radius:12px;padding:20px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .full{grid-column:1 / -1}
+    label{display:block;font-weight:600;margin:0 0 6px}
+    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #2a355f;background:#0f1530;color:#e6e9ef}
+    .err{color:#ffb4b4;font-size:13px;margin-top:6px}
+    .hint{color:#c7d2fe;font-size:12px;opacity:.9;margin-top:6px}
+    button{margin-top:16px;padding:12px 16px;border-radius:10px;border:0;background:#3b82f6;color:#fff;font-weight:700;cursor:pointer}
+    button:hover{filter:brightness(1.05)}
+    .hp{display:none} /* honeypot */
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Welcome to WURD Madden Franchise!</h1>
+    <p class="lead">Fill out the form below and our admins will reach out.</p>
+
+    <form method="post" action="{{ url_for('new_recruit') }}" novalidate
+      onsubmit="const b=this.querySelector('button[type=submit]'); if(b){b.disabled=true; b.textContent='Submitting…';}">
+      <div class="grid">
+        <div>
+          <label for="first_name">First Name</label>
+          <input id="first_name" name="first_name" required value="{{ (data.first_name or '') if data else '' }}" />
+          {% if errors.first_name %}<div class="err">{{ errors.first_name }}</div>{% endif %}
+        </div>
+        <div>
+          <label for="last_name">Last Name</label>
+          <input id="last_name" name="last_name" required value="{{ (data.last_name or '') if data else '' }}" />
+          {% if errors.last_name %}<div class="err">{{ errors.last_name }}</div>{% endif %}
+        </div>
+
+        <div>
+          <label for="phone">Phone Number</label>
+          <input id="phone" name="phone" inputmode="tel" placeholder="e.g. 555-555-5555" value="{{ (data.phone or '') if data else '' }}" />
+          {% if errors.phone %}<div class="err">{{ errors.phone }}</div>{% endif %}
+        </div>
+        <div>
+          <label for="timezone">Time Zone</label>
+          <select id="timezone" name="timezone" required>
+            <option value="">Select…</option>
+            {% for tz in tz_list %}
+              <option value="{{ tz }}" {% if data and data.timezone == tz %}selected{% endif %}>{{ tz }}</option>
+            {% endfor %}
+          </select>
+          {% if errors.timezone %}<div class="err">{{ errors.timezone }}</div>{% endif %}
+        </div>
+
+        <div>
+          <label for="platform_id">PS/Xbox ID</label>
+          <input id="platform_id" name="platform_id" required value="{{ (data.platform_id or '') if data else '' }}" />
+          {% if errors.platform_id %}<div class="err">{{ errors.platform_id }}</div>{% endif %}
+          <div class="hint">To find your PS5/Xbox ID: click your profile picture, then click <strong>Profile</strong>.</div>
+        </div>
+        <div>
+          <label for="ea_id">EA ID</label>
+          <input id="ea_id" name="ea_id" required value="{{ (data.ea_id or '') if data else '' }}" />
+          {% if errors.ea_id %}<div class="err">{{ errors.ea_id }}</div>{% endif %}
+          <div class="hint">On the Madden 26 main screen, press <strong>R3</strong> (PS5) or <strong>RS</strong> (Xbox). In the <strong>Player Search</strong> tab you’ll see your EA ID.</div>
+        </div>
+
+        <div class="full">
+          <label for="favorite_teams">What teams do you like?</label>
+          <textarea id="favorite_teams" name="favorite_teams" rows="2">{{ (data.favorite_teams or '') if data else '' }}</textarea>
+        </div>
+
+        <div class="full">
+          <label for="madden_experience">How long have you been playing Madden?</label>
+          <input id="madden_experience" name="madden_experience" placeholder="e.g., 2 years / since Madden 20" value="{{ (data.madden_experience or '') if data else '' }}" />
+        </div>
+
+        <div class="full">
+          <label for="referrer">What user let you know about WURD?</label>
+          <input id="referrer" name="referrer" value="{{ (data.referrer or '') if data else '' }}" />
+        </div>
+
+        <!-- Honeypot field (bots will fill it) -->
+        <div class="hp">
+          <label for="website">Website</label>
+          <input id="website" name="website" autocomplete="off" />
+        </div>
+      </div>
+
+      <button type="submit">Submit Application</button>
+    </form>
+  </div>
+</body>
+</html>
