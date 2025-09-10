@@ -13,11 +13,11 @@
 
 <div class="week-nav">
   {% if prev_week %}
-    <a class="arrow" href="{{ url_for('show_rushing_stats', league=league, season=season, week=prev_week) }}">&larr;</a>
+    <a class="arrow" href="{{ url_for('show_rushing_stats', league=league, season=season, week=prev_week) }}">&larr; Prev</a>
   {% else %}<span class="arrow disabled">&larr;</span>{% endif %}
   <span class="wk">Week {{ week.replace('week_', '') }}</span>
   {% if next_week %}
-    <a class="arrow" href="{{ url_for('show_rushing_stats', league=league, season=season, week=next_week) }}">&rarr;</a>
+    <a class="arrow" href="{{ url_for('show_rushing_stats', league=league, season=season, week=next_week) }}">Next &rarr;</a>
   {% else %}<span class="arrow disabled">&rarr;</span>{% endif %}
 </div>
 

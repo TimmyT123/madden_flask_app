@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Defensive Stats{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <style>
+    .week-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:20px 0 14px}
+    .week-nav .arrow{font-size:22px;text-decoration:none;padding:2px 10px;border:1px solid #ccc;border-radius:8px}
+    .week-nav .arrow.disabled{opacity:.35;pointer-events:none;border-color:transparent}
+    .week-nav .wk{font-weight:600}
+  </style>
+
+  <div class="week-nav">
+    {% if prev_week %}
+      <a class="arrow" href="{{ url_for('show_defense_stats', league=league, season=season, week=prev_week) }}">&larr; Prev</a>
+    {% else %}<span class="arrow disabled">&larr;</span>{% endif %}
+    <span class="wk">Week {{ week.replace('week_', '') }}</span>
+    {% if next_week %}
+      <a class="arrow" href="{{ url_for('show_defense_stats', league=league, season=season, week=next_week) }}">Next &rarr;</a>
+    {% else %}<span class="arrow disabled">&rarr;</span>{% endif %}
+  </div>
+
+  <h1>Defensive Stats</h1>
+
+  <div style="margin-bottom: 20px; font-size: 1.2em; font-weight: bold;">
+    Season: {{ season | replace('season_', '') }} &nbsp; &nbsp; Week: {{ week | replace('week_', '') }}
+  </div>
+
+  <div class="table-wrap">
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th>Team</th>
+          <th>Pos</th>
+          <th>#</th>
+          <th>Player</th>
+          <th title="Total Tackles">TKL</th>
+          <th title="Solo Tackles">SOLO</th>
+          <th title="Assisted Tackles">AST</th>
+          <th title="Tackles For Loss">TFL</th>
+          <th>Sacks</th>
+          <th>INT</th>
+          <th title="Interception Yards">INT Yds</th>
+          <th title="Interception TDs">INT TD</th>
+          <th title="Passes Defended">PD</th>
+          <th title="Forced Fumbles">FF</th>
+          <th title="Fumbles Recovered">FR</th>
+          <th title="Defensive TDs">DEF TD</th>
+          <th>Safety</th>
+          <th title="Catches Allowed">CA</th>
+          <th title="Defensive Points">PTS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in players %}
+        <tr>
+          <td>{{ p.team or "Unknown" }}</td>
+          <td>{{ p.position or p.pos or '' }}</td>
+          <td>{{ jersey_num(p) }}</td>
+          <td>{{ p.playerName or p.name }}</td>
+          <td>{{ p.tackles or 0 }}</td>
+          <td>{{ p.solo or 0 }}</td>
+          <td>{{ p.assisted or 0 }}</td>
+          <td>{{ p.tfl or 0 }}</td>
+          <td>{{ "%.1f"|format(p.sacks if p.sacks is not none else 0) }}</td>
+          <td>{{ p.ints or 0 }}</td>
+          <td>{{ p.intYds or 0 }}</td>
+          <td>{{ p.intTd or 0 }}</td>
+          <td>{{ p.pd or p.deflections or 0 }}</td>
+          <td>{{ p.ff or 0 }}</td>
+          <td>{{ p.fr or 0 }}</td>
+          <td>{{ p.defTds or 0 }}</td>
+          <td>{{ p.safeties or 0 }}</td>
+          <td>{{ p.catchAllowed or 0 }}</td>
+          <td>{{ p.points or 0 }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="16" style="text-align:center; opacity:.7;">No defensive stats found for this week.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+  .stats-table { width:100%; border-collapse: collapse; }
+  .stats-table th, .stats-table td { padding:8px 10px; border-bottom: 1px solid rgba(255,255,255,.15); text-align:center; }
+  .stats-table th { text-transform: uppercase; letter-spacing:.03em; font-size:.9rem; }
+  .btn { padding:6px 10px; border-radius:8px; background: rgba(255,255,255,.12); text-decoration:none; }
+  .btn.disabled { opacity:.35; pointer-events:none; }
+</style>
+{% endblock %}

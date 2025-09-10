@@ -18,7 +18,7 @@ from parsers.rosters_parser import parse_rosters_data
 from parsers.league_parser import parse_league_info_data
 from parsers.passing_parser import parse_passing_stats
 from parsers.standings_parser import parse_standings_data
-
+from parsers.defense_parser import parse_defense_stats
 
 from flask import render_template
 from urllib.parse import urlparse, parse_qs
@@ -1066,6 +1066,8 @@ def process_webhook_data(data, subpath, headers, body):
         filename = "passing.json"
     elif "playerReceivingStatInfoList" in data:
         filename = "receiving.json"
+    elif "playerDefensiveStatInfoList" in data:
+        filename = "defense.json"
     elif "gameScheduleInfoList" in data:
         filename = "schedule.json"
     elif "rosterInfoList" in data:
@@ -1234,6 +1236,9 @@ def process_webhook_data(data, subpath, headers, body):
         from parsers.rushing_parser import parse_rushing_stats
         print(f"🐛 DEBUG: Detected rushing stats for season={season_index}, week={week_index}")
         parse_rushing_stats(league_id, data, league_folder)
+    elif "playerDefensiveStatInfoList" in data:
+        print(f"🛡️ DEBUG: Detected defensive stats for season={season_index}, week={week_index}")
+        parse_defense_stats(league_id, data, league_folder)
 
     # 10) Cache copy
     league_data[subpath] = data
@@ -1461,6 +1466,129 @@ def show_rushing_stats():
                            prev_week=prev_week,
                            next_week=next_week
                            )
+
+@app.route('/defense')
+def show_defense_stats():
+    league = request.args.get("league")
+
+    if not league_data.get("latest_season") or not league_data.get("latest_week"):
+        get_latest_season_week()
+
+    season = request.args.get("season") or league_data.get("latest_season")
+    week   = request.args.get("week")   or league_data.get("latest_week")
+
+    # Normalize folder names
+    season = "season_" + season if not str(season).startswith("season_") else str(season)
+    week   = "week_"   + week   if not str(week).startswith("week_")     else str(week)
+
+    if not league or not season or not week:
+        return "Missing league, season, or week", 400
+
+    try:
+        base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, season, week)
+
+        # Prefer parsed output if present
+        parsed_path = os.path.join(base_path, "parsed_defense.json")
+        raw_path    = os.path.join(base_path, "defense.json")
+
+        players = []
+        if os.path.exists(parsed_path):
+            with open(parsed_path, "r", encoding="utf-8") as f:
+                players = json.load(f) or []
+        elif os.path.exists(raw_path):
+            with open(raw_path, "r", encoding="utf-8") as f:
+                data = json.load(f) or {}
+                players = data.get("playerDefensiveStatInfoList", []) or []
+        else:
+            players = []
+
+        # Enrich with position via roster index (defense payload lacks pos)
+        idx = load_roster_index(league)  # already defined in your app
+        rplayers = idx.get("players", [])
+
+        # Build fast lookups from roster -> position and jersey
+        pos_by_roster = {}
+        pos_by_pid = {}
+        pos_by_name_team = {}
+
+        jersey_by_roster = {}
+        jersey_by_pid = {}
+        jersey_by_name_team = {}
+
+        for rp in rplayers:
+            raw = rp.get("_raw") or {}
+            pos = rp.get("pos") or raw.get("position") or raw.get("pos")
+            jersey = (
+                    rp.get("jerseyNum") or raw.get("jerseyNum")
+                    or raw.get("uniformNumber") or raw.get("jerseyNumber")
+                    or raw.get("jersey") or raw.get("number")
+            )
+
+            rid = str(raw.get("rosterId") or raw.get("id") or "")
+            pid = str(raw.get("playerId") or "")
+            name = (rp.get("name") or raw.get("fullName") or raw.get("playerName"))
+            tid = str(rp.get("teamId") or raw.get("teamId") or raw.get("team") or "")
+
+            if pos:
+                if rid: pos_by_roster[rid] = pos
+                if pid: pos_by_pid[pid] = pos
+                if name and tid: pos_by_name_team[(name, tid)] = pos
+
+            if jersey not in (None, "", -1):
+                if rid: jersey_by_roster[rid] = jersey
+                if pid: jersey_by_pid[pid] = jersey
+                if name and tid: jersey_by_name_team[(name, tid)] = jersey
+
+        # Fill missing position/jersey on defense rows
+        for p in players:
+            if not (p.get("position") or p.get("pos")):
+                rid = str(p.get("rosterId") or p.get("playerId") or p.get("id") or "")
+                pid = str(p.get("playerId") or "")
+                name = p.get("playerName") or p.get("fullName") or p.get("name")
+                tid = str(p.get("teamId") or p.get("team") or "")
+                pos = (pos_by_roster.get(rid)
+                       or pos_by_pid.get(pid)
+                       or pos_by_name_team.get((name, tid)))
+                if pos:
+                    p["position"] = pos
+
+            if not p.get("jerseyNum"):
+                rid = str(p.get("rosterId") or p.get("playerId") or p.get("id") or "")
+                pid = str(p.get("playerId") or "")
+                name = p.get("playerName") or p.get("fullName") or p.get("name")
+                tid = str(p.get("teamId") or p.get("team") or "")
+                jersey = (jersey_by_roster.get(rid)
+                          or jersey_by_pid.get(pid)
+                          or jersey_by_name_team.get((name, tid)))
+                if jersey not in (None, "", -1):
+                    p["jerseyNum"] = jersey  # enables jersey_num(p)
+
+        # Load team names
+        teams = {}
+        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
+        if os.path.exists(team_map_path):
+            with open(team_map_path, "r", encoding="utf-8") as f:
+                teams = json.load(f)
+
+        # Inject team display name
+        for p in players:
+            team_id = str(p.get("teamId"))
+            p["team"] = (teams.get(team_id, {}) or {}).get("name", "Unknown")
+
+    except Exception as e:
+        print(f"❌ Error loading defensive stats: {e}")
+        players = []
+
+    prev_week, next_week = get_prev_next_week(league, season, week)
+
+    return render_template("defense.html",
+                           players=players,
+                           season=season,
+                           week=week,
+                           league=league,
+                           prev_week=prev_week,
+                           next_week=next_week)
+
 
 def _load_json_safe(path):
     try:

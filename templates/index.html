@@ -212,6 +212,7 @@
             <a class="big-link" href="#" onclick="goToStats()">View Passing Stats</a>
             <a class="big-link" href="#" onclick="goToReceiving()">View Receiving Stats</a>
             <a class="big-link" href="#" onclick="goToRushing()">View Rushing Stats</a>
+            <a class="big-link" href="#" onclick="goToDefense()">View Defensive Stats</a>
           </div>
 
           <!-- Right column: League -->
@@ -303,6 +304,13 @@
             const week = document.getElementById("week").value;
             const league = latestLeague;
             window.location.href = `/rushing?league=${league}&season=${season}&week=${week}`;
+        }
+
+        function goToDefense() {
+            const season = document.getElementById("season").value;
+            const week = document.getElementById("week").value;
+            const league = latestLeague;
+            window.location.href = `/defense?league=${league}&season=${season}&week=${week}`;
         }
 
         function goToSchedule() {
