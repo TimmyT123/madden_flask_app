@@ -36,24 +36,28 @@
     <thead>
         <tr>
             <th onclick="sortTable(0)">Team<span id="arrow-0" class="arrow"></span></th>
-            <th onclick="sortTable(1)">Player<span id="arrow-1" class="arrow"></span></th>
-            <th onclick="sortTable(2)">Yards<span id="arrow-2" class="arrow"></span></th>
-            <th onclick="sortTable(3)">Comp<span id="arrow-3" class="arrow"></span></th>
-            <th onclick="sortTable(4)">Att<span id="arrow-4" class="arrow"></span></th>
-            <th onclick="sortTable(5)">TD<span id="arrow-5" class="arrow"></span></th>
-            <th onclick="sortTable(6)">INT<span id="arrow-6" class="arrow"></span></th>
-            <th onclick="sortTable(7)">Comp%<span id="arrow-7" class="arrow"></span></th>
-            <th onclick="sortTable(8)">YPG<span id="arrow-8" class="arrow"></span></th>
-            <th onclick="sortTable(9)">Rating<span id="arrow-9" class="arrow"></span></th>
-            <th onclick="sortTable(10)">YPA<span id="arrow-10" class="arrow"></span></th>
-            <th onclick="sortTable(11)">Long<span id="arrow-11" class="arrow"></span></th>
-            <th onclick="sortTable(12)">Sacks<span id="arrow-12" class="arrow"></span></th>
+            <th onclick="sortTable(1)">#<span id="arrow-1" class="arrow"></span></th>
+            <th onclick="sortTable(2)">Pos<span id="arrow-2" class="arrow"></span></th>
+            <th onclick="sortTable(3)">Player<span id="arrow-3" class="arrow"></span></th>
+            <th onclick="sortTable(4)">Yards<span id="arrow-4" class="arrow"></span></th>
+            <th onclick="sortTable(5)">Comp<span id="arrow-5" class="arrow"></span></th>
+            <th onclick="sortTable(6)">Att<span id="arrow-6" class="arrow"></span></th>
+            <th onclick="sortTable(7)">TD<span id="arrow-7" class="arrow"></span></th>
+            <th onclick="sortTable(8)">INT<span id="arrow-8" class="arrow"></span></th>
+            <th onclick="sortTable(9)">Comp%<span id="arrow-9" class="arrow"></span></th>
+            <th onclick="sortTable(10)">YPG<span id="arrow-10" class="arrow"></span></th>
+            <th onclick="sortTable(11)">Rating<span id="arrow-11" class="arrow"></span></th>
+            <th onclick="sortTable(12)">YPA<span id="arrow-12" class="arrow"></span></th>
+            <th onclick="sortTable(13)">Long<span id="arrow-13" class="arrow"></span></th>
+            <th onclick="sortTable(14)">Sacks<span id="arrow-14" class="arrow"></span></th>
         </tr>
     </thead>
     <tbody>
         {% for p in players %}
         <tr>
             <td>{{ p.team }}</td>
+            <td>{{ jersey_num(p) }}</td>
+            <td>{{ p.position or p.pos or '' }}</td>
             <td>{{ p.name }}</td>
             <td>{{ p.passYds }}</td>
             <td>{{ p.passComp }}</td>

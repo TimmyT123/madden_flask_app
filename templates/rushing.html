@@ -28,32 +28,36 @@
 </div>
 {% if players %}
 <table id="statsTable">
-    <thead>
-        <tr>
-            <th onclick="sortTable(0)">Team<span id="arrow-0" class="arrow"></span></th>
-            <th onclick="sortTable(1)">Player<span id="arrow-1" class="arrow"></span></th>
-            <th onclick="sortTable(2)">Carries<span id="arrow-2" class="arrow"></span></th>
-            <th onclick="sortTable(3)">Yards<span id="arrow-3" class="arrow"></span></th>
-            <th onclick="sortTable(4)">TDs<span id="arrow-4" class="arrow"></span></th>
-            <th onclick="sortTable(5)">Fumbles<span id="arrow-5" class="arrow"></span></th>
-            <th onclick="sortTable(6)">Longest<span id="arrow-6" class="arrow"></span></th>
-            <th onclick="sortTable(7)">YPC<span id="arrow-7" class="arrow"></span></th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for p in players %}
-        <tr>
-            <td>{{ p.team }}</td>
-            <td>{{ p.fullName }}</td>
-            <td>{{ p.rushAtt }}</td>
-            <td>{{ p.rushYds }}</td>
-            <td>{{ p.rushTDs }}</td>
-            <td>{{ p.rushFum }}</td>
-            <td>{{ p.rushLongest }}</td>
-            <td>{{ "%.1f"|format(p.rushYdsPerAtt or 0) }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+  <thead>
+    <tr>
+      <th onclick="sortTable(0)">Team<span id="arrow-0" class="arrow"></span></th>
+      <th onclick="sortTable(1)">#<span id="arrow-1" class="arrow"></span></th>       <!-- NEW -->
+      <th onclick="sortTable(2)">Pos<span id="arrow-2" class="arrow"></span></th>     <!-- NEW -->
+      <th onclick="sortTable(3)">Player<span id="arrow-3" class="arrow"></span></th>
+      <th onclick="sortTable(4)">Carries<span id="arrow-4" class="arrow"></span></th>
+      <th onclick="sortTable(5)">Yards<span id="arrow-5" class="arrow"></span></th>
+      <th onclick="sortTable(6)">TDs<span id="arrow-6" class="arrow"></span></th>
+      <th onclick="sortTable(7)">Fumbles<span id="arrow-7" class="arrow"></span></th>
+      <th onclick="sortTable(8)">Longest<span id="arrow-8" class="arrow"></span></th>
+      <th onclick="sortTable(9)">YPC<span id="arrow-9" class="arrow"></span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in players %}
+    <tr>
+      <td>{{ p.team or "Unknown" }}</td>
+      <td>{{ jersey_num(p) }}</td>                              {# NEW #}
+      <td>{{ p.position or p.pos or '' }}</td>                  {# NEW #}
+      <td>{{ p.playerName or p.fullName or p.name }}</td>
+      <td>{{ p.rushAtt or p.carries or p.att or 0 }}</td>
+      <td>{{ p.rushYds or p.yards or p.yds or 0 }}</td>
+      <td>{{ p.rushTDs or p.td or p.tds or 0 }}</td>
+      <td>{{ p.rushFum or p.fumbles or 0 }}</td>
+      <td>{{ p.rushLongest or p.long or p.longest or 0 }}</td>
+      <td>{{ "%.1f"|format((p.rushYdsPerAtt or p.ypc or 0)) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
 </table>
 {% else %}
 <p>No rushing stats available.</p>

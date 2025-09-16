@@ -27,66 +27,111 @@
   </div>
 
   <div class="table-wrap">
-    <table class="stats-table">
-      <thead>
-        <tr>
-          <th>Team</th>
-          <th>Pos</th>
-          <th>#</th>
-          <th>Player</th>
-          <th title="Total Tackles">TKL</th>
-          <th title="Solo Tackles">SOLO</th>
-          <th title="Assisted Tackles">AST</th>
-          <th title="Tackles For Loss">TFL</th>
-          <th>Sacks</th>
-          <th>INT</th>
-          <th title="Interception Yards">INT Yds</th>
-          <th title="Interception TDs">INT TD</th>
-          <th title="Passes Defended">PD</th>
-          <th title="Forced Fumbles">FF</th>
-          <th title="Fumbles Recovered">FR</th>
-          <th title="Defensive TDs">DEF TD</th>
-          <th>Safety</th>
-          <th title="Catches Allowed">CA</th>
-          <th title="Defensive Points">PTS</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in players %}
-        <tr>
-          <td>{{ p.team or "Unknown" }}</td>
-          <td>{{ p.position or p.pos or '' }}</td>
-          <td>{{ jersey_num(p) }}</td>
-          <td>{{ p.playerName or p.name }}</td>
-          <td>{{ p.tackles or 0 }}</td>
-          <td>{{ p.solo or 0 }}</td>
-          <td>{{ p.assisted or 0 }}</td>
-          <td>{{ p.tfl or 0 }}</td>
-          <td>{{ "%.1f"|format(p.sacks if p.sacks is not none else 0) }}</td>
-          <td>{{ p.ints or 0 }}</td>
-          <td>{{ p.intYds or 0 }}</td>
-          <td>{{ p.intTd or 0 }}</td>
-          <td>{{ p.pd or p.deflections or 0 }}</td>
-          <td>{{ p.ff or 0 }}</td>
-          <td>{{ p.fr or 0 }}</td>
-          <td>{{ p.defTds or 0 }}</td>
-          <td>{{ p.safeties or 0 }}</td>
-          <td>{{ p.catchAllowed or 0 }}</td>
-          <td>{{ p.points or 0 }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="16" style="text-align:center; opacity:.7;">No defensive stats found for this week.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  <table class="stats-table" id="defenseTable">
+    <thead>
+      <tr>
+        <th data-sort="string">Team</th>
+        <th data-sort="number">#</th>
+        <th data-sort="string">Pos</th>
+        <th data-sort="string">Player</th>
+        <th data-sort="number" title="Total Tackles">TKL</th>
+        <th data-sort="number" title="Solo Tackles">SOLO</th>
+        <th data-sort="number" title="Assisted Tackles">AST</th>
+        <th data-sort="number" title="Tackles For Loss">TFL</th>
+        <th data-sort="number">Sacks</th>
+        <th data-sort="number">INT</th>
+        <th data-sort="number" title="Interception Yards">INT Yds</th>
+        <th data-sort="number" title="Interception TDs">INT TD</th>
+        <th data-sort="number" title="Passes Defended">PD</th>
+        <th data-sort="number" title="Forced Fumbles">FF</th>
+        <th data-sort="number" title="Fumbles Recovered">FR</th>
+        <th data-sort="number" title="Defensive TDs">DEF TD</th>
+        <th data-sort="number">Safety</th>
+        <th data-sort="number" title="Catches Allowed">CA</th>
+        <th data-sort="number" title="Defensive Points">PTS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in players %}
+      <tr>
+        <td>{{ p.team or "Unknown" }}</td>
+        <td>{{ jersey_num(p) }}</td>
+        <td>{{ p.position or p.pos or '' }}</td>
+        <td>{{ p.playerName or p.name }}</td>
+        <td>{{ p.tackles or 0 }}</td>
+        <td>{{ p.solo or 0 }}</td>
+        <td>{{ p.assisted or 0 }}</td>
+        <td>{{ p.tfl or 0 }}</td>
+        <td>{{ "%.1f"|format(p.sacks if p.sacks is not none else 0) }}</td>
+        <td>{{ p.ints or 0 }}</td>
+        <td>{{ p.intYds or 0 }}</td>
+        <td>{{ p.intTd or 0 }}</td>
+        <td>{{ p.pd or p.deflections or 0 }}</td>
+        <td>{{ p.ff or 0 }}</td>
+        <td>{{ p.fr or 0 }}</td>
+        <td>{{ p.defTds or 0 }}</td>
+        <td>{{ p.safeties or 0 }}</td>
+        <td>{{ p.catchAllowed or 0 }}</td>
+        <td>{{ p.points or 0 }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="19" style="text-align:center; opacity:.7;">No defensive stats found for this week.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const table = document.getElementById("defenseTable");
+  if (!table) return;
+
+  const headers = table.querySelectorAll("thead th");
+  let sortCol = -1, sortAsc = true;
+
+  headers.forEach((th, i) => {
+    th.style.cursor = "pointer";
+    th.addEventListener("click", () => {
+      const type = th.dataset.sort || "string";
+      const tbody = table.tBodies[0];
+      const rows = Array.from(tbody.querySelectorAll("tr"));
+
+      // toggle order if same column; otherwise ascending
+      sortAsc = (sortCol === i ? !sortAsc : true);
+      sortCol = i;
+
+      const getVal = (row) => {
+        const txt = row.children[i].innerText.trim();
+        if (type === "number") {
+          // allow floats (e.g., 0.5 sacks), commas, blanks
+          const n = parseFloat(txt.replace(/,/g, ""));
+          // -Infinity keeps blanks at bottom when ascending
+          return isNaN(n) ? -Infinity : n;
+        }
+        return txt.toLowerCase();
+      };
+
+      rows.sort((a, b) => {
+        const A = getVal(a), B = getVal(b);
+        if (A < B) return sortAsc ? -1 : 1;
+        if (A > B) return sortAsc ? 1 : -1;
+        return 0;
+      });
+
+      rows.forEach(r => tbody.appendChild(r));
+
+      // arrow indicators (remove existing then add to current)
+      headers.forEach(h => h.textContent = h.textContent.replace(/[\u25B2\u25BC]\s*$/,''));
+      th.textContent = th.textContent.replace(/[\u25B2\u25BC]\s*$/,'') + (sortAsc ? " ▲" : " ▼");
+    });
+  });
+});
+</script>
+
 </div>
 
 <style>
-  .stats-table { width:100%; border-collapse: collapse; }
-  .stats-table th, .stats-table td { padding:8px 10px; border-bottom: 1px solid rgba(255,255,255,.15); text-align:center; }
-  .stats-table th { text-transform: uppercase; letter-spacing:.03em; font-size:.9rem; }
-  .btn { padding:6px 10px; border-radius:8px; background: rgba(255,255,255,.12); text-decoration:none; }
-  .btn.disabled { opacity:.35; pointer-events:none; }
+  .stats-table th { text-transform: uppercase; letter-spacing:.03em; font-size:.9rem; user-select: none; }
 </style>
+
 {% endblock %}

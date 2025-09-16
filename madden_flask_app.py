@@ -19,6 +19,7 @@ from parsers.league_parser import parse_league_info_data
 from parsers.passing_parser import parse_passing_stats
 from parsers.standings_parser import parse_standings_data
 from parsers.defense_parser import parse_defense_stats
+from parsers.enrich_helpers import enrich_with_pos_jersey
 
 from flask import render_template
 from urllib.parse import urlparse, parse_qs
@@ -1305,30 +1306,33 @@ def show_stats():
     season = request.args.get("season") or league_data.get("latest_season") or "season_0"
     week   = request.args.get("week")   or league_data.get("latest_week")   or "week_0"
 
-    # Normalize folder names
     season = season if season.startswith("season_") else f"season_{season}"
     week   = week   if week.startswith("week_")     else f"week_{week}"
 
     try:
         base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, season, week)
-        filepath  = os.path.join(base_path, "passing.json")  # or "parsed_passing.json" if that's what you output
+        filepath  = os.path.join(base_path, "passing.json")
 
         players = []
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
             players = data.get("playerPassingStatInfoList", [])
 
-        # Load team_map.json for team name lookups
+        # team names
         teams = {}
         team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
         if os.path.exists(team_map_path):
-            with open(team_map_path, "r", encoding="utf-8") as f:
-                teams = json.load(f)
-
-        # Inject team name
+            with open(team_map_path, "r", encoding="utf-8") as tf:
+                teams = json.load(tf)
         for p in players:
             team_id = str(p.get("teamId"))
             p["team"] = teams.get(team_id, {}).get("name", "Unknown")
+
+        # ⭐ ADD THIS: enrich with position + jersey from the roster
+        try:
+            enrich_with_pos_jersey(players, league)
+        except Exception as e:
+            app.logger.warning("enrich_with_pos_jersey failed: %s", e)
 
     except FileNotFoundError:
         app.logger.warning(f"Passing file not found: {filepath}")
@@ -1337,7 +1341,6 @@ def show_stats():
         app.logger.exception(f"❌ Error loading stats: {e}")
         players = []
 
-    #  week nav
     prev_week, next_week = get_prev_next_week(league, season, week)
 
     return render_template("stats.html",
@@ -1346,9 +1349,7 @@ def show_stats():
                            week=week,
                            league=league,
                            prev_week=prev_week,
-                           next_week=next_week
-                           )
-
+                           next_week=next_week)
 
 
 @app.route('/receiving')
@@ -1392,6 +1393,12 @@ def show_receiving_stats():
             team_id = str(p.get("teamId"))
             team_info = teams.get(team_id, {})
             p["team"] = team_info.get("name", "Unknown")
+
+        # Fill jerseyNum + position from roster data
+        try:
+            enrich_with_pos_jersey(players, league)
+        except Exception as e:
+            print(f"enrich_with_pos_jersey failed: {e}")
 
     except Exception as e:
         print(f"❌ Error loading receiving stats: {e}")
@@ -1455,6 +1462,12 @@ def show_rushing_stats():
     except Exception as e:
         print(f"❌ Error loading rushing stats: {e}")
         players = []
+
+    # Fill jerseyNum + position from roster data
+    try:
+        enrich_with_pos_jersey(players, league)
+    except Exception as e:
+        print(f"enrich_with_pos_jersey failed: {e}")
 
     prev_week, next_week = get_prev_next_week(league, season, week)
 
