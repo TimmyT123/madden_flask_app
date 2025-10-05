@@ -190,6 +190,46 @@ def ap_users_ui():
     # simple Jinja render of a static HTML page
     return render_template("ap_users_admin.html")
 
+# --- AP Users Admin JSON API -----------------------------------------------
+from flask import abort
+
+@app.get("/admin/ap-users")
+def ap_users_list():
+    if not _admin_ok():
+        abort(401)
+    return jsonify(_ap_read_all())
+
+@app.post("/admin/ap-users")
+def ap_users_upsert():
+    if not _admin_ok():
+        abort(401)
+    try:
+        payload = request.get_json(force=True) or {}
+        # expected: {"user_id": 123, "display":"...", "reason":"...", "until":"YYYY-MM-DD", "notes":"..."}
+        saved = _ap_upsert(payload)
+        return jsonify(saved), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.patch("/admin/ap-users/<int:user_id>")
+def ap_users_update(user_id):
+    if not _admin_ok():
+        abort(401)
+    try:
+        fields = request.get_json(force=True) or {}
+        saved = _ap_update_fields(user_id, **fields)
+        if not saved:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(saved), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.delete("/admin/ap-users/<int:user_id>")
+def ap_users_delete(user_id):
+    if not _admin_ok():
+        abort(401)
+    ok = _ap_remove(user_id)
+    return ("", 204) if ok else (jsonify({"error": "not found"}), 404)
 
 
 def _hash_bytes(b: bytes) -> str:

@@ -43,7 +43,7 @@
     <div class="row3">
       <div>
         <label>User ID (Discord numeric)</label>
-        <input id="user_id" type="number" placeholder="e.g. 792929559900061697" />
+        <input id="user_id" type="text" inputmode="numeric" pattern="[0-9]{6,20}" placeholder="e.g. 792929559900061697" />
       </div>
       <div>
         <label>Display</label>
@@ -51,7 +51,7 @@
       </div>
       <div>
         <label>Until (YYYY-MM-DD)</label>
-        <input id="until" type="date" />
+        <input id="until" type="date" min="2024-01-01" />
       </div>
     </div>
     <div class="row">
@@ -116,30 +116,41 @@
       $('#notes').value = '';
     }
 
-    function rowHtml(r) {
-      const esc = s => (s==null?'':String(s));
+    function esc(s){
+      return (s==null?'':String(s))
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+    }
+
+    function escAttr(s){ return esc(s).replace(/"/g,'&quot;'); }
+
+
+    function rowHtml(r){
+      const uid = String(r.user_id);
       return `
-        <tr data-userid="${r.user_id}">
-          <td><span class="badge">${esc(r.user_id)}</span></td>
+        <tr data-userid="${escAttr(uid)}">
+          <td><span class="badge">${esc(uid)}</span></td>
           <td>${esc(r.display)}</td>
           <td>${esc(r.reason)}</td>
           <td>${esc(r.until)}</td>
           <td>${esc(r.notes)}</td>
           <td>
-            <button class="ghost" onclick="loadIntoForm(${r.user_id})">Edit</button>
-            <button class="danger" onclick="removeUser(${r.user_id})">Delete</button>
+            <button class="ghost" onclick="loadIntoForm('${escAttr(uid)}')">Edit</button>
+            <button class="danger" onclick="removeUser('${escAttr(uid)}')">Delete</button>
           </td>
-        </tr>
-      `;
+        </tr>`;
     }
 
-    async function loadList() {
+
+    async function loadList(){
       const token = getToken();
-      if (!token) { alert('Enter Admin Token first'); return; }
+      if (!token) return; // don't alert on first visit
       try {
-        const res = await fetch('/admin/ap-users', {
-          headers: {'X-Admin-Token': token}
-        });
+        const res = await fetch('/admin/ap-users', { headers: {'X-Admin-Token': token} });
+        if (res.status === 401) throw new Error('Unauthorized – check your Admin Token.');
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
         const tbody = $('#tbody');
@@ -148,9 +159,7 @@
           return;
         }
         tbody.innerHTML = data.map(rowHtml).join('');
-      } catch (e) {
-        alert('Load failed: ' + e.message);
-      }
+      } catch(e){ alert('Load failed: ' + e.message); }
     }
 
     function loadIntoForm(user_id) {
@@ -168,17 +177,29 @@
     async function upsert() {
       const token = getToken();
       if (!token) { alert('Enter Admin Token first'); return; }
+
+      // Validate inputs
+      const uidStr = $('#user_id').value.trim();
+      if (!/^\d{6,20}$/.test(uidStr)) {
+        alert('User ID must be 6–20 digits.'); return;
+      }
+      const untilStr = $('#until').value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(untilStr)) {
+        alert('Until must be YYYY-MM-DD'); return;
+      }
+
       const payload = {
-        user_id: Number($('#user_id').value),
+        user_id: Number(uidStr),                         // server expects int
         display: $('#display').value.trim(),
         reason:  $('#reason').value.trim(),
-        until:   $('#until').value, // must be YYYY-MM-DD
+        until:   untilStr,                               // YYYY-MM-DD from input[type=date]
         notes:   $('#notes').value.trim()
       };
-      if (!payload.user_id || !payload.display || !payload.reason || !payload.until) {
-        alert('user_id, display, reason, until are required.');
-        return;
+
+      if (!payload.display || !payload.reason || !payload.until) {
+        alert('user_id, display, reason, until are required.'); return;
       }
+
       try {
         const res = await fetch('/admin/ap-users', {
           method: 'POST',
@@ -201,7 +222,7 @@
       if (!token) { alert('Enter Admin Token first'); return; }
       if (!confirm(`Delete AP for ${user_id}?`)) return;
       try {
-        const res = await fetch(`/admin/ap-users/${user_id}`, {
+        const res = await fetch(`/admin/ap-users/${encodeURIComponent(user_id)}`, {
           method: 'DELETE',
           headers: {'X-Admin-Token': token}
         });
