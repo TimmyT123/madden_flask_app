@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AP Users Admin</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    h1 { margin: 0 0 12px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    input, textarea, select, button { padding: 8px; font-size: 14px; }
+    input[type="text"], input[type="date"], input[type="number"], textarea { width: 100%; box-sizing: border-box; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #eee; padding: 8px; text-align: left; }
+    tr:hover { background: #fafafa; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .muted { color: #777; }
+    .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .danger { background: #b00020; color: #fff; border: none; border-radius: 8px; padding: 8px 12px; }
+    .primary { background: #0d6efd; color: #fff; border: none; border-radius: 8px; padding: 8px 12px; }
+    .ghost { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; }
+    .badge { display: inline-block; padding: 2px 6px; background: #eef6ff; border: 1px solid #cfe3ff; border-radius: 999px; font-size: 12px; }
+    .grid { display: grid; gap: 8px; }
+    @media (max-width: 720px) { .row, .row3 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>AP Users Admin</h1>
+  <p class="muted">Edit <code>ap_users.json</code> from your browser. Changes are atomic and locked.</p>
+
+  <div class="card">
+    <div class="flex">
+      <label for="token"><strong>Admin Token</strong></label>
+      <input id="token" type="password" placeholder="Enter X-Admin-Token" />
+      <button class="ghost" onclick="saveToken()">Save token</button>
+      <span class="muted">Stored only in this browser’s localStorage.</span>
+    </div>
+  </div>
+
+  <div class="card grid">
+    <strong>Add / Update (Upsert)</strong>
+    <div class="row3">
+      <div>
+        <label>User ID (Discord numeric)</label>
+        <input id="user_id" type="number" placeholder="e.g. 792929559900061697" />
+      </div>
+      <div>
+        <label>Display</label>
+        <input id="display" type="text" placeholder="e.g. FALCONS jr.(awholelottablues) PT" />
+      </div>
+      <div>
+        <label>Until (YYYY-MM-DD)</label>
+        <input id="until" type="date" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Reason</label>
+        <input id="reason" type="text" placeholder="e.g. PS5 not working" />
+      </div>
+      <div>
+        <label>Notes</label>
+        <input id="notes" type="text" placeholder="" />
+      </div>
+    </div>
+    <div class="flex">
+      <button class="primary" onclick="upsert()">Save / Upsert</button>
+      <button class="ghost" onclick="clearForm()">Clear</button>
+      <span id="status" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="flex">
+      <strong>Current AP Users</strong>
+      <button class="ghost" onclick="loadList()">Refresh</button>
+      <span class="muted">Click a row to load it into the form.</span>
+    </div>
+    <table id="table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Display</th>
+          <th>Reason</th>
+          <th>Until</th>
+          <th>Notes</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="6" class="muted">No data yet…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const $ = sel => document.querySelector(sel);
+
+    function getToken() {
+      const t = $('#token').value || localStorage.getItem('ap_admin_token') || '';
+      if (!$('#token').value && t) $('#token').value = t;
+      return t;
+    }
+    function saveToken() {
+      localStorage.setItem('ap_admin_token', $('#token').value || '');
+      $('#status').textContent = 'Token saved locally.';
+      setTimeout(() => $('#status').textContent = '', 1500);
+    }
+
+    function clearForm() {
+      $('#user_id').value = '';
+      $('#display').value = '';
+      $('#reason').value = '';
+      $('#until').value = '';
+      $('#notes').value = '';
+    }
+
+    function rowHtml(r) {
+      const esc = s => (s==null?'':String(s));
+      return `
+        <tr data-userid="${r.user_id}">
+          <td><span class="badge">${esc(r.user_id)}</span></td>
+          <td>${esc(r.display)}</td>
+          <td>${esc(r.reason)}</td>
+          <td>${esc(r.until)}</td>
+          <td>${esc(r.notes)}</td>
+          <td>
+            <button class="ghost" onclick="loadIntoForm(${r.user_id})">Edit</button>
+            <button class="danger" onclick="removeUser(${r.user_id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    }
+
+    async function loadList() {
+      const token = getToken();
+      if (!token) { alert('Enter Admin Token first'); return; }
+      try {
+        const res = await fetch('/admin/ap-users', {
+          headers: {'X-Admin-Token': token}
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        const tbody = $('#tbody');
+        if (!Array.isArray(data) || data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="muted">Empty</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = data.map(rowHtml).join('');
+      } catch (e) {
+        alert('Load failed: ' + e.message);
+      }
+    }
+
+    function loadIntoForm(user_id) {
+      const tr = document.querySelector(`tr[data-userid="${user_id}"]`);
+      if (!tr) return;
+      const tds = tr.querySelectorAll('td');
+      $('#user_id').value = user_id;
+      $('#display').value = tds[1].textContent;
+      $('#reason').value  = tds[2].textContent;
+      $('#until').value   = tds[3].textContent;
+      $('#notes').value   = tds[4].textContent;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function upsert() {
+      const token = getToken();
+      if (!token) { alert('Enter Admin Token first'); return; }
+      const payload = {
+        user_id: Number($('#user_id').value),
+        display: $('#display').value.trim(),
+        reason:  $('#reason').value.trim(),
+        until:   $('#until').value, // must be YYYY-MM-DD
+        notes:   $('#notes').value.trim()
+      };
+      if (!payload.user_id || !payload.display || !payload.reason || !payload.until) {
+        alert('user_id, display, reason, until are required.');
+        return;
+      }
+      try {
+        const res = await fetch('/admin/ap-users', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Admin-Token': token},
+          body: JSON.stringify(payload)
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(text);
+        $('#status').textContent = 'Saved.';
+        clearForm();
+        loadList();
+        setTimeout(() => $('#status').textContent = '', 1500);
+      } catch (e) {
+        alert('Save failed: ' + e.message);
+      }
+    }
+
+    async function removeUser(user_id) {
+      const token = getToken();
+      if (!token) { alert('Enter Admin Token first'); return; }
+      if (!confirm(`Delete AP for ${user_id}?`)) return;
+      try {
+        const res = await fetch(`/admin/ap-users/${user_id}`, {
+          method: 'DELETE',
+          headers: {'X-Admin-Token': token}
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(text);
+        loadList();
+      } catch (e) {
+        alert('Delete failed: ' + e.message);
+      }
+    }
+
+    // Auto-fill token from localStorage and load
+    (function init() {
+      const saved = localStorage.getItem('ap_admin_token');
+      if (saved) $('#token').value = saved;
+      loadList();
+    })();
+  </script>
+</body>
+</html>

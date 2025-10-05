@@ -32,6 +32,14 @@ from datetime import datetime
 import csv
 from html import escape
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+from pathlib import Path
+import tempfile
+
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"), override=True)
 
@@ -81,9 +89,111 @@ _roster_state: dict[str, dict] = {}     # {league_id: {"last_hash": str, "last_l
 _roster_lock = Lock()
 
 
+# --- AP Users storage (admin-editable) ---------------------------------------
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "change-me")  # set in systemd env
+
+AP_USERS_PATH = Path("/home/raspberrync/PycharmProjects/discord_madden/ap_users.json")
+AP_USERS_LOCK = AP_USERS_PATH.with_suffix(".lock")
+
+def _ap_lock_call(fn, *args, **kwargs):
+    AP_USERS_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with open(AP_USERS_LOCK, "w") as lockf:
+        fcntl.flock(lockf, fcntl.LOCK_EX)
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            fcntl.flock(lockf, fcntl.LOCK_UN)
+
+def _ap_read_all():
+    if not AP_USERS_PATH.exists():
+        return []
+    with open(AP_USERS_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def _ap_write_all(rows: list[dict]):
+    # atomic write to avoid partial/corrupted JSON
+    AP_USERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(AP_USERS_PATH.parent), prefix=".ap_users.", text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as w:
+            json.dump(rows, w, ensure_ascii=False, indent=2)
+            w.flush(); os.fsync(w.fileno())
+        os.replace(tmp, AP_USERS_PATH)
+    finally:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+
+def _ap_upsert(entry: dict):
+    # minimal schema & type checks
+    for k in ("user_id", "display", "reason", "until", "notes"):
+        if k not in entry:
+            raise ValueError(f"Missing field: {k}")
+    if not isinstance(entry["user_id"], int):
+        raise ValueError("user_id must be int (Discord ID)")
+    # YYYY-MM-DD date format
+    datetime.strptime(entry["until"], "%Y-%m-%d")
+
+    def _inner():
+        rows = _ap_read_all()
+        for i, r in enumerate(rows):
+            if r.get("user_id") == entry["user_id"]:
+                rows[i] = entry
+                _ap_write_all(rows)
+                return entry
+        rows.append(entry)
+        _ap_write_all(rows)
+        return entry
+
+    return _ap_lock_call(_inner)
+
+def _ap_update_fields(user_id: int, **fields):
+    if "until" in fields:
+        datetime.strptime(fields["until"], "%Y-%m-%d")
+
+    def _inner():
+        rows = _ap_read_all()
+        for i, r in enumerate(rows):
+            if r.get("user_id") == user_id:
+                r = {**r, **fields}
+                # revalidate
+                for k in ("user_id", "display", "reason", "until", "notes"):
+                    if k not in r:
+                        raise ValueError(f"Missing field after update: {k}")
+                datetime.strptime(r["until"], "%Y-%m-%d")
+                rows[i] = r
+                _ap_write_all(rows)
+                return r
+        return None
+
+    return _ap_lock_call(_inner)
+
+def _ap_remove(user_id: int) -> bool:
+    def _inner():
+        rows = _ap_read_all()
+        new_rows = [r for r in rows if r.get("user_id") != user_id]
+        if len(new_rows) != len(rows):
+            _ap_write_all(new_rows)
+            return True
+        return False
+    return _ap_lock_call(_inner)
+
+def _admin_ok() -> bool:
+    return request.headers.get("X-Admin-Token") == ADMIN_TOKEN
+
+
+# --- AP Users Admin UI (browser) ---------------------------------------------
+@app.get("/admin/ap-users/ui")
+def ap_users_ui():
+    # simple Jinja render of a static HTML page
+    return render_template("ap_users_admin.html")
+
+
+
 def _hash_bytes(b: bytes) -> str:
     return sha256(b).hexdigest()
-
 
 def _queue_roster_write(league_id: str, data: dict, raw_body: bytes, output_dir: str):
     """
@@ -137,7 +247,6 @@ def _queue_roster_write(league_id: str, data: dict, raw_body: bytes, output_dir:
         _roster_timers[league_id] = Timer(2.0, _flush)  # 2s debounce window
         _roster_timers[league_id].start()
 
-import tempfile
 
 def _atomic_write_json(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
