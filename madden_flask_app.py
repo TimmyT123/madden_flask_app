@@ -95,7 +95,18 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "change-me")  # set in systemd env
 AP_USERS_PATH = Path("/home/raspberrync/PycharmProjects/discord_madden/ap_users.json")
 AP_USERS_LOCK = AP_USERS_PATH.with_suffix(".lock")
 
+UID_RE = re.compile(r"^\d{16,22}$")  # Discord snowflakes are 17–19 digits typically
+
+def _uid_str(v) -> str:
+    return str(v).strip()
+
+def _validate_uid(uid: str):
+    if not UID_RE.match(uid):
+        raise ValueError("user_id must be a numeric string (16–22 digits)")
+
 def _ap_lock_call(fn, *args, **kwargs):
+    if fcntl is None:
+        return fn(*args, **kwargs)
     AP_USERS_LOCK.parent.mkdir(parents=True, exist_ok=True)
     with open(AP_USERS_LOCK, "w") as lockf:
         fcntl.flock(lockf, fcntl.LOCK_EX)
@@ -108,7 +119,15 @@ def _ap_read_all():
     if not AP_USERS_PATH.exists():
         return []
     with open(AP_USERS_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+        rows = json.load(f) or []
+    # normalize legacy ints to strings
+    out = []
+    for r in rows:
+        if isinstance(r, dict) and "user_id" in r:
+            r = dict(r)
+            r["user_id"] = _uid_str(r["user_id"])
+        out.append(r)
+    return out
 
 def _ap_write_all(rows: list[dict]):
     # atomic write to avoid partial/corrupted JSON
@@ -127,19 +146,20 @@ def _ap_write_all(rows: list[dict]):
             pass
 
 def _ap_upsert(entry: dict):
-    # minimal schema & type checks
     for k in ("user_id", "display", "reason", "until", "notes"):
         if k not in entry:
             raise ValueError(f"Missing field: {k}")
-    if not isinstance(entry["user_id"], int):
-        raise ValueError("user_id must be int (Discord ID)")
-    # YYYY-MM-DD date format
+
+    # coerce & validate
+    entry = dict(entry)
+    entry["user_id"] = _uid_str(entry["user_id"])
+    _validate_uid(entry["user_id"])
     datetime.strptime(entry["until"], "%Y-%m-%d")
 
     def _inner():
         rows = _ap_read_all()
         for i, r in enumerate(rows):
-            if r.get("user_id") == entry["user_id"]:
+            if _uid_str(r.get("user_id")) == entry["user_id"]:
                 rows[i] = entry
                 _ap_write_all(rows)
                 return entry
@@ -149,19 +169,24 @@ def _ap_upsert(entry: dict):
 
     return _ap_lock_call(_inner)
 
-def _ap_update_fields(user_id: int, **fields):
+
+def _ap_update_fields(user_id: str, **fields):
     if "until" in fields:
         datetime.strptime(fields["until"], "%Y-%m-%d")
+    user_id = _uid_str(user_id)
+    _validate_uid(user_id)
 
     def _inner():
         rows = _ap_read_all()
         for i, r in enumerate(rows):
-            if r.get("user_id") == user_id:
+            if _uid_str(r.get("user_id")) == user_id:
                 r = {**r, **fields}
-                # revalidate
+                # revalidate requireds
                 for k in ("user_id", "display", "reason", "until", "notes"):
                     if k not in r:
                         raise ValueError(f"Missing field after update: {k}")
+                r["user_id"] = _uid_str(r["user_id"])
+                _validate_uid(r["user_id"])
                 datetime.strptime(r["until"], "%Y-%m-%d")
                 rows[i] = r
                 _ap_write_all(rows)
@@ -170,14 +195,19 @@ def _ap_update_fields(user_id: int, **fields):
 
     return _ap_lock_call(_inner)
 
-def _ap_remove(user_id: int) -> bool:
+
+def _ap_remove(user_id: str) -> bool:
+    user_id = _uid_str(user_id)
+    _validate_uid(user_id)
+
     def _inner():
         rows = _ap_read_all()
-        new_rows = [r for r in rows if r.get("user_id") != user_id]
+        new_rows = [r for r in rows if _uid_str(r.get("user_id")) != user_id]
         if len(new_rows) != len(rows):
             _ap_write_all(new_rows)
             return True
         return False
+
     return _ap_lock_call(_inner)
 
 def _admin_ok() -> bool:
@@ -205,17 +235,21 @@ def ap_users_upsert():
         abort(401)
     try:
         payload = request.get_json(force=True) or {}
-        # expected: {"user_id": 123, "display":"...", "reason":"...", "until":"YYYY-MM-DD", "notes":"..."}
+        # force string user_id
+        if "user_id" in payload:
+            payload["user_id"] = _uid_str(payload["user_id"])
         saved = _ap_upsert(payload)
         return jsonify(saved), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@app.patch("/admin/ap-users/<int:user_id>")
+
+@app.patch("/admin/ap-users/<user_id>")
 def ap_users_update(user_id):
     if not _admin_ok():
         abort(401)
     try:
+        user_id = _uid_str(user_id)
         fields = request.get_json(force=True) or {}
         saved = _ap_update_fields(user_id, **fields)
         if not saved:
@@ -224,11 +258,12 @@ def ap_users_update(user_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@app.delete("/admin/ap-users/<int:user_id>")
+
+@app.delete("/admin/ap-users/<user_id>")
 def ap_users_delete(user_id):
     if not _admin_ok():
         abort(401)
-    ok = _ap_remove(user_id)
+    ok = _ap_remove(_uid_str(user_id))
     return ("", 204) if ok else (jsonify({"error": "not found"}), 404)
 
 
