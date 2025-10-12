@@ -120,12 +120,13 @@ def _ap_read_all():
         return []
     with open(AP_USERS_PATH, "r", encoding="utf-8") as f:
         rows = json.load(f) or []
-    # normalize legacy ints to strings
     out = []
     for r in rows:
         if isinstance(r, dict) and "user_id" in r:
             r = dict(r)
             r["user_id"] = _uid_str(r["user_id"])
+            if "start" not in r:
+                r["start"] = ""   # keep explicit blank for downstream logic
         out.append(r)
     return out
 
@@ -154,7 +155,17 @@ def _ap_upsert(entry: dict):
     entry = dict(entry)
     entry["user_id"] = _uid_str(entry["user_id"])
     _validate_uid(entry["user_id"])
+
+    # required
     datetime.strptime(entry["until"], "%Y-%m-%d")
+
+    # optional: start
+    start_s = (entry.get("start") or "").strip()
+    if start_s:
+        datetime.strptime(start_s, "%Y-%m-%d")
+    else:
+        # keep explicit blank so other services can 'treat missing as today'
+        entry["start"] = ""
 
     def _inner():
         rows = _ap_read_all()
@@ -171,8 +182,11 @@ def _ap_upsert(entry: dict):
 
 
 def _ap_update_fields(user_id: str, **fields):
-    if "until" in fields:
+    if "until" in fields and fields["until"]:
         datetime.strptime(fields["until"], "%Y-%m-%d")
+    if "start" in fields and (fields["start"] or "").strip():
+        datetime.strptime(fields["start"].strip(), "%Y-%m-%d")
+
     user_id = _uid_str(user_id)
     _validate_uid(user_id)
 
@@ -181,13 +195,15 @@ def _ap_update_fields(user_id: str, **fields):
         for i, r in enumerate(rows):
             if _uid_str(r.get("user_id")) == user_id:
                 r = {**r, **fields}
-                # revalidate requireds
+                # ensure all requireds remain, and keep start present (may be "")
                 for k in ("user_id", "display", "reason", "until", "notes"):
                     if k not in r:
                         raise ValueError(f"Missing field after update: {k}")
                 r["user_id"] = _uid_str(r["user_id"])
                 _validate_uid(r["user_id"])
                 datetime.strptime(r["until"], "%Y-%m-%d")
+                if "start" not in r:
+                    r["start"] = r.get("start", "")
                 rows[i] = r
                 _ap_write_all(rows)
                 return r
