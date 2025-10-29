@@ -922,20 +922,23 @@ def load_wurd_champions():
 def wurd_champions():
     m24_raw = _read_json_from_app_root("wurd_champions_m24.json", [])
     m25_raw = _read_json_from_app_root("wurd_champions_m25.json", [])
+    m26_raw = _read_json_from_app_root("wurd_champions_m26.json", [])
 
     m24 = _normalize(m24_raw)
     m25 = _normalize(m25_raw)
+    m26 = _normalize(m26_raw)
 
     members = _read_json_from_app_root("discord_members.json", {})  # {"123...": "Display Name"}
 
     # ✅ add names to the era lists too
     m24 = enrich_with_names(m24, members)
     m25 = enrich_with_names(m25, members)
+    m26 = enrich_with_names(m26, members)
 
-    team_rows, user_rows = build_leaderboards(m24 + m25, members)
+    team_rows, user_rows = build_leaderboards(m24 + m25 + m26, members)
 
     return render_template("champions.html",
-                           m24=m24, m25=m25,
+                           m24=m24, m25=m25, m26=m26,
                            team_rows=team_rows, user_rows=user_rows)
 
 # Optional: JSON API (kept as your m25 endpoint)
