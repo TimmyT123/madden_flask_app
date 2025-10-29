@@ -1089,24 +1089,50 @@ def webhook(subpath):
     return 'OK', 200
 
 
+WEEK_RE = re.compile(r"^week_(\d+)$")
+SEASON_RE = re.compile(r"^season_(\d+)$")
+
 def get_latest_season_week():
     base_path = app.config['UPLOAD_FOLDER']
+    if not os.path.isdir(base_path):
+        return  # nothing to do
+
     for league_id in os.listdir(base_path):
         league_path = os.path.join(base_path, league_id)
-        if os.path.isdir(league_path):
-            seasons = [s for s in os.listdir(league_path) if s.startswith("season_")]
-            seasons.sort(reverse=True)
-            if seasons:
-                latest_season = seasons[0]
-                weeks_path = os.path.join(league_path, latest_season)
-                weeks = [w for w in os.listdir(weeks_path) if w.startswith("week_")]
-                weeks.sort(key=lambda x: int(x.replace("week_", "")), reverse=True)
+        if not os.path.isdir(league_path):
+            continue
 
-                if weeks:
-                    league_data["latest_league"] = league_id
-                    league_data["latest_season"] = latest_season
-                    league_data["latest_week"] = weeks[0]
-                    return
+        # Only seasons that match season_<digits>, sort numerically (not lexicographically)
+        seasons_nums = []
+        for s in os.listdir(league_path):
+            m = SEASON_RE.match(s)
+            if m:
+                seasons_nums.append((int(m.group(1)), s))
+        if not seasons_nums:
+            continue
+        seasons_nums.sort(key=lambda t: t[0], reverse=True)
+        latest_season_num, latest_season = seasons_nums[0]
+
+        weeks_path = os.path.join(league_path, latest_season)
+        if not os.path.isdir(weeks_path):
+            continue
+
+        # Only weeks that match week_<digits>, sort numerically
+        week_entries = []
+        for w in os.listdir(weeks_path):
+            m = WEEK_RE.match(w)
+            if m:
+                week_entries.append((int(m.group(1)), w))
+        if not week_entries:
+            continue
+
+        week_entries.sort(key=lambda t: t[0], reverse=True)
+        latest_week_num, latest_week_name = week_entries[0]
+
+        league_data["latest_league"] = league_id
+        league_data["latest_season"] = latest_season
+        league_data["latest_week"] = latest_week_name
+        return  # keep your existing contract
 
 def update_default_week(season_index, week_index):
     try:
