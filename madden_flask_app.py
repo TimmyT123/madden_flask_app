@@ -92,7 +92,7 @@ _roster_lock = Lock()
 # --- AP Users storage (admin-editable) ---------------------------------------
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "change-me")  # set in systemd env
 
-AP_USERS_PATH = Path("/home/raspberrync/PycharmProjects/discord_madden/ap_users.json")
+AP_USERS_PATH = Path("/home/pi/projects/time_madden_old/ap_users.json")
 AP_USERS_LOCK = AP_USERS_PATH.with_suffix(".lock")
 
 UID_RE = re.compile(r"^\d{16,22}$")  # Discord snowflakes are 17–19 digits typically
