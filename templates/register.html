@@ -19,6 +19,16 @@
     button{margin-top:16px;padding:12px 16px;border-radius:10px;border:0;background:#3b82f6;color:#fff;font-weight:700;cursor:pointer}
     button:hover{filter:brightness(1.05)}
     .hp{display:none} /* honeypot */
+    .checkbox {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+    }
+    .checkbox input {
+      width: auto;
+      margin: 0;
+    }
   </style>
 </head>
 <body>
@@ -41,14 +51,10 @@
         </div>
 
         <div>
-          <label for="timezone">Time Zone</label>
-          <select id="timezone" name="timezone" required>
-            <option value="">Select…</option>
-            {% for tz in tz_list %}
-              <option value="{{ tz }}" {% if data and data.timezone == tz %}selected{% endif %}>{{ tz }}</option>
-            {% endfor %}
-          </select>
-          {% if errors.timezone %}<div class="err">{{ errors.timezone }}</div>{% endif %}
+          <label for="ea_id">EA ID</label>
+          <input id="ea_id" name="ea_id" required value="{{ (data.ea_id or '') if data else '' }}" />
+          {% if errors.ea_id %}<div class="err">{{ errors.ea_id }}</div>{% endif %}
+          <div class="hint">On the Madden 26 main screen, press <strong>R3</strong> (PS5) or <strong>RS</strong> (Xbox). In the <strong>Player Search</strong> tab you’ll see your EA ID.</div>
         </div>
 
         <div>
@@ -57,11 +63,16 @@
           {% if errors.platform_id %}<div class="err">{{ errors.platform_id }}</div>{% endif %}
           <div class="hint">To find your PS5/Xbox ID: click your profile picture, then click <strong>Profile</strong>.</div>
         </div>
+
         <div>
-          <label for="ea_id">EA ID</label>
-          <input id="ea_id" name="ea_id" required value="{{ (data.ea_id or '') if data else '' }}" />
-          {% if errors.ea_id %}<div class="err">{{ errors.ea_id }}</div>{% endif %}
-          <div class="hint">On the Madden 26 main screen, press <strong>R3</strong> (PS5) or <strong>RS</strong> (Xbox). In the <strong>Player Search</strong> tab you’ll see your EA ID.</div>
+          <label for="timezone">Time Zone</label>
+          <select id="timezone" name="timezone" required>
+            <option value="">Select…</option>
+            {% for tz in tz_list %}
+              <option value="{{ tz }}" {% if data and data.timezone == tz %}selected{% endif %}>{{ tz }}</option>
+            {% endfor %}
+          </select>
+          {% if errors.timezone %}<div class="err">{{ errors.timezone }}</div>{% endif %}
         </div>
 
         <div class="full">
@@ -128,9 +139,9 @@
         </div>
 
         <div class="full">
-          <label>
+          <label class="checkbox">
             <input type="checkbox" name="ack_rules" value="yes" required>
-            I understand scheduling is a commitment and commissioner rulings are final.
+            <span>I understand scheduling is a commitment and commissioner rulings are final.</span>
           </label>
           {% if errors.ack_rules %}<div class="err">{{ errors.ack_rules }}</div>{% endif %}
         </div>
