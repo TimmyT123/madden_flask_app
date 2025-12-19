@@ -567,7 +567,6 @@ def _append_registration_csv(clean: dict):
         datetime.utcnow().isoformat(timespec='seconds') + "Z",
         clean["first_name"], clean["last_name"], clean["timezone"],
         clean["platform_id"], clean["ea_id"], clean["favorite_teams"],
-        clean["madden_experience"],  # NEW
         clean["skill_level"],
         clean["schedule_handling"],
         clean["rule_disagreement"],
