@@ -24,7 +24,7 @@
 <body>
   <div class="wrap">
     <h1>Welcome to WURD Madden Franchise!</h1>
-    <p class="lead">Fill out the form below and our admins will reach out.</p>
+    <p class="lead">Fill out the form below. Approved users will be contacted by a commissioner.</p>
 
     <form method="post" action="{{ url_for('new_recruit') }}" novalidate
       onsubmit="const b=this.querySelector('button[type=submit]'); if(b){b.disabled=true; b.textContent='Submitting…';}">
@@ -40,11 +40,6 @@
           {% if errors.last_name %}<div class="err">{{ errors.last_name }}</div>{% endif %}
         </div>
 
-        <div>
-          <label for="phone">Phone Number</label>
-          <input id="phone" name="phone" inputmode="tel" placeholder="e.g. 555-555-5555" value="{{ (data.phone or '') if data else '' }}" />
-          {% if errors.phone %}<div class="err">{{ errors.phone }}</div>{% endif %}
-        </div>
         <div>
           <label for="timezone">Time Zone</label>
           <select id="timezone" name="timezone" required>
@@ -74,14 +69,70 @@
           <textarea id="favorite_teams" name="favorite_teams" rows="2">{{ (data.favorite_teams or '') if data else '' }}</textarea>
         </div>
 
+        <div>
+          <label for="skill_level">How would you describe your Madden skill level?</label>
+          <select id="skill_level" name="skill_level" required>
+            <option value="">Select…</option>
+
+            {% if data and data['skill_level'] == 'Beginner' %}
+              <option value="Beginner" selected>Beginner / Casual</option>
+            {% else %}
+              <option value="Beginner">Beginner / Casual</option>
+            {% endif %}
+
+            {% if data and data['skill_level'] == 'Intermediate' %}
+              <option value="Intermediate" selected>Intermediate</option>
+            {% else %}
+              <option value="Intermediate">Intermediate</option>
+            {% endif %}
+
+            {% if data and data['skill_level'] == 'Advanced' %}
+              <option value="Advanced" selected>Advanced</option>
+            {% else %}
+              <option value="Advanced">Advanced</option>
+            {% endif %}
+
+            {% if data and data['skill_level'] == 'Highly Competitive' %}
+              <option value="Highly Competitive" selected>Highly Competitive</option>
+            {% else %}
+              <option value="Highly Competitive">Highly Competitive</option>
+            {% endif %}
+          </select>
+
+          {% if errors.skill_level %}
+            <div class="err">{{ errors.skill_level }}</div>
+          {% endif %}
+        </div>
+
         <div class="full">
-          <label for="madden_experience">How long have you been playing Madden?</label>
-          <input id="madden_experience" name="madden_experience" placeholder="e.g., 2 years / since Madden 20" value="{{ (data.madden_experience or '') if data else '' }}" />
+          <label for="schedule_handling">
+            If you agree to a game time and something comes up last minute, what do you do?
+          </label>
+          <textarea id="schedule_handling" name="schedule_handling" rows="3"
+            required>{{ data.schedule_handling if data else '' }}</textarea>
+          {% if errors.schedule_handling %}<div class="err">{{ errors.schedule_handling }}</div>{% endif %}
+        </div>
+
+        <div class="full">
+          <label for="rule_disagreement">
+            If you disagree with a commissioner ruling, how would you handle it?
+          </label>
+          <textarea id="rule_disagreement" name="rule_disagreement" rows="3"
+            required>{{ data.rule_disagreement if data else '' }}</textarea>
+          {% if errors.rule_disagreement %}<div class="err">{{ errors.rule_disagreement }}</div>{% endif %}
         </div>
 
         <div class="full">
           <label for="referrer">What user let you know about WURD?</label>
           <input id="referrer" name="referrer" value="{{ (data.referrer or '') if data else '' }}" />
+        </div>
+
+        <div class="full">
+          <label>
+            <input type="checkbox" name="ack_rules" value="yes" required>
+            I understand scheduling is a commitment and commissioner rulings are final.
+          </label>
+          {% if errors.ack_rules %}<div class="err">{{ errors.ack_rules }}</div>{% endif %}
         </div>
 
         <!-- Honeypot field (bots will fill it) -->

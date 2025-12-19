@@ -473,7 +473,6 @@ def _load_team_map(league_id):
 
 NEW_RECRUITS_WEBHOOK_URL = os.getenv("NEW_RECRUITS_WEBHOOK_URL") or DISCORD_WEBHOOK_URL
 
-PHONE_RE = re.compile(r"^[+\d][\d\s().-]{6,}$")
 TIMEZONES = ["PT", "AZ", "MT", "CT", "ET"]
 
 def _clean_field(v: str, max_len: int = 120) -> str:
@@ -488,12 +487,14 @@ def _validate_payload(form: dict):
     clean = {
         "first_name": _clean_field(form.get("first_name"), 60),
         "last_name": _clean_field(form.get("last_name"), 60),
-        "phone": _clean_field(form.get("phone"), 40),
         "timezone": _clean_field(form.get("timezone"), 8).upper(),
         "platform_id": _clean_field(form.get("platform_id"), 60),
         "ea_id": _clean_field(form.get("ea_id"), 60),
         "favorite_teams": _clean_field(form.get("favorite_teams"), 200),
-        "madden_experience": _clean_field(form.get("madden_experience"), 80),  # NEW
+        "skill_level": _clean_field(form.get("skill_level"), 30),
+        "schedule_handling": _clean_field(form.get("schedule_handling"), 400),
+        "rule_disagreement": _clean_field(form.get("rule_disagreement"), 400),
+        "ack_rules": form.get("ack_rules"),
         "referrer": _clean_field(form.get("referrer"), 100),
         "website": _clean_field(form.get("website"), 60),  # honeypot
     }
@@ -502,15 +503,20 @@ def _validate_payload(form: dict):
         errors["first_name"] = "First name is required."
     if not clean["last_name"]:
         errors["last_name"] = "Last name is required."
-    if clean["phone"] and not PHONE_RE.match(clean["phone"]):
-        errors["phone"] = "Phone number looks invalid."
     if clean["timezone"] not in TIMEZONES:
         errors["timezone"] = "Please pick a valid time zone (PT/AZ/MT/CT/ET)."
     if not clean["platform_id"]:
         errors["platform_id"] = "PS/Xbox ID is required."
     if not clean["ea_id"]:
         errors["ea_id"] = "EA ID is required."
-
+    if not clean["skill_level"]:
+        errors["skill_level"] = "Please select a skill level."
+    if not clean["schedule_handling"]:
+        errors["schedule_handling"] = "This question is required."
+    if not clean["rule_disagreement"]:
+        errors["rule_disagreement"] = "This question is required."
+    if clean["ack_rules"] != "yes":
+        errors["ack_rules"] = "You must acknowledge the league rules."
     if clean["website"]:
         errors["__spam__"] = "Spam detected."
 
@@ -528,12 +534,13 @@ def _post_new_recruit_to_discord(clean: dict):
         SEP,  # <-- separator first so it appears between applicants
         "**New Recruit Application**",
         f"**Name:** {escape(clean['first_name'])} {escape(clean['last_name'])}",
-        f"**Phone:** {escape(clean['phone']) or '—'}",
         f"**Time Zone:** {escape(clean['timezone'])}",
         f"**PS/Xbox ID:** {escape(clean['platform_id'])}",
         f"**EA ID:** {escape(clean['ea_id'])}",
         f"**Favorite Teams:** {escape(clean['favorite_teams']) or '—'}",
-        f"**Madden Experience:** {escape(clean['madden_experience']) or '—'}",
+        f"**Skill Level:** {escape(clean['skill_level'])}",
+        f"**Scheduling Response:** {escape(clean['schedule_handling'])}",
+        f"**Rule Disagreement Response:** {escape(clean['rule_disagreement'])}",
         f"**Referrer:** {escape(clean['referrer']) or '—'}",
         ""  # trailing newline for breathing room
     ]
@@ -558,9 +565,12 @@ def _append_registration_csv(clean: dict):
     path = os.path.join(folder, "new_recruits.csv")
     new_row = [
         datetime.utcnow().isoformat(timespec='seconds') + "Z",
-        clean["first_name"], clean["last_name"], clean["phone"], clean["timezone"],
+        clean["first_name"], clean["last_name"], clean["timezone"],
         clean["platform_id"], clean["ea_id"], clean["favorite_teams"],
         clean["madden_experience"],  # NEW
+        clean["skill_level"],
+        clean["schedule_handling"],
+        clean["rule_disagreement"],
         clean["referrer"],
     ]
     header = [
