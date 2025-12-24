@@ -721,7 +721,7 @@ def compute_display_week(phase: str | None, week_number: int | None) -> int | No
     return week_number
 
 def get_default_season_week():
-    league_id = league_data.get("latest_league", "17287266")
+    league_id = league_data.get("latest_league", "3264906")
     path = os.path.join("uploads", league_id, "default_week.json")
     try:
         with open(path) as f:
@@ -1148,7 +1148,7 @@ def get_latest_season_week():
 
 def update_default_week(season_index, week_index):
     try:
-        league_id = league_data.get("latest_league", "17287266")
+        league_id = league_data.get("latest_league", "3264906")
         default_path = os.path.join("uploads", league_id, "default_week.json")
         season_str = f"season_{season_index}"
         week_str = f"week_{week_index}"
@@ -1535,7 +1535,7 @@ def ui_player(p, _dev_to_label):
 @app.route('/stats')
 def show_stats():
     # Get league/season/week from query or cache
-    league = request.args.get("league") or league_data.get("latest_league") or "17287266"
+    league = request.args.get("league") or league_data.get("latest_league") or "3264906"
 
     if not league_data.get("latest_season") or not league_data.get("latest_week"):
         get_latest_season_week()
@@ -1928,7 +1928,7 @@ def fmt_signed(n):
 
 @app.route("/teams")
 def show_teams():
-    league_id = "17287266"
+    league_id = "3264906"
     path = f"uploads/{league_id}/season_global/week_global/parsed_league_info.json"
 
     try:
@@ -2271,7 +2271,7 @@ DEV_LABELS = {0: "Normal", 1: "Star", 2: "Superstar", 3: "X-Factor"}
 
 @app.route("/rosters")
 def rosters():
-    league = request.args.get("league") or league_data.get("latest_league") or "17287266"
+    league = request.args.get("league") or league_data.get("latest_league") or "3264906"
     team   = request.args.get("team", "NFL")
     pos    = request.args.get("pos", "ALL")
     page   = max(int(request.args.get("page", 1)), 1)
@@ -2389,7 +2389,7 @@ def rosters():
 
 @app.route('/schedule')
 def show_schedule():
-    league_id = league_data.get("latest_league", "17287266")
+    league_id = league_data.get("latest_league", "3264906")
     season = request.args.get("season") or league_data.get("latest_season")
     week = request.args.get("week") or league_data.get("latest_week")
 
@@ -2457,7 +2457,7 @@ def show_schedule():
 @app.route("/standings")
 def show_standings():
     try:
-        league_id = "17287266"
+        league_id = "3264906"
         folder = f"uploads/{league_id}/season_global/week_global"
         standings_file = os.path.join(folder, "parsed_standings.json")
 
