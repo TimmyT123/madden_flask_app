@@ -959,70 +959,44 @@ def wurd_champions_api():
 @app.route('/')
 def home():
     base_path = app.config['UPLOAD_FOLDER']
+
+    # ✅ authoritative values (set by webhooks)
+    latest_league_id = league_data.get("latest_league")
+    latest_season    = league_data.get("latest_season")
+    latest_week      = league_data.get("latest_week")
+
     leagues = []
-    latest_season = None
-    latest_week = None
-    latest_league_id = None
 
     if os.path.exists(base_path):
         for league_id in os.listdir(base_path):
             league_path = os.path.join(base_path, league_id)
-            if os.path.isdir(league_path):
-                seasons = []
-                for season in os.listdir(league_path):
-                    season_path = os.path.join(league_path, season)
-                    if os.path.isdir(season_path):
-                        weeks = [
-                            w for w in os.listdir(season_path)
-                            if os.path.isdir(os.path.join(season_path, w)) and re.match(r'^week_\d+$', w)
-                        ]
-                        weeks.sort(key=lambda x: int(x.replace("week_", "")))
+            if not os.path.isdir(league_path):
+                continue
 
-                        seasons.append({'name': season, 'weeks': weeks})
+            seasons = []
+            for season in os.listdir(league_path):
+                season_path = os.path.join(league_path, season)
+                if not os.path.isdir(season_path):
+                    continue
 
-                        if re.match(r'^season_\d+$', season):
-                            if not latest_season or season > latest_season:
-                                latest_season = season
-                                latest_week = sorted(weeks)[-1] if weeks else None
-                                latest_league_id = league_id
-
-                leagues.append({'id': league_id, 'seasons': seasons})
-
-    # ✅ Use default_week.json if it exists
-    # ✅ Use default_week.json if it exists — but do NOT shift weeks
-    if latest_league_id:
-        season_from_default, week_from_default = get_default_season_week()
-
-        # If the default paths exist on disk, trust them
-        default_dir = os.path.join(base_path, latest_league_id, season_from_default, week_from_default)
-        if os.path.isdir(default_dir):
-            latest_season = season_from_default
-            latest_week = week_from_default
-        else:
-            # Fallback: pick the latest week that actually exists for the latest season
-            season_dir = os.path.join(base_path, latest_league_id, latest_season or "")
-            weeks = []
-            if os.path.isdir(season_dir):
-                weeks = [w for w in os.listdir(season_dir)
-                         if os.path.isdir(os.path.join(season_dir, w)) and re.match(r'^week_\d+$', w)]
+                weeks = [
+                    w for w in os.listdir(season_path)
+                    if os.path.isdir(os.path.join(season_path, w))
+                    and re.match(r'^week_\d+$', w)
+                ]
                 weeks.sort(key=lambda x: int(x.replace("week_", "")))
-            latest_week = weeks[-1] if weeks else None
 
-    # 💾 Save latest season/week to memory
-    league_data["latest_season"] = latest_season
-    league_data["latest_week"] = latest_week
-    league_data["latest_league"] = latest_league_id
+                seasons.append({'name': season, 'weeks': weeks})
 
-    # ✅ NEW: Compute latest_week_display (Week # for UI)
+            leagues.append({'id': league_id, 'seasons': seasons})
+
+    # display helpers
     if latest_week and latest_week.startswith("week_"):
         latest_week_display = int(latest_week.replace("week_", ""))
+        current_week = latest_week_display
     else:
         latest_week_display = "?"
-
-    print(f"latest_week passed to template: {latest_week}", flush=True)
-
-    # turn "week_19" into int 19
-    current_week = int(latest_week.replace("week_", "")) if (latest_week and latest_week.startswith("week_") and latest_week[5:].isdigit()) else 0
+        current_week = 0
 
     return render_template(
         'index.html',
@@ -1031,7 +1005,7 @@ def home():
         latest_season=latest_season,
         latest_week=latest_week,
         latest_week_display=latest_week_display,
-        current_week=current_week  # 👈 pass to template
+        current_week=current_week
     )
 
 
