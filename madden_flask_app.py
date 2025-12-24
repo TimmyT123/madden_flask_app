@@ -990,6 +990,33 @@ def home():
 
             leagues.append({'id': league_id, 'seasons': seasons})
 
+    # 🔁 Fallback: if new league has no cached season/week yet, infer from disk
+    if latest_league_id and (not latest_season or not latest_week):
+        league_path = os.path.join(base_path, latest_league_id)
+
+        seasons = sorted(
+            [s for s in os.listdir(league_path) if re.match(r'^season_\d+$', s)],
+            key=lambda x: int(x.replace("season_", "")),
+            reverse=True
+        )
+
+        if seasons:
+            latest_season = seasons[0]
+            season_path = os.path.join(league_path, latest_season)
+
+            weeks = sorted(
+                [w for w in os.listdir(season_path) if re.match(r'^week_\d+$', w)],
+                key=lambda x: int(x.replace("week_", "")),
+                reverse=True
+            )
+
+            if weeks:
+                latest_week = weeks[0]
+
+            # 🔒 update memory so next request is clean
+            league_data["latest_season"] = latest_season
+            league_data["latest_week"] = latest_week
+
     # display helpers
     if latest_week and latest_week.startswith("week_"):
         latest_week_display = int(latest_week.replace("week_", ""))
