@@ -1162,13 +1162,12 @@ def update_default_week(season_index, week_index):
     except Exception as e:
         print(f"⚠️ Failed to update default week: {e}")
 
-
-def find_league_in_subpath(subpath: str | None) -> str | None:
-    # Handles "ps5/17287266/league" or "17287266/league"
-    for seg in (subpath or "").split("/"):
-        if seg.isdigit() and 6 <= len(seg) <= 12:
-            return seg
-    return None
+def find_league_in_subpath(subpath):
+    candidates = [
+        seg for seg in (subpath or "").split("/")
+        if seg.isdigit() and 6 <= len(seg) <= 12
+    ]
+    return candidates[-1] if candidates else None
 
 def resolve_league_id(payload: dict, subpath: str | None = None) -> str | None:
     # Try payload fields first
