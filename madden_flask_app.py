@@ -965,19 +965,16 @@ def home():
     latest_season    = league_data.get("latest_season")
     latest_week      = league_data.get("latest_week")
 
-    # 🔁 Fallback: determine active league if not yet set
-    if not latest_league_id and os.path.exists(base_path):
+    # 🔁 Fallback ONLY if app has never seen a webhook
+    if not latest_league_id:
         league_dirs = [
             d for d in os.listdir(base_path)
             if os.path.isdir(os.path.join(base_path, d)) and d.isdigit()
         ]
 
         if league_dirs:
-            # pick most recently modified league folder
-            league_dirs.sort(
-                key=lambda d: os.path.getmtime(os.path.join(base_path, d)),
-                reverse=True
-            )
+            # pick numerically highest league ID (EA IDs increase over time)
+            league_dirs.sort(key=int, reverse=True)
             latest_league_id = league_dirs[0]
             league_data["latest_league"] = latest_league_id
 
