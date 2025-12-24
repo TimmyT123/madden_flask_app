@@ -1437,6 +1437,21 @@ def process_webhook_data(data, subpath, headers, body):
     raw_week_for_display = week_index_int_path if week_index_int_path is not None else week_index_int_payload
     display_week = compute_display_week(phase, raw_week_for_display)
 
+    # 🔒 AUTHORITATIVE STATE UPDATE (ONE SOURCE OF TRUTH)
+    if season_index_int is not None and display_week is not None:
+        season_str = f"season_{season_index_int}"
+        week_str = f"week_{display_week}"
+
+        league_data["latest_league"] = league_id
+        league_data["latest_season"] = season_str
+        league_data["latest_week"] = week_str
+
+        print(
+            f"🔒 Authoritative set → league={league_id} "
+            f"season={season_str} week={week_str}",
+            flush=True
+        )
+
     # 8) Destination folder (non-roster)
     if (season_index == "global" and week_index == "global") or \
        ("leagueteams" in (subpath or "")) or \
