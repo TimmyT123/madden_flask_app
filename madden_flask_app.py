@@ -1354,6 +1354,16 @@ def process_webhook_data(data, subpath, headers, body):
             return
 
         league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
+
+        # 🔒 ROSTERS ARE GLOBAL SNAPSHOTS
+        # They must ONLY ever write to season_global/week_global
+        # Weekly season_X/week_Y folders must NEVER contain roster data
+
+        if not league_folder.endswith(os.path.join("season_global", "week_global")):
+            raise RuntimeError(
+                f"🚨 INVALID ROSTER WRITE TARGET: {league_folder}"
+            )
+
         os.makedirs(league_folder, exist_ok=True)
 
         roster_list = data.get("rosterInfoList") or []
@@ -1483,13 +1493,6 @@ def process_webhook_data(data, subpath, headers, body):
     # 9) Write + parse (non-roster)
     if filename == "league.json":
         parse_league_info_data(data, subpath, league_folder)
-
-    # Special handling for roster chunks: merge instead of overwrite
-    if filename == "rosters.json":
-        merged_players = _upsert_rosters(league_folder, data.get("rosterInfoList") or [])
-        parse_rosters_data({"rosterInfoList": merged_players}, subpath, league_folder)
-        league_data[subpath] = {"success": True, "rosterInfoList": merged_players}
-        return
 
     # Generic write for non-roster payloads
     output_path = os.path.join(league_folder, filename)
