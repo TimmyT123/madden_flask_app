@@ -977,6 +977,10 @@ def home():
             league_dirs.sort(key=int, reverse=True)
             latest_league_id = league_dirs[0]
             league_data["latest_league"] = latest_league_id
+            # NOTE:
+            # league_data["latest_*"] is AUTHORITATIVE and updated ONLY by webhooks.
+            # UI navigation must NEVER modify these values.
+            # Historical browsing will be implemented via query params only.
 
     leagues = []
 
