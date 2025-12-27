@@ -854,6 +854,9 @@ def _format_member_name(members: dict, user_id: str) -> str:
         return info
     return user_id
 
+def is_team_id(value: str) -> bool:
+    return isinstance(value, str) and value.isdigit() and value.startswith("774")
+
 def build_leaderboards(champions, members=None):
     from collections import Counter
     members = members or {}
@@ -1235,6 +1238,12 @@ def process_webhook_data(data, subpath, headers, body):
         app.logger.error("No league_id found for webhook; skipping write.")
         return
 
+    # 🚨 HARD BLOCK: teamIds must NEVER become league folders
+    if is_team_id(league_id):
+        if "rosterInfoList" not in data:
+            raise RuntimeError(
+                f"🚨 TeamId used as league_id outside roster handler: {league_id}"
+            )
     league_data["latest_league"] = league_id
     league_data["league_id"] = league_id
     print(f"📎 Using league_id: {league_id}")
@@ -1330,6 +1339,24 @@ def process_webhook_data(data, subpath, headers, body):
     elif "gameScheduleInfoList" in data:
         filename = "schedule.json"
     elif "rosterInfoList" in data:
+        # ✅ Normalize league_id if payload came in with a teamId
+        if is_team_id(league_id):
+            real_league = (
+                    data.get("leagueId")
+                    or data.get("franchiseInfo", {}).get("leagueId")
+                    or league_data.get("latest_league")
+            )
+
+            if not real_league:
+                raise RuntimeError("Cannot resolve real league for team roster payload")
+
+            team_id = league_id
+            league_id = real_league
+
+            print(f"🧭 Rerouting team roster {team_id} → league {league_id}")
+        else:
+            team_id = None
+
         # ✳️ Debug FA payloads specifically
         if "freeagents" in (subpath or "").lower():
             fa_count = len(data.get("rosterInfoList") or [])
@@ -1367,6 +1394,22 @@ def process_webhook_data(data, subpath, headers, body):
         os.makedirs(league_folder, exist_ok=True)
 
         roster_list = data.get("rosterInfoList") or []
+
+        rosters_by_team_dir = os.path.join(
+            app.config['UPLOAD_FOLDER'],
+            league_id,
+            "season_global",
+            "week_global",
+            "rosters_by_team"
+        )
+        os.makedirs(rosters_by_team_dir, exist_ok=True)
+
+        # If this payload is team-scoped, persist it
+        if team_id:
+            team_path = os.path.join(rosters_by_team_dir, f"{team_id}.json")
+            with open(team_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+
         added, total = _add_roster_chunk(league_id, roster_list)
         print(f"📥 Roster chunk received ({len(roster_list)}); merged so far={total} (added={added}).")
 
