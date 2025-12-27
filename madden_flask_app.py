@@ -1251,7 +1251,16 @@ def process_webhook_data(data, subpath, headers, body):
                 or league_data.get("latest_league")
         )
         if not real_league:
-            raise RuntimeError(f"Cannot resolve real league for teamId {league_id}")
+            # 🔁 FINAL fallback: extract leagueId from URL path
+            # subpath example:
+            # /rosters/ps5/3264906/team/774242331/roster
+            parts = (subpath or "").split("/")
+            try:
+                idx = parts.index("ps5")
+                real_league = parts[idx + 1]
+                print(f"🧭 Fallback league from path → {real_league}")
+            except Exception:
+                raise RuntimeError(f"Cannot resolve real league for teamId {league_id}")
 
         print(f"🧭 Normalizing teamId {league_id} → league {real_league}")
         team_id = league_id
