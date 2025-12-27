@@ -115,3 +115,57 @@ def parse_rosters_data(data: dict, subpath: str, output_folder: str) -> None:
 
     except Exception as e:
         print(f"❌ parse_rosters_data failed: {e}")
+
+def rebuild_parsed_rosters(output_folder: str) -> None:
+    """
+    Rebuild parsed_rosters.json ONLY from rosters_by_team/*.json
+    This avoids partial merges and guarantees all teams are included.
+    """
+    by_team_dir = os.path.join(output_folder, "rosters_by_team")
+    if not os.path.isdir(by_team_dir):
+        print("❌ rebuild_parsed_rosters: rosters_by_team folder not found")
+        return
+
+    all_players = []
+
+    for fname in sorted(os.listdir(by_team_dir)):
+        if not fname.endswith(".json"):
+            continue
+
+        path = os.path.join(by_team_dir, fname)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+                if isinstance(data, list):
+                    players = data
+                elif isinstance(data, dict):
+                    players = data.get("rosterInfoList", []) or data.get("players", [])
+                else:
+                    players = []
+
+                all_players.extend(players)
+
+        except Exception as e:
+            print(f"⚠️ Failed reading {fname}: {e}")
+
+    out_path = os.path.join(output_folder, "parsed_rosters.json")
+    payload = {
+        "players": all_players,
+        "meta": {
+            "count": len(all_players),
+            "teams": len([f for f in os.listdir(by_team_dir) if f.endswith('.json')])
+        }
+    }
+
+    tmp = out_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+    os.replace(tmp, out_path)
+
+    print(
+        f"✅ REBUILT parsed_rosters.json "
+        f"(players={payload['meta']['count']}, teams={payload['meta']['teams']})"
+    )
+

@@ -14,7 +14,7 @@ import re
 from config import UPLOAD_FOLDER
 
 from parsers.schedule_parser import parse_schedule_data
-from parsers.rosters_parser import parse_rosters_data
+from parsers.rosters_parser import parse_rosters_data, rebuild_parsed_rosters
 from parsers.league_parser import parse_league_info_data
 from parsers.passing_parser import parse_passing_stats
 from parsers.standings_parser import parse_standings_data
@@ -447,6 +447,16 @@ def _flush_roster(league_id: str, dest_folder: str):
     with open(raw_path, "w", encoding="utf-8") as f:
         json.dump(out_raw, f, indent=2)
     print(f"✅ Roster merged → {raw_path} (players={len(merged)})")
+
+    output_folder = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        league_id,
+        "season_global",
+        "week_global"
+    )
+
+    # 🔧 FINAL, AUTHORITATIVE rebuild from per-team files
+    rebuild_parsed_rosters(output_folder)
 
     # Drive the existing parser (keeps rosters.html reading parsed_rosters.json)
     parse_rosters_data(out_raw, "debounced/merge", dest_folder)
