@@ -972,7 +972,7 @@ def home():
     if not latest_league_id:
         league_dirs = [
             d for d in os.listdir(base_path)
-            if os.path.isdir(os.path.join(base_path, d)) and d.isdigit()
+            if os.path.isdir(os.path.join(base_path, d)) and d.isdigit() and not d.startswith("774")
         ]
 
         if league_dirs:
