@@ -91,7 +91,10 @@ def parse_rosters_data(data: dict, subpath: str, output_folder: str) -> None:
         tmp = out_path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
-        os.replace(tmp, out_path)
+
+        # Only replace if tmp was actually written
+        if os.path.exists(tmp):
+            os.replace(tmp, out_path)
 
         print(f"✅ parsed_rosters.json updated → {out_path} "
               f"(players={payload['meta']['count']}, teams={payload['meta']['teams']})")
