@@ -95,6 +95,8 @@ def parse_rosters_data(data: dict, subpath: str, output_folder: str) -> None:
         # Only replace if tmp was actually written
         if os.path.exists(tmp):
             os.replace(tmp, out_path)
+        else:
+            print("⚠️ rebuild_parsed_rosters: tmp file not created; skipping replace")
 
         print(f"✅ parsed_rosters.json updated → {out_path} "
               f"(players={payload['meta']['count']}, teams={payload['meta']['teams']})")
