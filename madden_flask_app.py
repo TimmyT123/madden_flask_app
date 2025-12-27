@@ -1235,17 +1235,33 @@ def process_webhook_data(data, subpath, headers, body):
     # ✅ 2. Determine storage path (league id)
     league_id = resolve_league_id(data, subpath)
     if not league_id:
-        app.logger.error("No league_id found for webhook; skipping write.")
+        app.logger.error("No league_id found")
         return
 
-    # 🚨 HARD BLOCK: teamIds must NEVER become league folders
+    # ✅ FORCE STRING (prevents path bugs)
+    league_id = str(league_id)
+
+    # 🔒 ABSOLUTE NORMALIZATION
     if is_team_id(league_id):
-        if "rosterInfoList" not in data:
-            raise RuntimeError(
-                f"🚨 TeamId used as league_id outside roster handler: {league_id}"
-            )
+        real_league = (
+                data.get("leagueId")
+                or data.get("franchiseInfo", {}).get("leagueId")
+                or league_data.get("latest_league")
+        )
+        if not real_league:
+            raise RuntimeError(f"Cannot resolve real league for teamId {league_id}")
+
+        print(f"🧭 Normalizing teamId {league_id} → league {real_league}")
+        team_id = league_id
+        league_id = str(real_league)
+    else:
+        team_id = None
+
+    # 🔒 Invariant: after normalization, league_id must NOT be a teamId
+    if is_team_id(league_id):
+        raise RuntimeError(f"🚨 INTERNAL ERROR: league_id still a teamId after normalization: {league_id}")
+
     league_data["latest_league"] = league_id
-    league_data["league_id"] = league_id
     print(f"📎 Using league_id: {league_id}")
 
     # 3) Classify batch for debug batching (kept as-is: based on subpath)
@@ -1304,7 +1320,7 @@ def process_webhook_data(data, subpath, headers, body):
                 batch_timers[batch_type].cancel()
 
             def flush_batch(bt=batch_type):
-                debug_path_flush = os.path.join(app.config['UPLOAD_FOLDER'], f'webhook_debug_{bt}.txt')
+                debug_path_flush = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 # NOTE: this still overwrites on each flush; switch to 'a' to append history
                 with open(debug_path_flush, 'w', encoding='utf-8') as f:
                     for entry in webhook_buffer[bt]:
@@ -1339,23 +1355,11 @@ def process_webhook_data(data, subpath, headers, body):
     elif "gameScheduleInfoList" in data:
         filename = "schedule.json"
     elif "rosterInfoList" in data:
-        # ✅ Normalize league_id if payload came in with a teamId
+        # 🔒 SAFETY ASSERT — normalization must already be done
         if is_team_id(league_id):
-            real_league = (
-                    data.get("leagueId")
-                    or data.get("franchiseInfo", {}).get("leagueId")
-                    or league_data.get("latest_league")
+            raise RuntimeError(
+                f"🚨 INTERNAL ERROR: league_id still a teamId inside roster handler: {league_id}"
             )
-
-            if not real_league:
-                raise RuntimeError("Cannot resolve real league for team roster payload")
-
-            team_id = league_id
-            league_id = real_league
-
-            print(f"🧭 Rerouting team roster {team_id} → league {league_id}")
-        else:
-            team_id = None
 
         # ✳️ Debug FA payloads specifically
         if "freeagents" in (subpath or "").lower():
