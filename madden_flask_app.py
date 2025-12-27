@@ -979,7 +979,8 @@ def home():
             # pick numerically highest league ID (EA IDs increase over time)
             league_dirs.sort(key=int, reverse=True)
             latest_league_id = league_dirs[0]
-            league_data["latest_league"] = latest_league_id
+            # DO NOT write into league_data here
+
             # NOTE:
             # league_data["latest_*"] is AUTHORITATIVE and updated ONLY by webhooks.
             # UI navigation must NEVER modify these values.
@@ -1131,7 +1132,7 @@ SEASON_RE = re.compile(r"^season_(\d+)$")
 def get_latest_season_week():
     base_path = app.config['UPLOAD_FOLDER']
     if not os.path.isdir(base_path):
-        return  # nothing to do
+        return None  # nothing to do
 
     for league_id in os.listdir(base_path):
         league_path = os.path.join(base_path, league_id)
@@ -1146,6 +1147,7 @@ def get_latest_season_week():
                 seasons_nums.append((int(m.group(1)), s))
         if not seasons_nums:
             continue
+
         seasons_nums.sort(key=lambda t: t[0], reverse=True)
         latest_season_num, latest_season = seasons_nums[0]
 
@@ -1165,10 +1167,10 @@ def get_latest_season_week():
         week_entries.sort(key=lambda t: t[0], reverse=True)
         latest_week_num, latest_week_name = week_entries[0]
 
-        league_data["latest_league"] = league_id
-        league_data["latest_season"] = latest_season
-        league_data["latest_week"] = latest_week_name
-        return  # keep your existing contract
+        # ⚠️ READ-ONLY helper: DO NOT mutate league_data here
+        return league_id, latest_season, latest_week_name
+
+    return None
 
 def update_default_week(season_index, week_index):
     try:
