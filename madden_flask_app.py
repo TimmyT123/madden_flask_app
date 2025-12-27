@@ -2379,6 +2379,17 @@ def rosters():
     all_players = idx["players"]
     positions = ["ALL"] + sorted(list(idx["positions"]))
 
+    league_folder = os.path.join(
+        app.config['UPLOAD_FOLDER'],
+        league,
+        "season_global",
+        "week_global"
+    )
+
+    parsed_path = os.path.join(league_folder, "parsed_rosters.json")
+    if not os.path.exists(parsed_path):
+        return "Rosters are still processing, please refresh"
+
     # --- build valid ids first ---
     team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
     teams = {}
