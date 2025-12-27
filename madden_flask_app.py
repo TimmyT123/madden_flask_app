@@ -968,6 +968,22 @@ def home():
     latest_season    = league_data.get("latest_season")
     latest_week      = league_data.get("latest_week")
 
+    # 🔁 Restore latest league from disk (survives reboot)
+    latest_path = os.path.join(base_path, "_latest.json")
+    if os.path.exists(latest_path):
+        try:
+            with open(latest_path, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                latest_league_id = saved.get("league") or latest_league_id
+                latest_season    = saved.get("season") or latest_season
+                latest_week      = saved.get("week") or latest_week
+
+                league_data["latest_league"] = latest_league_id
+                league_data["latest_season"] = latest_season
+                league_data["latest_week"]   = latest_week
+        except Exception as e:
+            print(f"⚠️ Failed to load _latest.json: {e}", flush=True)
+
     # 🔁 Fallback ONLY if app has never seen a webhook
     if not latest_league_id:
         league_dirs = [
@@ -1523,6 +1539,15 @@ def process_webhook_data(data, subpath, headers, body):
             f"season={season_str} week={week_str}",
             flush=True
         )
+
+        # 💾 Persist latest league across restarts
+        latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
+        with open(latest_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "league": league_id,
+                "season": season_str,
+                "week": week_str
+            }, f)
 
     # 8) Destination folder (non-roster)
     if (season_index == "global" and week_index == "global") or \
