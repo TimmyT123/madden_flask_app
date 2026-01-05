@@ -458,6 +458,19 @@ def _flush_roster(league_id: str, dest_folder: str):
     # 🔧 FINAL, AUTHORITATIVE rebuild from per-team files
     rebuild_parsed_rosters(output_folder)
 
+    valid_team_ids = {
+        str(tid) for tid in _load_team_map(league_id).keys()
+        if str(tid) not in {"0", "-1", "32", "1000"}
+    }
+
+    team_counts = Counter(str(p.get("teamId")) for p in merged)
+
+    missing = valid_team_ids - set(team_counts.keys())
+    if missing:
+        print(f"🚨 WARNING: Missing teams in roster snapshot: {sorted(missing)}")
+    else:
+        print("✅ All teams present in roster snapshot")
+
     # Drive the existing parser (keeps rosters.html reading parsed_rosters.json)
     parse_rosters_data(out_raw, "debounced/merge", dest_folder)
 
