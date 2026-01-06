@@ -1144,6 +1144,58 @@ def get_schedule():
     return jsonify(league_data.get('schedule', []))
 
 
+@app.get("/api/flyer/game")
+def flyer_game():
+    league = request.args.get("league") or league_data.get("latest_league")
+    season = request.args.get("season") or league_data.get("latest_season")
+    week   = request.args.get("week")   or league_data.get("latest_week")
+
+    home_id = request.args.get("home")
+    away_id = request.args.get("away")
+
+    if not all([league, season, week, home_id, away_id]):
+        return jsonify({"error": "Missing league/season/week/home/away"}), 400
+
+    # --- Load core data ---
+    root = os.path.join(app.config["UPLOAD_FOLDER"], league)
+    records = load_team_records(root)
+    team_map = _load_json_safe(os.path.join(root, "team_map.json")) or {}
+    team_ovr = load_team_ovr_by_id(league)
+    roster   = load_roster_index(league)["players"]
+
+    def team_block(team_id):
+        team_id = str(team_id)
+        info = team_map.get(team_id, {})
+        wlt = records.get(team_id, (0,0,0))
+        record = f"{wlt[0]}-{wlt[1]}" if wlt[2] == 0 else f"{wlt[0]}-{wlt[1]}-{wlt[2]}"
+
+        top_players = sorted(
+            [p for p in roster if str(p.get("teamId")) == team_id],
+            key=lambda p: p.get("ovr", 0),
+            reverse=True
+        )[:3]
+
+        return {
+            "teamId": team_id,
+            "name": info.get("name", f"Team {team_id}"),
+            "user": info.get("userName") or info.get("displayName") or "CPU",
+            "record": record,
+            "ovr": team_ovr.get(team_id),
+            "top_players": [
+                {"name": p["name"], "pos": p["pos"], "ovr": p["ovr"]}
+                for p in top_players
+            ]
+        }
+
+    return jsonify({
+        "league": league,
+        "season": season,
+        "week": int(str(week).replace("week_", "")),
+        "home": team_block(home_id),
+        "away": team_block(away_id)
+    })
+
+
 @app.route('/webhook', defaults={'subpath': ''}, methods=['POST'])
 @app.route('/webhook/<path:subpath>', methods=['POST'])
 def webhook(subpath):
