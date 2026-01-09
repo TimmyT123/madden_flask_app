@@ -41,6 +41,44 @@
         tr:hover {
             background-color: #f9f9f9;
         }
+
+        .table-container {
+            max-height: 75vh;   /* uses most of the screen */
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        /* Make table headers stick */
+        .table thead th {
+            position: sticky;
+            top: 0;
+            background: #1f2937;   /* dark background so text stays readable */
+            color: white;
+            z-index: 5;
+            border-bottom: 2px solid #888;
+        }
+
+        /* Prevent header flicker when scrolling */
+        .table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .table th:nth-child(1),
+        .table td:nth-child(1) {
+            position: sticky;
+            left: 0;
+            background: #111;
+            z-index: 4;
+        }
+
+        .table th:nth-child(2),
+        .table td:nth-child(2) {
+            position: sticky;
+            left: 150px;
+            background: #111;
+            z-index: 4;
+        }
     </style>
 </head>
 <body>
