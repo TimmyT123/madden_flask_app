@@ -71,6 +71,27 @@
             background: #111;
             z-index: 4;
         }
+
+        /* Top-left corner: Team header */
+        .table thead th:nth-child(1) {
+            z-index: 30;
+        }
+
+        /* Top-left second column header: User header */
+        .table thead th:nth-child(2) {
+            z-index: 30;
+        }
+
+        /* All other headers */
+        .table thead th {
+            z-index: 20;
+        }
+
+        /* Sticky left columns body cells */
+        .table td:nth-child(1),
+        .table td:nth-child(2) {
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
