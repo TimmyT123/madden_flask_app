@@ -432,11 +432,22 @@ def _flush_roster(league_id: str, dest_folder: str):
         try:
             with open(parsed_path, "r", encoding="utf-8") as f:
                 prev = json.load(f)
-            if isinstance(prev, list):
-                for p in prev:
-                    k = _player_key(p)
-                    if k not in merged_map:
-                        merged.append(p)
+
+            # handle both raw-list and wrapped-dict formats
+            if isinstance(prev, dict):
+                prev_players = prev.get("rosterInfoList") or prev.get("players") or []
+            elif isinstance(prev, list):
+                prev_players = prev
+            else:
+                prev_players = []
+
+            for p in prev_players:
+                k = _player_key(p)
+                if k not in merged_map:
+                    merged.append(p)
+
+            print(f"🧬 Unioned {len(prev_players)} previous players for fallback safety")
+
         except Exception as e:
             print(f"⚠️ Couldn’t union previous parsed_rosters.json: {e}")
 
