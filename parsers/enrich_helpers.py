@@ -42,8 +42,14 @@ def enrich_with_pos_jersey(players: list[dict], league_id: str) -> list[dict]:
     for rp in rplayers:
         raw = rp.get("_raw") or {}
         rid = str(raw.get("rosterId") or raw.get("id") or "")
-        pid = str(rp.get("playerId") or raw.get("playerId") or "")
-        tid = str(rp.get("teamId") or raw.get("teamId") or raw.get("team") or "")
+        pid = str(
+            rp.get("playerId")
+            or raw.get("playerId")
+            or raw.get("id")
+            or raw.get("personaId")
+            or ""
+        )
+        tid = str(rp.get("teamId") or raw.get("teamId") or raw.get("team") or "").strip()
 
         first = raw.get("firstName") or rp.get("firstName")
         last  = raw.get("lastName")  or rp.get("lastName")
@@ -75,8 +81,13 @@ def enrich_with_pos_jersey(players: list[dict], league_id: str) -> list[dict]:
     # Enrich rows
     for p in players:
         rid  = str(p.get("rosterId") or p.get("id") or "")
-        pid  = str(p.get("playerId") or "")
-        tid  = str(p.get("teamId") or p.get("team") or "")
+        pid = str(
+            p.get("playerId")
+            or p.get("id")
+            or p.get("personaId")
+            or ""
+        )
+        tid = str(p.get("teamId") or p.get("team") or "").strip()
 
         disp = (p.get("playerName") or p.get("fullName") or p.get("name") or p.get("displayName") or "").strip()
 
