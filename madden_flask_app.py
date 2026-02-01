@@ -1207,6 +1207,62 @@ def flyer_game():
     })
 
 
+@app.get("/api/health/flyer")
+def flyer_health():
+    league = league_data.get("latest_league")
+    season = league_data.get("latest_season")
+    week   = league_data.get("latest_week")
+
+    if not all([league, season, week]):
+        return jsonify({
+            "status": "FAIL",
+            "reason": "Missing latest league/season/week"
+        }), 500
+
+    root = os.path.join(app.config["UPLOAD_FOLDER"], league)
+
+    # Check team_map
+    team_map = _load_json_safe(os.path.join(root, "team_map.json"))
+    if not team_map:
+        return jsonify({
+            "status": "FAIL",
+            "reason": "team_map.json missing"
+        }), 500
+
+    # Check roster index
+    roster_index = load_roster_index(league)
+    if not roster_index["players"]:
+        return jsonify({
+            "status": "FAIL",
+            "reason": "No players loaded"
+        }), 500
+
+    # Check OVR data
+    ovr_map = load_team_ovr_by_id(league)
+    if not ovr_map:
+        return jsonify({
+            "status": "FAIL",
+            "reason": "Team OVR not loaded"
+        }), 500
+
+    # Check standings
+    records = load_team_records(root)
+    if not records:
+        return jsonify({
+            "status": "FAIL",
+            "reason": "Standings not loaded"
+        }), 500
+
+    return jsonify({
+        "status": "OK",
+        "league": league,
+        "season": season,
+        "week": week,
+        "teams": len(team_map),
+        "players": len(roster_index["players"])
+    })
+
+
 @app.route('/webhook', defaults={'subpath': ''}, methods=['POST'])
 @app.route('/webhook/<path:subpath>', methods=['POST'])
 def webhook(subpath):
