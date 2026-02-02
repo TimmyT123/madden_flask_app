@@ -41,7 +41,7 @@ def enrich_with_pos_jersey(players: list[dict], league_id: str) -> list[dict]:
 
     for rp in rplayers:
         raw = rp.get("_raw") or {}
-        rid = str(raw.get("rosterId") or raw.get("id") or "")
+        rid = str(rp.get("rosterId") or rp.get("id") or raw.get("rosterId") or raw.get("id") or "")
         pid = str(
             rp.get("playerId")
             or raw.get("playerId")
@@ -58,7 +58,7 @@ def enrich_with_pos_jersey(players: list[dict], league_id: str) -> list[dict]:
 
         clean_full, init_last, clean_last = _name_keys(first, last, full)
 
-        pos = rp.get("pos") or raw.get("position") or raw.get("pos")
+        pos = rp.get("pos") or rp.get("position") or raw.get("position") or raw.get("pos")
         jersey = (rp.get("jerseyNum") or raw.get("jerseyNum") or raw.get("uniformNumber")
                   or raw.get("jerseyNumber") or raw.get("jersey") or raw.get("number"))
 
