@@ -2151,7 +2151,8 @@ def show_defense_stats():
 
         for rp in rplayers:
             raw = rp.get("_raw") or {}
-            pos = rp.get("pos") or raw.get("position") or raw.get("pos")
+            pos = rp.get("pos") or rp.get("position") or raw.get("position") or raw.get("pos")
+
             jersey = (
                     rp.get("jerseyNum") or raw.get("jerseyNum")
                     or raw.get("uniformNumber") or raw.get("jerseyNumber")
