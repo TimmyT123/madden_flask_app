@@ -108,6 +108,7 @@ def enrich_with_pos_jersey(players: list[dict], league_id: str) -> list[dict]:
                    or (pos_by_last.get((clean_last, tid)) if clean_last and tid else None))
             if pos:
                 p["position"] = pos
+                p["pos"] = pos
 
         if p.get("jerseyNum") in (None, "", -1):
             jersey = (jer_by_rid.get(rid) or jer_by_pid.get(pid)
