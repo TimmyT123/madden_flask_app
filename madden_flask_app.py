@@ -52,7 +52,37 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+def rehydrate_latest_state():
+    latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
+
+    if not os.path.exists(latest_path):
+        print("⚠️ No _latest.json found on startup.")
+        return
+
+    try:
+        with open(latest_path, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+
+        league = saved.get("league")
+        season = saved.get("season")
+        week   = saved.get("week")
+
+        if not all([league, season, week]):
+            print("⚠️ _latest.json incomplete.")
+            return
+
+        league_data["latest_league"] = league
+        league_data["latest_season"] = season
+        league_data["latest_week"]   = week
+
+        print(f"✅ Rehydrated latest state → {league} {season} {week}")
+
+    except Exception as e:
+        print(f"❌ Failed to rehydrate state: {e}")
+
+
 league_data = {}
+rehydrate_latest_state()
 
 ROSTER_DEBOUNCE_SEC = 10.0   # try 8s; tweak to 10–12s if needed
 _roster_acc = {}            # {league_id: {"players_by_key": {}, "timer": Timer | None}}
@@ -1134,12 +1164,37 @@ def uploaded_file(filename):
 
 @app.route('/api/teams', methods=['GET'])
 def get_teams():
-    # Try to find the key that contains the team list
-    for key, value in league_data.items():
-        if "leagueTeamInfoList" in value:
-            return jsonify(value["leagueTeamInfoList"])
-    return jsonify({'error': 'No team data found'}), 404
 
+    league = league_data.get("latest_league")
+
+    if not league:
+        return jsonify({'error': 'No league loaded'}), 404
+
+    path = os.path.join(
+        app.config['UPLOAD_FOLDER'],
+        league,
+        "season_global",
+        "week_global",
+        "parsed_league_info.json"
+    )
+
+    if not os.path.exists(path):
+        return jsonify({'error': 'parsed_league_info.json missing'}), 404
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        teams = (
+            data.get("leagueTeamInfoList")
+            or data.get("teamInfoList")
+            or []
+        )
+
+        return jsonify(teams)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/teams/<team_name>', methods=['GET'])
