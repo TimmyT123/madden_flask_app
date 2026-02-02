@@ -2439,8 +2439,12 @@ def load_roster_index(league_id: str) -> dict:
         return cached
 
     # load and normalize
-    with open(roster_path, "r", encoding="utf-8") as f:
-        raw = json.load(f)
+    try:
+        with open(roster_path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception as e:
+        app.logger.error("⚠️ Corrupted roster file %s: %s", roster_path, e)
+        return {"players": [], "positions": set()}
 
     # Support either the Companion raw shape or your parsed shape
     if isinstance(raw, dict):
