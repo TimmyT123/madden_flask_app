@@ -151,6 +151,9 @@ def rebuild_parsed_rosters(output_folder: str) -> None:
         except Exception as e:
             print(f"⚠️ Failed reading {fname}: {e}")
 
+    # 🔥 ENSURE DIRECTORY EXISTS (THIS FIXES YOUR ERROR)
+    os.makedirs(output_folder, exist_ok=True)
+
     out_path = os.path.join(output_folder, "parsed_rosters.json")
     payload = {
         "players": all_players,
@@ -161,10 +164,21 @@ def rebuild_parsed_rosters(output_folder: str) -> None:
     }
 
     tmp = out_path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
 
-    os.replace(tmp, out_path)
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+
+        os.replace(tmp, out_path)
+
+    except Exception as e:
+        print(f"❌ rebuild_parsed_rosters write failed: {e}")
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except:
+                pass
+        return
 
     print(
         f"✅ REBUILT parsed_rosters.json "
