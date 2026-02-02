@@ -80,9 +80,40 @@ def rehydrate_latest_state():
     except Exception as e:
         print(f"❌ Failed to rehydrate state: {e}")
 
+def validate_rosters_on_boot():
+    league = league_data.get("latest_league")
+    if not league:
+        return
+
+    path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        league,
+        "season_global",
+        "week_global",
+        "parsed_rosters.json"
+    )
+
+    if not os.path.exists(path):
+        print("⚠️ No parsed_rosters.json found on boot.")
+        return
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            players = json.load(f)
+
+        if not isinstance(players, list):
+            raise ValueError("Roster file not list")
+
+        team_ids = {str(p.get("teamId")) for p in players if p.get("teamId")}
+        print(f"✅ Boot roster validation OK → players={len(players)}, teams={len(team_ids)}")
+
+    except Exception as e:
+        print(f"🚨 Roster corrupted on boot: {e}")
+
 
 league_data = {}
 rehydrate_latest_state()
+validate_rosters_on_boot()
 
 ROSTER_DEBOUNCE_SEC = 10.0   # try 8s; tweak to 10–12s if needed
 _roster_acc = {}            # {league_id: {"players_by_key": {}, "timer": Timer | None}}
