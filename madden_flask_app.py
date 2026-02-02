@@ -1213,6 +1213,27 @@ def flyer_health():
     season = league_data.get("latest_season")
     week   = league_data.get("latest_week")
 
+    # 🔁 Auto-heal from disk if memory missing
+    if not all([league, season, week]):
+        latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
+        if os.path.exists(latest_path):
+            try:
+                with open(latest_path, "r", encoding="utf-8") as f:
+                    saved = json.load(f)
+                    league = saved.get("league")
+                    season = saved.get("season")
+                    week   = saved.get("week")
+
+                    # restore memory cache
+                    league_data["latest_league"] = league
+                    league_data["latest_season"] = season
+                    league_data["latest_week"]   = week
+            except Exception as e:
+                return jsonify({
+                    "status": "FAIL",
+                    "reason": f"Could not read _latest.json: {e}"
+                }), 500
+
     if not all([league, season, week]):
         return jsonify({
             "status": "FAIL",
@@ -1224,34 +1245,22 @@ def flyer_health():
     # Check team_map
     team_map = _load_json_safe(os.path.join(root, "team_map.json"))
     if not team_map:
-        return jsonify({
-            "status": "FAIL",
-            "reason": "team_map.json missing"
-        }), 500
+        return jsonify({"status": "FAIL", "reason": "team_map.json missing"}), 500
 
     # Check roster index
     roster_index = load_roster_index(league)
     if not roster_index["players"]:
-        return jsonify({
-            "status": "FAIL",
-            "reason": "No players loaded"
-        }), 500
+        return jsonify({"status": "FAIL", "reason": "No players loaded"}), 500
 
-    # Check OVR data
+    # Check OVR
     ovr_map = load_team_ovr_by_id(league)
     if not ovr_map:
-        return jsonify({
-            "status": "FAIL",
-            "reason": "Team OVR not loaded"
-        }), 500
+        return jsonify({"status": "FAIL", "reason": "Team OVR not loaded"}), 500
 
     # Check standings
     records = load_team_records(root)
     if not records:
-        return jsonify({
-            "status": "FAIL",
-            "reason": "Standings not loaded"
-        }), 500
+        return jsonify({"status": "FAIL", "reason": "Standings not loaded"}), 500
 
     return jsonify({
         "status": "OK",
