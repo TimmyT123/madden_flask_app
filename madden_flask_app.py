@@ -1157,13 +1157,38 @@ def get_schedule():
 
 @app.get("/api/flyer/game")
 def flyer_game():
-    league = request.args.get("league") or league_data.get("latest_league")
-    season = request.args.get("season") or league_data.get("latest_season")
-    week   = request.args.get("week")   or league_data.get("latest_week")
+
+    # 1️⃣ Query params first
+    league = request.args.get("league")
+    season = request.args.get("season")
+    week   = request.args.get("week")
 
     home_id = request.args.get("home")
     away_id = request.args.get("away")
 
+    # 2️⃣ If league/season/week missing → load from disk (_latest.json)
+    if not all([league, season, week]):
+        latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
+
+        if os.path.exists(latest_path):
+            try:
+                with open(latest_path, "r", encoding="utf-8") as f:
+                    saved = json.load(f)
+                    league = league or saved.get("league")
+                    season = season or saved.get("season")
+                    week = week or saved.get("week")
+
+                    # optional: restore memory cache
+                    league_data["latest_league"] = league
+                    league_data["latest_season"] = season
+                    league_data["latest_week"] = week
+
+            except Exception as e:
+                return jsonify({
+                    "error": f"Failed reading _latest.json: {e}"
+                }), 500
+
+    # 3️⃣ Final validation
     if not all([league, season, week, home_id, away_id]):
         return jsonify({"error": "Missing league/season/week/home/away"}), 400
 
