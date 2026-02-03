@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
-# From the directory that contains the 17287266 folder:
-#python weekly_lineups.py --root uploads\17287266 --season season_4 --out weekly_lineups.txt --csv weekly_lineups.csv
+# Every new season...you'll have to make sure you change the league number.
+# From the directory that contains the 3264906 folder:
+# Run this on PI:
+# python weekly_lineups.py --root uploads\3264906 --season season_4 --out weekly_lineups.txt --csv weekly_lineups.csv
+# It will save to madden_flask and then copy and paste to laptop time_madden_old -> wurd24sched.csv and git push and then pull from PI
 
 import argparse
 import json
