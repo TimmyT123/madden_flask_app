@@ -373,28 +373,33 @@ def _queue_roster_write(league_id: str, data: dict, raw_body: bytes, output_dir:
         def _flush():
             with _roster_lock:
                 entries = _roster_pending.pop(league_id, [])
-            if not entries:
-                return
 
-            best = max(entries, key=lambda e: e["len"])
-            new_hash = _hash_bytes(best["raw"])
-            st = _roster_state.get(league_id, {})
+                if not entries:
+                    return
 
-            if st.get("last_hash") == new_hash:
-                print("🟡 Roster unchanged; skipping write.")
-                return
+                best = max(entries, key=lambda e: e["len"])
+                new_hash = _hash_bytes(best["raw"])
+                st = _roster_state.get(league_id, {})
 
-            os.makedirs(output_dir, exist_ok=True)
-            out = os.path.join(output_dir, "rosters.json")
-            with open(out, "w", encoding="utf-8") as f:
-                json.dump(best["data"], f, indent=2)
+                if st.get("last_hash") == new_hash:
+                    print("🟡 Roster unchanged; skipping write.")
+                    return
 
-            print(f"✅ Roster written once after debounce → {out} (players={best['len']})")
+                os.makedirs(output_dir, exist_ok=True)
+                out = os.path.join(output_dir, "rosters.json")
 
-            # cache state, parse, and bust roster cache
-            _roster_state[league_id] = {"last_hash": new_hash, "last_len": best["len"]}
-            parse_rosters_data(best["data"], "roster", output_dir)
-            _roster_cache.pop(league_id, None)
+                _atomic_write_json(out, best["data"])
+
+                print(f"✅ Roster written once after debounce → {out} (players={best['len']})")
+
+                _roster_state[league_id] = {
+                    "last_hash": new_hash,
+                    "last_len": best["len"]
+                }
+
+                parse_rosters_data(best["data"], "roster", output_dir)
+
+                _roster_cache.pop(league_id, None)
 
         _roster_timers[league_id] = Timer(2.0, _flush)  # 2s debounce window
         _roster_timers[league_id].start()
@@ -516,8 +521,9 @@ def _flush_roster(league_id: str, dest_folder: str):
     out_raw = {"rosterInfoList": merged}
     os.makedirs(dest_folder, exist_ok=True)
     raw_path = os.path.join(dest_folder, "rosters.json")
-    with open(raw_path, "w", encoding="utf-8") as f:
-        json.dump(out_raw, f, indent=2)
+
+    _atomic_write_json(raw_path, out_raw)
+
     print(f"✅ Roster merged → {raw_path} (players={len(merged)})")
 
     output_folder = os.path.join(
