@@ -46,7 +46,8 @@ load_dotenv(dotenv_path=Path(__file__).with_name(".env"), override=True)
 
 print("🚀 Running Madden Flask App!")
 
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1395202722227290213/fbpHTWl3nwq0XxD-AKriIJSUdBhgqGhGoGxBScUQLBK2d_SxSlIHsCRAj6A3g55kz0aD"
+DISCORD_HIGHLIGHT_WEBHOOK_URL = os.getenv("DISCORD_HIGHLIGHT_WEBHOOK_URL")
+DISCORD_RECAP_WEBHOOK_URL = os.getenv("DISCORD_RECAP_WEBHOOK_URL")
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -572,7 +573,7 @@ def _load_team_map(league_id):
     except Exception:
         return {}
 
-NEW_RECRUITS_WEBHOOK_URL = os.getenv("NEW_RECRUITS_WEBHOOK_URL") or DISCORD_WEBHOOK_URL
+NEW_RECRUITS_WEBHOOK_URL = os.getenv("NEW_RECRUITS_WEBHOOK_URL")
 
 TIMEZONES = ["PT", "AZ", "MT", "CT", "ET"]
 
@@ -1503,6 +1504,161 @@ def resolve_league_id(payload: dict, subpath: str | None = None) -> str | None:
     env_default = os.getenv("DEFAULT_LEAGUE_ID")
     return str(env_default) if env_default else None
 
+def _safe_int(x, default=0):
+    try:
+        return int(x)
+    except Exception:
+        return default
+
+def _safe_float(x, default=0.0):
+    try:
+        return float(x)
+    except Exception:
+        return default
+
+def _load_json_safe_path(path, default):
+    try:
+        if not os.path.exists(path):
+            return default
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+def _team_name(team_map: dict, tid: str) -> str:
+    return (team_map.get(str(tid), {}) or {}).get("name") or f"Team {tid}"
+
+def _pick_winner(home_id, away_id, home_score, away_score):
+    if home_score > away_score:
+        return str(home_id), str(away_id)
+    return str(away_id), str(home_id)
+
+def _tone_from_scores(home_score: int, away_score: int) -> str:
+    diff = abs(home_score - away_score)
+    total = home_score + away_score
+
+    if diff <= 3:
+        return "a nail-biter"
+    if diff <= 7:
+        return "a tight battle"
+    if diff >= 35:
+        return "a complete blowout"
+    if diff >= 21:
+        return "a dominant win"
+    if total >= 70:
+        return "an offensive shootout"
+    return "a convincing win"
+
+def _fmt_player(name, pos=None, jersey=None):
+    name = name or "Unknown"
+    j = ""
+    try:
+        if jersey not in (None, "", -1):
+            j = f" #{int(str(jersey).strip())}"
+    except Exception:
+        j = f" #{str(jersey).strip()}" if jersey else ""
+    p = f" ({pos})" if pos else ""
+    return f"{name}{j}{p}"
+
+def _best_offense_player(team_id: str, passing_rows: list, rushing_rows: list):
+    """
+    Returns (player_dict, score_float, blurb_str)
+    """
+    team_id = str(team_id)
+    candidates = []
+
+    # Passing candidates
+    for p in passing_rows or []:
+        if str(p.get("teamId")) != team_id:
+            continue
+        name = p.get("playerName") or p.get("fullName") or p.get("name")
+        yds  = _safe_int(p.get("passYds") or p.get("passingYards") or p.get("yards") or 0)
+        tds  = _safe_int(p.get("passTDs") or p.get("passingTDs") or p.get("tds") or 0)
+        ints = _safe_int(p.get("int") or p.get("ints") or p.get("interceptions") or 0)
+        comp = _safe_int(p.get("completions") or p.get("comp") or 0)
+        att  = _safe_int(p.get("attempts") or p.get("att") or 0)
+
+        # Simple POG score
+        score = (yds / 25.0) + (tds * 6.0) - (ints * 5.0)
+        blurb = f"{yds} pass yds, {tds} TD, {ints} INT" + (f" ({comp}/{att})" if att else "")
+        candidates.append(("pass", p, score, name, blurb))
+
+    # Rushing candidates
+    for r in rushing_rows or []:
+        if str(r.get("teamId")) != team_id:
+            continue
+        name = r.get("playerName") or r.get("fullName") or r.get("name")
+        yds  = _safe_int(r.get("rushYds") or r.get("rushingYards") or r.get("yards") or 0)
+        tds  = _safe_int(r.get("rushTDs") or r.get("rushingTDs") or r.get("tds") or 0)
+        att  = _safe_int(r.get("rushAtt") or r.get("attempts") or r.get("att") or 0)
+
+        score = (yds / 12.0) + (tds * 6.0)
+        blurb = f"{yds} rush yds, {tds} TD" + (f" ({att} carries)" if att else "")
+        candidates.append(("rush", r, score, name, blurb))
+
+    if not candidates:
+        return None, 0.0, ""
+
+    _, row, score, name, blurb = max(candidates, key=lambda x: x[2])
+    return row, float(score), f"{name}: {blurb}"
+
+
+def _impact_defenders(team_id: str, defense_rows: list, top_n: int = 3):
+    """
+    Returns list of small blurbs like:
+      "J. Smith: 2 sacks, 1 INT"
+    """
+    team_id = str(team_id)
+    defenders = []
+
+    for d in defense_rows or []:
+        if str(d.get("teamId")) != team_id:
+            continue
+        name = d.get("playerName") or d.get("fullName") or d.get("name")
+
+        sacks = _safe_float(d.get("sacks") or d.get("sack") or 0)
+        ints  = _safe_int(d.get("ints") or d.get("int") or d.get("interceptions") or 0)
+        tfl   = _safe_float(d.get("tfl") or d.get("tacklesForLoss") or 0)
+        ff    = _safe_int(d.get("forcedFumbles") or d.get("ff") or 0)
+        td    = _safe_int(d.get("defTDs") or d.get("td") or 0)
+
+        # Impact score: prioritize sacks + picks
+        score = (sacks * 4.0) + (ints * 5.0) + (tfl * 2.0) + (ff * 3.0) + (td * 6.0)
+        if score <= 0:
+            continue
+
+        bits = []
+        if sacks: bits.append(f"{sacks:g} sacks")
+        if ints:  bits.append(f"{ints} INT")
+        if tfl:   bits.append(f"{tfl:g} TFL")
+        if ff:    bits.append(f"{ff} FF")
+        if td:    bits.append(f"{td} DEF TD")
+
+        defenders.append((score, f"{name}: " + ", ".join(bits)))
+
+    defenders.sort(key=lambda x: x[0], reverse=True)
+    return [txt for _, txt in defenders[:top_n]]
+
+def post_summary_to_discord(summary, week_number, league_id, season_dir, week_dir):
+    base_url = os.getenv("SITE_BASE_URL", "https://wurd-madden.com")
+
+    recap_url = f"{base_url}/summary/{summary['gameId']}?league={league_id}&season={season_dir}&week={week_dir}"
+
+    message = (
+        f"📰 **WURD Game Recap – Week {week_number}**\n\n"
+        f"**{summary['headline']}**\n\n"
+        f"🌐 Read the full recap:\n{recap_url}"
+    )
+
+    try:
+        response = requests.post(DISCORD_RECAP_WEBHOOK_URL, json={"content": message})
+        if response.status_code in (200, 204):
+            print("✅ Recap teaser posted to Discord")
+        else:
+            print(f"❌ Failed to post recap teaser: {response.status_code} {response.text}")
+    except Exception as e:
+        print(f"❌ Discord recap error: {e}")
+
 def generate_week_summaries_if_ready(league_id: str, season_dir: str, week_dir: str):
     """
     Generates one summary per completed game.
@@ -1516,10 +1672,24 @@ def generate_week_summaries_if_ready(league_id: str, season_dir: str, week_dir: 
         week_dir
     )
 
+    week_number = int(str(week_dir).replace("week_", ""))
+
     schedule_path = os.path.join(base_path, "parsed_schedule.json")
     passing_path  = os.path.join(base_path, "passing.json")
     rushing_path  = os.path.join(base_path, "parsed_rushing.json")
     defense_path  = os.path.join(base_path, "parsed_defense.json")
+
+    passing_data = _load_json_safe_path(passing_path, {})
+    passing_rows = passing_data.get("playerPassingStatInfoList", []) if isinstance(passing_data, dict) else (
+                passing_data or [])
+
+    rushing_data = _load_json_safe_path(rushing_path, {})
+    rushing_rows = rushing_data.get("playerRushingStatInfoList", []) if isinstance(rushing_data, dict) else (
+                rushing_data or [])
+
+    defense_data = _load_json_safe_path(defense_path, {})
+    defense_rows = defense_data.get("playerDefensiveStatInfoList", []) if isinstance(defense_data, dict) else (
+                defense_data or [])
 
     if not os.path.exists(schedule_path):
         print("⚠️ No schedule found. Skipping summaries.")
@@ -1553,40 +1723,43 @@ def generate_week_summaries_if_ready(league_id: str, season_dir: str, week_dir: 
             team_map = json.load(f)
 
     new_games_added = False
+
     for game in schedule:
-        home_id = str(game.get("homeTeamId"))
-        away_id = str(game.get("awayTeamId"))
-        home_score = game.get("homeScore")
-        away_score = game.get("awayScore")
-
-        status = game.get("status")
-
-        # Only generate for completed games
-        if status not in (2, 3):
+        game_id = str(game.get("scheduleId") or game.get("gameId"))
+        if not game_id:
             continue
 
-        game_id = str(game.get("scheduleId") or f"{home_id}_{away_id}")
-
         if game_id in existing_ids:
-            continue  # already generated
+            continue
 
-        # Get team names
-        home_name = team_map.get(home_id, {}).get("name", f"Team {home_id}")
-        away_name = team_map.get(away_id, {}).get("name", f"Team {away_id}")
+        home_id = str(game.get("homeTeamId"))
+        away_id = str(game.get("awayTeamId"))
+        home_score = _safe_int(game.get("homeScore"))
+        away_score = _safe_int(game.get("awayScore"))
 
-        # Determine winner + loser + proper score display
-        if home_score > away_score:
-            winner_name = home_name
-            loser_name = away_name
-            winner_score = home_score
-            loser_score = away_score
-        else:
-            winner_name = away_name
-            loser_name = home_name
-            winner_score = away_score
-            loser_score = home_score
+        # Skip incomplete games
+        if home_score == 0 and away_score == 0:
+            continue
 
-        headline = f"{winner_name} defeat {loser_name} {winner_score}–{loser_score}"
+        winner_id, loser_id = _pick_winner(home_id, away_id, home_score, away_score)
+        winner_name = _team_name(team_map, winner_id)
+        loser_name = _team_name(team_map, loser_id)
+
+        tone = _tone_from_scores(home_score, away_score)
+
+        headline = f"{winner_name} defeats {loser_name} {home_score}–{away_score}"
+
+        pog_row, pog_score, pog_blurb = _best_offense_player(
+            winner_id, passing_rows, rushing_rows
+        )
+
+        impact = _impact_defenders(winner_id, defense_rows, top_n=3)
+
+        narr = f"In {tone}, {winner_name} took down {loser_name} {home_score}–{away_score}."
+        if pog_blurb:
+            narr += f" Player of the Game: {pog_blurb}."
+        if impact:
+            narr += " Defensive impact: " + "; ".join(impact) + "."
 
         summary_obj = {
             "gameId": game_id,
@@ -1595,12 +1768,19 @@ def generate_week_summaries_if_ready(league_id: str, season_dir: str, week_dir: 
             "homeScore": home_score,
             "awayScore": away_score,
             "headline": headline,
-            "narrative": "Game summary coming soon.",
-            "player_of_game": None,
-            "impact_defense": []
+            "narrative": narr,
+            "player_of_game": pog_blurb or None,
+            "impact_defense": impact or []
         }
 
         summaries_data["games"].append(summary_obj)
+        post_summary_to_discord(
+            summary_obj,
+            week_number,
+            league_id,
+            season_dir,
+            week_dir
+        )
         new_games_added = True
 
         print(f"📝 Generated summary for game {game_id}")
@@ -2007,11 +2187,42 @@ def post_highlight_to_discord(message, file_path=None):
     files = {}
     if file_path and os.path.exists(file_path):
         files["file"] = open(file_path, "rb")
-    response = requests.post(DISCORD_WEBHOOK_URL, data=data, files=files)
+    response = requests.post(DISCORD_HIGHLIGHT_WEBHOOK_URL, data=data, files=files)
     if response.status_code == 204:
         print("✅ Highlight posted to Discord!")
     else:
         print(f"❌ Failed to post to Discord: {response.status_code} {response.text}")
+
+
+@app.route("/summary/<game_id>")
+def view_summary(game_id):
+    league = request.args.get("league")
+    season = request.args.get("season")
+    week = request.args.get("week")
+
+    if not all([league, season, week]):
+        return "Missing parameters", 400
+
+    base_path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        league,
+        season,
+        week
+    )
+
+    summaries_path = os.path.join(base_path, "game_summaries.json")
+
+    if not os.path.exists(summaries_path):
+        return "No summaries found", 404
+
+    with open(summaries_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    for game in data.get("games", []):
+        if str(game.get("gameId")) == str(game_id):
+            return render_template("recap.html", game=game)
+
+    return "Summary not found", 404
 
 
 FA_IDS = {"0", "32", "-1", "1000"}        #

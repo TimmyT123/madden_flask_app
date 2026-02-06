@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WURD Game Recap</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #111;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #1c1c1c;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.6);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 26px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .score {
+            font-size: 32px;
+            margin: 15px 0;
+        }
+
+        .narrative {
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+
+        .pog {
+            margin-top: 25px;
+            padding: 15px;
+            background: #222;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .defense {
+            margin-top: 20px;
+            padding: 15px;
+            background: #222;
+            border-left: 4px solid #2196F3;
+        }
+
+        a {
+            color: #4CAF50;
+        }
+
+        .back {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <h1>{{ game.headline }}</h1>
+
+    <div class="score">
+        {{ game.homeScore }} - {{ game.awayScore }}
+    </div>
+
+    <div class="narrative">
+        {{ game.narrative }}
+    </div>
+
+    {% if game.player_of_game %}
+    <div class="pog">
+        <strong>⭐ Player of the Game</strong><br>
+        {{ game.player_of_game }}
+    </div>
+    {% endif %}
+
+    {% if game.impact_defense %}
+    <div class="defense">
+        <strong>🛡 Defensive Impact</strong>
+        <ul>
+            {% for player in game.impact_defense %}
+                <li>{{ player }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="back">
+        <a href="/">← Back to WURD</a>
+    </div>
+
+</div>
+
+</body>
+</html>
