@@ -1503,6 +1503,113 @@ def resolve_league_id(payload: dict, subpath: str | None = None) -> str | None:
     env_default = os.getenv("DEFAULT_LEAGUE_ID")
     return str(env_default) if env_default else None
 
+def generate_week_summaries_if_ready(league_id: str, season_dir: str, week_dir: str):
+    """
+    Generates one summary per completed game.
+    Runs after defensive stats webhook (stats complete signal).
+    """
+
+    base_path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        league_id,
+        season_dir,
+        week_dir
+    )
+
+    schedule_path = os.path.join(base_path, "parsed_schedule.json")
+    passing_path  = os.path.join(base_path, "passing.json")
+    rushing_path  = os.path.join(base_path, "parsed_rushing.json")
+    defense_path  = os.path.join(base_path, "parsed_defense.json")
+
+    if not os.path.exists(schedule_path):
+        print("⚠️ No schedule found. Skipping summaries.")
+        return
+
+    # Load schedule
+    with open(schedule_path, "r", encoding="utf-8") as f:
+        schedule = json.load(f)
+
+    # Load summaries file (if exists)
+    summaries_path = os.path.join(base_path, "game_summaries.json")
+
+    if os.path.exists(summaries_path):
+        with open(summaries_path, "r", encoding="utf-8") as f:
+            summaries_data = json.load(f)
+    else:
+        summaries_data = {"games": []}
+
+    existing_ids = {g["gameId"] for g in summaries_data.get("games", [])}
+
+    # Load team_map
+    team_map_path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        league_id,
+        "team_map.json"
+    )
+
+    team_map = {}
+    if os.path.exists(team_map_path):
+        with open(team_map_path, "r", encoding="utf-8") as f:
+            team_map = json.load(f)
+
+    new_games_added = False
+    for game in schedule:
+        home_id = str(game.get("homeTeamId"))
+        away_id = str(game.get("awayTeamId"))
+        home_score = game.get("homeScore")
+        away_score = game.get("awayScore")
+
+        status = game.get("status")
+
+        # Only generate for completed games
+        if status not in (2, 3):
+            continue
+
+        game_id = str(game.get("scheduleId") or f"{home_id}_{away_id}")
+
+        if game_id in existing_ids:
+            continue  # already generated
+
+        # Get team names
+        home_name = team_map.get(home_id, {}).get("name", f"Team {home_id}")
+        away_name = team_map.get(away_id, {}).get("name", f"Team {away_id}")
+
+        # Determine winner + loser + proper score display
+        if home_score > away_score:
+            winner_name = home_name
+            loser_name = away_name
+            winner_score = home_score
+            loser_score = away_score
+        else:
+            winner_name = away_name
+            loser_name = home_name
+            winner_score = away_score
+            loser_score = home_score
+
+        headline = f"{winner_name} defeat {loser_name} {winner_score}–{loser_score}"
+
+        summary_obj = {
+            "gameId": game_id,
+            "homeTeamId": home_id,
+            "awayTeamId": away_id,
+            "homeScore": home_score,
+            "awayScore": away_score,
+            "headline": headline,
+            "narrative": "Game summary coming soon.",
+            "player_of_game": None,
+            "impact_defense": []
+        }
+
+        summaries_data["games"].append(summary_obj)
+        new_games_added = True
+
+        print(f"📝 Generated summary for game {game_id}")
+
+    # Write file only if new games added
+    if new_games_added:
+        with open(summaries_path, "w", encoding="utf-8") as f:
+            json.dump(summaries_data, f, indent=2)
+
 
 def process_webhook_data(data, subpath, headers, body):
     # ✅ detect simulator replays (headers dict is passed in from the request)
@@ -1867,6 +1974,14 @@ def process_webhook_data(data, subpath, headers, body):
     elif "playerDefensiveStatInfoList" in data:
         print(f"🛡️ DEBUG: Detected defensive stats for season={season_index}, week={week_index}")
         parse_defense_stats(league_id, data, league_folder)
+        try:
+            generate_week_summaries_if_ready(
+                league_id=league_id,
+                season_dir=season_dir,
+                week_dir=week_dir
+            )
+        except Exception as e:
+            print(f"❌ Summary generation failed: {e}")
 
     # 10) Cache copy
     league_data[subpath] = data
