@@ -1775,7 +1775,7 @@ def generate_week_summaries_if_ready(league_id: str, season_dir: str, week_dir: 
 
             tone = _tone_from_scores(home_score, away_score)
 
-            headline = f"{winner_name} defeats {loser_name} {winner_score}–{loser_score}"
+            headline = f"{winner_name} defeat {loser_name} {winner_score}–{loser_score}"
 
             pog_row, pog_score, pog_blurb = _best_offense_player(
                 winner_id, passing_rows, rushing_rows
