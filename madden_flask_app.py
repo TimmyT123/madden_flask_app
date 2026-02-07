@@ -1531,7 +1531,9 @@ def _team_name(team_map: dict, tid: str) -> str:
 def _pick_winner(home_id, away_id, home_score, away_score):
     if home_score > away_score:
         return str(home_id), str(away_id)
-    return str(away_id), str(home_id)
+    if away_score > home_score:
+        return str(away_id), str(home_id)
+    return None, None  # tie
 
 def _tone_from_scores(home_score: int, away_score: int) -> str:
     diff = abs(home_score - away_score)
@@ -1644,7 +1646,10 @@ def post_summary_to_discord(summary, week_number, league_id, season_dir, week_di
 
     recap_url = f"{base_url}/summary/{summary['gameId']}?league={league_id}&season={season_dir}&week={week_dir}"
 
+    separator = "\n══════════════════════\n"
+
     message = (
+        f"{separator}\n"
         f"📰 **WURD Game Recap – Week {week_number}**\n\n"
         f"**{summary['headline']}**\n\n"
         f"🌐 Read the full recap:\n{recap_url}"
@@ -1742,24 +1747,48 @@ def generate_week_summaries_if_ready(league_id: str, season_dir: str, week_dir: 
             continue
 
         winner_id, loser_id = _pick_winner(home_id, away_id, home_score, away_score)
-        winner_name = _team_name(team_map, winner_id)
-        loser_name = _team_name(team_map, loser_id)
 
-        tone = _tone_from_scores(home_score, away_score)
+        home_name = _team_name(team_map, home_id)
+        away_name = _team_name(team_map, away_id)
 
-        headline = f"{winner_name} defeats {loser_name} {home_score}–{away_score}"
+        if winner_id is None:
+            # 🟡 TIE GAME
+            headline = f"{home_name} and {away_name} tie {home_score}–{away_score}"
+            narr = (
+                f"In a hard-fought battle, {home_name} and {away_name} "
+                f"finished deadlocked at {home_score}–{away_score}."
+            )
 
-        pog_row, pog_score, pog_blurb = _best_offense_player(
-            winner_id, passing_rows, rushing_rows
-        )
+            pog_blurb = None
+            impact = []
 
-        impact = _impact_defenders(winner_id, defense_rows, top_n=3)
+        else:
+            winner_name = _team_name(team_map, winner_id)
+            loser_name = _team_name(team_map, loser_id)
 
-        narr = f"In {tone}, {winner_name} took down {loser_name} {home_score}–{away_score}."
-        if pog_blurb:
-            narr += f" Player of the Game: {pog_blurb}."
-        if impact:
-            narr += " Defensive impact: " + "; ".join(impact) + "."
+            if winner_id == str(home_id):
+                winner_score = home_score
+                loser_score = away_score
+            else:
+                winner_score = away_score
+                loser_score = home_score
+
+            tone = _tone_from_scores(home_score, away_score)
+
+            headline = f"{winner_name} defeats {loser_name} {winner_score}–{loser_score}"
+
+            pog_row, pog_score, pog_blurb = _best_offense_player(
+                winner_id, passing_rows, rushing_rows
+            )
+
+            impact = _impact_defenders(winner_id, defense_rows, top_n=3)
+
+            narr = f"In {tone}, {winner_name} took down {loser_name} {winner_score}–{loser_score}."
+
+            if pog_blurb:
+                narr += f" Player of the Game: {pog_blurb}."
+            if impact:
+                narr += " Defensive impact: " + "; ".join(impact) + "."
 
         summary_obj = {
             "gameId": game_id,
