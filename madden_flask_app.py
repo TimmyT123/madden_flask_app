@@ -53,6 +53,8 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+current_stats_hash = None
+
 def rehydrate_latest_state():
     latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
 
@@ -675,9 +677,11 @@ def _append_registration_csv(clean: dict):
         clean["referrer"],
     ]
     header = [
-        "submitted_at","first_name","last_name","phone","timezone",
-        "platform_id","ea_id","favorite_teams","madden_experience","referrer"  # NEW header column
+        "submitted_at", "first_name", "last_name", "timezone",
+        "platform_id", "ea_id", "favorite_teams", "skill_level",
+        "schedule_handling", "rule_disagreement", "referrer"
     ]
+
     write_header = not os.path.exists(path)
     with open(path, "a", newline='', encoding="utf-8") as f:
         w = csv.writer(f)
@@ -2195,6 +2199,16 @@ def process_webhook_data(data, subpath, headers, body):
     # 10) Cache copy
     league_data[subpath] = data
 
+    # 🔐 Update stats hash after stats write
+    try:
+        global current_stats_hash
+        current_stats_hash = sha256(
+            json.dumps(data, sort_keys=True).encode()
+        ).hexdigest()
+        print(f"🔄 Stats hash updated → {current_stats_hash}")
+    except Exception as e:
+        print(f"⚠️ Failed to update stats hash: {e}")
+
 
 @app.route('/debug', methods=['GET'])
 def get_debug_file():
@@ -2275,6 +2289,10 @@ def ui_player(p, _dev_to_label):
     q = dict(p)
     q["dev"] = _dev_to_label(p.get("dev"))
     return q
+
+@app.get("/stats-hash")
+def stats_hash():
+    return jsonify({"hash": current_stats_hash})
 
 
 @app.route('/stats')
