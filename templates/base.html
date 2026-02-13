@@ -1,71 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}WURD Madden{% endblock %}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
+            background-color: #0f172a;  /* dark background */
+            color: #e5e7eb;             /* soft white text */
         }
 
         .page {
             max-width: 1200px;
-            margin: 0 auto;   /* centers everything */
+            margin: 0 auto;
             padding: 20px;
             text-align: center;
         }
 
+        a {
+            color: #38bdf8;   /* light blue links */
+        }
+
         a.button {
             padding: 8px 16px;
-            background-color: #2c3e50;
+            background-color: #1f2937;
             color: white;
             text-decoration: none;
-            border-radius: 4px;
+            border-radius: 6px;
             margin: 20px;
             display: inline-block;
+            transition: 0.2s ease-in-out;
         }
 
         a.button:hover {
             background-color: #e74c3c;
-        }
-
-        th, td {
-            padding: 8px 12px;
-            text-align: center;
-            border: 1px solid #ccc;
-        }
-
-        tr:hover {
-            background-color: #f9f9f9;
+            transform: scale(1.05);
         }
 
         table {
             margin: 0 auto;
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #111827;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 10px 14px;
+            text-align: center;
+            border: 1px solid #374151;
+        }
+
+        tr:hover {
+            background-color: #1e293b;
         }
 
         .table-container {
-            max-height: 75vh;   /* uses most of the screen */
+            max-height: 75vh;
             overflow-y: auto;
             overflow-x: auto;
         }
 
-        /* Make table headers stick */
         .table thead th {
             position: sticky;
             top: 0;
-            background: #1f2937;   /* dark background so text stays readable */
+            background: #1f2937;
             color: white;
             z-index: 5;
-            border-bottom: 2px solid #888;
-        }
-
-        /* Prevent header flicker when scrolling */
-        .table {
-            border-collapse: separate;
-            border-spacing: 0;
-            width: 100%;
-            margin: auto;
+            border-bottom: 2px solid #e74c3c;
         }
     </style>
 </head>
