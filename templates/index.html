@@ -201,27 +201,27 @@
         </form>
 
         <div class="links">
-          <a href="{{ url_for('wurd_champions') }}">👑 Champions</a>
-          <a href="{{ url_for('streamers_hub', league=latest_league) }}" class="btn">🎥 Streamers</a>
+          <a href="{{ url_for('wurd_champions') }}" class="champions-link">👑 Champions</a>
+          <a href="{{ url_for('streamers_hub', league=latest_league) }}" class="streamers-link btn">🎥 Streamers</a>
         </div>
 
         <div class="link-grid">
           <!-- Left column: Weekly Stats -->
           <div class="section">
-            <h2>Weekly Stats</h2>
-            <a class="big-link" href="#" onclick="goToStats()">View Passing Stats</a>
-            <a class="big-link" href="#" onclick="goToReceiving()">View Receiving Stats</a>
-            <a class="big-link" href="#" onclick="goToRushing()">View Rushing Stats</a>
-            <a class="big-link" href="#" onclick="goToDefense()">View Defensive Stats</a>
+            <h2 class="stats-title">Weekly Stats</h2>
+            <a class="big-link stats-link" href="#" onclick="goToStats()">View Passing Stats</a>
+            <a class="big-link stats-link" href="#" onclick="goToReceiving()">View Receiving Stats</a>
+            <a class="big-link stats-link" href="#" onclick="goToRushing()">View Rushing Stats</a>
+            <a class="big-link stats-link" href="#" onclick="goToDefense()">View Defensive Stats</a>
           </div>
 
           <!-- Right column: League -->
           <div class="section">
-              <h2>League</h2>
-              <a class="big-link" href="#" onclick="goToSchedule()">View Schedule</a>
-              <a class="big-link" href="/teams?league={{ latest_league }}">View Teams</a>
-              <a class="big-link" href="/rosters?league={{ latest_league }}">View Rosters</a>
-              <a class="big-link" href="/standings?league={{ latest_league }}">View Standings</a>
+              <h2 class="league-title">League</h2>
+              <a class="big-link league-link" href="#" onclick="goToSchedule()">View Schedule</a>
+              <a class="big-link league-link" href="/teams?league={{ latest_league }}">View Teams</a>
+              <a class="big-link league-link" href="/rosters?league={{ latest_league }}">View Rosters</a>
+              <a class="big-link league-link" href="/standings?league={{ latest_league }}">View Standings</a>
           </div>
         </div>
     </div>
