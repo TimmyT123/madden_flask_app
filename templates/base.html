@@ -80,16 +80,16 @@
             max-height: 75vh;
             overflow-y: auto;
             overflow-x: auto;
+            position: relative;   /* add this */
         }
 
         thead th {
             position: sticky;
             top: 0;
-            background: #1f2937;
-            color: #38bdf8;              /* Light blue header text */
-            z-index: 5;
+            z-index: 20;   /* increase */
+            background: #1f2937; /* must be solid */
+            color: #38bdf8;
             border-bottom: 2px solid #e74c3c;
-            font-weight: bold;
         }
 
     </style>
