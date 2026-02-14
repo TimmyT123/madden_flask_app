@@ -1,9 +1,9 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Rosters</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
+
+{% block title %}Rosters{% endblock %}
+
+{% block content %}
+
   <style>
       .topbar {
       position: sticky;
@@ -33,7 +33,6 @@
       box-shadow: 0 0 0 2px rgba(255,213,74,0.35);
     }
 
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#fff; background:#0f1221; }
     .wrap { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
     .controls { display:flex; gap:12px; align-items:center; justify-content:center; margin-bottom:16px; }
     select, button { padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,.15); background:#171a2c; color:#fff; }
@@ -115,12 +114,6 @@
     }
 
   </style>
-</head>
-<body>
-
-<nav class="topbar">
-<a class="homebtn" href="/">🏠 Home</a>
-</nav>
 
 <div class="wrap">
   <h2>🏈 Rosters</h2>
@@ -422,5 +415,3 @@
 })();
 </script>
 {% endif %}
-</body>
-</html>
