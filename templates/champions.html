@@ -14,7 +14,8 @@
 
     #trophyCanvas {
       width: 100%;
-      height: 100%;
+      height: 420px;
+      display: block;
     }
 
     .topbar {
@@ -182,8 +183,7 @@
       const canvas = document.getElementById("trophyCanvas");
       const scene = new THREE.Scene();
 
-      const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-      camera.position.set(0, 1.5, 4);
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
 
       const renderer = new THREE.WebGLRenderer({
         canvas: canvas,
@@ -191,14 +191,14 @@
         alpha: true
       });
 
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
 
       function resizeRenderer() {
-        const width = canvas.clientWidth;
-        const height = canvas.clientHeight;
+        const width = canvas.parentElement.clientWidth;
+        const height = canvas.parentElement.clientHeight;
 
-        renderer.setSize(width, height, false);
+        renderer.setSize(width, height);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
       }
@@ -206,26 +206,32 @@
       window.addEventListener("resize", resizeRenderer);
       resizeRenderer();
 
+      // Lights
       const light1 = new THREE.DirectionalLight(0xffffff, 1.5);
       light1.position.set(5, 10, 5);
       scene.add(light1);
 
-      const light2 = new THREE.AmbientLight(0xffffff, 0.6);
-      scene.add(light2);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 
       const loader = new GLTFLoader();
       loader.load("/static/models/wurd_trophy.glb", (gltf) => {
 
         const trophy = gltf.scene;
 
-        // Center the model
-        const box = new THREE.Box3().setFromObject(trophy);
-        const center = box.getCenter(new THREE.Vector3());
-        trophy.position.sub(center);
-
-        trophy.scale.set(1.5, 1.5, 1.5);
-
         scene.add(trophy);
+
+        // AUTO CENTER + AUTO ZOOM
+        const box = new THREE.Box3().setFromObject(trophy);
+        const size = box.getSize(new THREE.Vector3()).length();
+        const center = box.getCenter(new THREE.Vector3());
+
+        trophy.position.x += (trophy.position.x - center.x);
+        trophy.position.y += (trophy.position.y - center.y);
+        trophy.position.z += (trophy.position.z - center.z);
+
+        const distance = size * 1.2;
+        camera.position.set(0, size * 0.3, distance);
+        camera.lookAt(0, 0, 0);
 
         function animate() {
           requestAnimationFrame(animate);
