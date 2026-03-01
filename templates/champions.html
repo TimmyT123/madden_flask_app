@@ -176,14 +176,6 @@
     </div>
 
   </div>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-        }
-      }
-    </script>
-
     <script type="module">
         import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
         import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
@@ -202,6 +194,10 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+        renderer.physicallyCorrectLights = true;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+
         function resizeRenderer() {
           const width = canvas.parentElement.clientWidth;
           const height = canvas.parentElement.clientHeight;
@@ -214,12 +210,21 @@
         window.addEventListener("resize", resizeRenderer);
         resizeRenderer();
 
-        // Lights
-        const light1 = new THREE.DirectionalLight(0xffffff, 1.5);
-        light1.position.set(5, 10, 5);
-        scene.add(light1);
+        // Strong key light
+        const keyLight = new THREE.DirectionalLight(0xffffff, 3);
+        keyLight.position.set(6, 10, 6);
+        scene.add(keyLight);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const fillLight = new THREE.DirectionalLight(0xffffff, 1.8);
+        fillLight.position.set(-6, 4, -4);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        rimLight.position.set(0, 8, -10);
+        scene.add(rimLight);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        scene.background = new THREE.Color(0x0f1221);
 
         const loader = new GLTFLoader();
 
@@ -228,6 +233,14 @@
         (gltf) => {
 
           const trophy = gltf.scene;
+          trophy.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material.metalness = 0.7;
+              child.material.roughness = 0.25;
+              child.material.needsUpdate = true;
+            }
+          });
+
           scene.add(trophy);
 
           // Auto-center model
