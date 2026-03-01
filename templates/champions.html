@@ -78,13 +78,13 @@
   </style>
 </head>
 <body>
-  <section id="trophy-hero">
-    <canvas id="trophyCanvas"></canvas>
-  </section>
-
   <nav class="topbar">
     <a class="homebtn" href="/">🏠 Home</a>
   </nav>
+
+  <section id="trophy-hero">
+    <canvas id="trophyCanvas"></canvas>
+  </section>
 
   <div class="wrap">
     <h2>👑 W.UR.D Champions</h2>
@@ -224,30 +224,42 @@
         const loader = new GLTFLoader();
 
         loader.load(
-          "/static/models/wurd_trophy.glb",
-          (gltf) => {
+        "/static/models/wurd_trophy.glb",
+        (gltf) => {
 
-            const trophy = gltf.scene;
-            trophy.scale.set(2, 2, 2);
+          const trophy = gltf.scene;
+          scene.add(trophy);
 
-            scene.add(trophy);
+          // Auto-center model
+          const box = new THREE.Box3().setFromObject(trophy);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
 
-            camera.position.set(0, 2, 6);
-            camera.lookAt(0, 1, 0);
+          trophy.position.sub(center);
 
-            function animate() {
-              requestAnimationFrame(animate);
-              trophy.rotation.y += 0.01;
-              renderer.render(scene, camera);
-            }
+          // Calculate ideal camera distance
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const fov = camera.fov * (Math.PI / 180);
+          let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
 
-            animate();
-          },
-          undefined,
-          (error) => {
-            console.error("GLB load error:", error);
+          cameraZ *= 1.6; // add some padding space
+
+          camera.position.set(0, maxDim * 0.2, cameraZ);
+          camera.lookAt(0, 0, 0);
+
+          function animate() {
+            requestAnimationFrame(animate);
+            trophy.rotation.y += 0.005; // slower rotation looks classier
+            renderer.render(scene, camera);
           }
-        );
+
+          animate();
+        },
+        undefined,
+        (error) => {
+          console.error("GLB load error:", error);
+        }
+      );
     </script>
 </body>
 </html>
