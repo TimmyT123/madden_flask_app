@@ -214,30 +214,33 @@
       scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 
       const loader = new GLTFLoader();
-      loader.load("/static/models/wurd_trophy.glb", (gltf) => {
+      loader.load(
+        "/static/models/wurd_trophy.glb",
+        (gltf) => {
 
-        const trophy = gltf.scene;
+          const trophy = gltf.scene;
 
-        scene.add(trophy);
+          trophy.scale.set(2, 2, 2);
+          trophy.position.set(0, 0, 0);
 
-        // AUTO CENTER + AUTO ZOOM
-        const box = new THREE.Box3().setFromObject(trophy);
-        const size = box.getSize(new THREE.Vector3()).length();
-        const center = box.getCenter(new THREE.Vector3());
+          scene.add(trophy);
 
-        trophy.position.x += (trophy.position.x - center.x);
-        trophy.position.y += (trophy.position.y - center.y);
-        trophy.position.z += (trophy.position.z - center.z);
+          camera.position.set(0, 2, 6);
+          camera.lookAt(0, 1, 0);
 
-        const distance = size * 1.2;
-        camera.position.set(0, size * 0.3, distance);
-        camera.lookAt(0, 0, 0);
+          function animate() {
+            requestAnimationFrame(animate);
+            trophy.rotation.y += 0.01;
+            renderer.render(scene, camera);
+          }
 
-        function animate() {
-          requestAnimationFrame(animate);
-          trophy.rotation.y += 0.01;
-          renderer.render(scene, camera);
+          animate();
+        },
+        undefined,
+        (error) => {
+          console.error("GLB load error:", error);
         }
+      );
 
         animate();
       });
