@@ -176,13 +176,20 @@
     </div>
 
   </div>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+    </script>
+
     <script type="module">
-        import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+        import * as THREE from "three";
         import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 
         const canvas = document.getElementById("trophyCanvas");
         const scene = new THREE.Scene();
-
         const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
 
         const renderer = new THREE.WebGLRenderer({
@@ -194,14 +201,9 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-        renderer.physicallyCorrectLights = true;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.1;
-
         function resizeRenderer() {
           const width = canvas.parentElement.clientWidth;
           const height = canvas.parentElement.clientHeight;
-
           renderer.setSize(width, height);
           camera.aspect = width / height;
           camera.updateProjectionMatrix();
@@ -210,69 +212,48 @@
         window.addEventListener("resize", resizeRenderer);
         resizeRenderer();
 
-        // Strong key light
+        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+
         const keyLight = new THREE.DirectionalLight(0xffffff, 3);
         keyLight.position.set(6, 10, 6);
         scene.add(keyLight);
 
-        const fillLight = new THREE.DirectionalLight(0xffffff, 1.8);
-        fillLight.position.set(-6, 4, -4);
-        scene.add(fillLight);
-
-        const rimLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        rimLight.position.set(0, 8, -10);
-        scene.add(rimLight);
-
-        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-        scene.background = new THREE.Color(0x0f1221);
-
         const loader = new GLTFLoader();
 
         loader.load(
-        "/static/models/wurd_trophy.glb",
-        (gltf) => {
+          "/static/models/wurd_trophy.glb",
+          (gltf) => {
 
-          const trophy = gltf.scene;
-          trophy.traverse((child) => {
-            if (child.isMesh && child.material) {
-              child.material.metalness = 0.7;
-              child.material.roughness = 0.25;
-              child.material.needsUpdate = true;
+            const trophy = gltf.scene;
+            scene.add(trophy);
+
+            const box = new THREE.Box3().setFromObject(trophy);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+
+            trophy.position.sub(center);
+
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+            cameraZ *= 1.6;
+
+            camera.position.set(0, maxDim * 0.2, cameraZ);
+            camera.lookAt(0, 0, 0);
+
+            function animate() {
+              requestAnimationFrame(animate);
+              trophy.rotation.y += 0.005;
+              renderer.render(scene, camera);
             }
-          });
 
-          scene.add(trophy);
-
-          // Auto-center model
-          const box = new THREE.Box3().setFromObject(trophy);
-          const center = box.getCenter(new THREE.Vector3());
-          const size = box.getSize(new THREE.Vector3());
-
-          trophy.position.sub(center);
-
-          // Calculate ideal camera distance
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const fov = camera.fov * (Math.PI / 180);
-          let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-
-          cameraZ *= 1.6; // add some padding space
-
-          camera.position.set(0, maxDim * 0.2, cameraZ);
-          camera.lookAt(0, 0, 0);
-
-          function animate() {
-            requestAnimationFrame(animate);
-            trophy.rotation.y += 0.005; // slower rotation looks classier
-            renderer.render(scene, camera);
+            animate();
+          },
+          undefined,
+          (error) => {
+            console.error("GLB load error:", error);
           }
-
-          animate();
-        },
-        undefined,
-        (error) => {
-          console.error("GLB load error:", error);
-        }
-      );
+        );
     </script>
 </body>
 </html>
