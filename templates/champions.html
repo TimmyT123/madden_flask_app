@@ -177,73 +177,70 @@
 
   </div>
     <script type="module">
-      import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-      import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+        import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+        import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 
-      const canvas = document.getElementById("trophyCanvas");
-      const scene = new THREE.Scene();
+        const canvas = document.getElementById("trophyCanvas");
+        const scene = new THREE.Scene();
 
-      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
 
-      const renderer = new THREE.WebGLRenderer({
-        canvas: canvas,
-        antialias: true,
-        alpha: true
-      });
+        const renderer = new THREE.WebGLRenderer({
+          canvas: canvas,
+          antialias: true,
+          alpha: true
+        });
 
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-      function resizeRenderer() {
-        const width = canvas.parentElement.clientWidth;
-        const height = canvas.parentElement.clientHeight;
+        function resizeRenderer() {
+          const width = canvas.parentElement.clientWidth;
+          const height = canvas.parentElement.clientHeight;
 
-        renderer.setSize(width, height);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-      }
-
-      window.addEventListener("resize", resizeRenderer);
-      resizeRenderer();
-
-      // Lights
-      const light1 = new THREE.DirectionalLight(0xffffff, 1.5);
-      light1.position.set(5, 10, 5);
-      scene.add(light1);
-
-      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-
-      const loader = new GLTFLoader();
-      loader.load(
-        "/static/models/wurd_trophy.glb",
-        (gltf) => {
-
-          const trophy = gltf.scene;
-
-          trophy.scale.set(2, 2, 2);
-          trophy.position.set(0, 0, 0);
-
-          scene.add(trophy);
-
-          camera.position.set(0, 2, 6);
-          camera.lookAt(0, 1, 0);
-
-          function animate() {
-            requestAnimationFrame(animate);
-            trophy.rotation.y += 0.01;
-            renderer.render(scene, camera);
-          }
-
-          animate();
-        },
-        undefined,
-        (error) => {
-          console.error("GLB load error:", error);
+          renderer.setSize(width, height);
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
         }
-      );
 
-        animate();
-      });
+        window.addEventListener("resize", resizeRenderer);
+        resizeRenderer();
+
+        // Lights
+        const light1 = new THREE.DirectionalLight(0xffffff, 1.5);
+        light1.position.set(5, 10, 5);
+        scene.add(light1);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+
+        const loader = new GLTFLoader();
+
+        loader.load(
+          "/static/models/wurd_trophy.glb",
+          (gltf) => {
+            const trophy = gltf.scene;
+
+            trophy.scale.set(2, 2, 2);
+            trophy.position.set(0, 0, 0);
+
+            scene.add(trophy);
+
+            camera.position.set(0, 2, 6);
+            camera.lookAt(0, 1, 0);
+
+            function animate() {
+              requestAnimationFrame(animate);
+              trophy.rotation.y += 0.01;
+              renderer.render(scene, camera);
+            }
+
+            animate();
+          },
+          undefined,
+          (error) => {
+            console.error("GLB load error:", error);
+          }
+        );
     </script>
 </body>
 </html>
