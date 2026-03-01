@@ -5,6 +5,18 @@
   <title>WURD Champions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    #trophy-hero {
+      height: 420px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #trophyCanvas {
+      width: 100%;
+      height: 100%;
+    }
+
     .topbar {
       position: sticky;
       top: 0;
@@ -65,6 +77,10 @@
   </style>
 </head>
 <body>
+  <section id="trophy-hero">
+    <canvas id="trophyCanvas"></canvas>
+  </section>
+
   <nav class="topbar">
     <a class="homebtn" href="/">🏠 Home</a>
   </nav>
@@ -159,5 +175,66 @@
     </div>
 
   </div>
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+      import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+
+      const canvas = document.getElementById("trophyCanvas");
+      const scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+      camera.position.set(0, 1.5, 4);
+
+      const renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        antialias: true,
+        alpha: true
+      });
+
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.setPixelRatio(window.devicePixelRatio);
+
+      function resizeRenderer() {
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+
+        renderer.setSize(width, height, false);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      }
+
+      window.addEventListener("resize", resizeRenderer);
+      resizeRenderer();
+
+      const light1 = new THREE.DirectionalLight(0xffffff, 1.5);
+      light1.position.set(5, 10, 5);
+      scene.add(light1);
+
+      const light2 = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(light2);
+
+      const loader = new GLTFLoader();
+      loader.load("/static/models/wurd_trophy.glb", (gltf) => {
+
+        const trophy = gltf.scene;
+
+        // Center the model
+        const box = new THREE.Box3().setFromObject(trophy);
+        const center = box.getCenter(new THREE.Vector3());
+        trophy.position.sub(center);
+
+        trophy.scale.set(1.5, 1.5, 1.5);
+
+        scene.add(trophy);
+
+        function animate() {
+          requestAnimationFrame(animate);
+          trophy.rotation.y += 0.01;
+          renderer.render(scene, camera);
+        }
+
+        animate();
+      });
+    </script>
 </body>
 </html>
