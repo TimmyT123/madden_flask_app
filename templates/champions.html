@@ -226,7 +226,7 @@
         window.addEventListener("resize", resizeRenderer);
         resizeRenderer();
 
-        scene.add(new THREE.AmbientLight(0xffffff, 1));
+        scene.add(new THREE.AmbientLight(0xffffff, .9));
 
         const keyLight = new THREE.DirectionalLight(0xffffff, 3);
         keyLight.position.set(6, 10, 6);
