@@ -240,6 +240,10 @@
         rimLight.position.set(0, 8, -8);
         scene.add(rimLight);
 
+        const frontLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        frontLight.position.set(0, 3, 8);
+        scene.add(frontLight);
+
         const loader = new GLTFLoader();
 
         loader.load(
