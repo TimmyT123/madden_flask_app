@@ -187,9 +187,23 @@
     <script type="module">
         import * as THREE from "three";
         import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+        import { RGBELoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/RGBELoader.js";
 
         const canvas = document.getElementById("trophyCanvas");
         const scene = new THREE.Scene();
+
+        new RGBELoader()
+        .load(
+          "https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr",
+          function (texture) {
+
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+
+            scene.environment = texture;
+
+          }
+        );
+
         const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
 
         const renderer = new THREE.WebGLRenderer({
@@ -212,7 +226,6 @@
         window.addEventListener("resize", resizeRenderer);
         resizeRenderer();
 
-        scene.environment = null;
         scene.add(new THREE.AmbientLight(0xffffff, 1));
 
         const keyLight = new THREE.DirectionalLight(0xffffff, 3);
