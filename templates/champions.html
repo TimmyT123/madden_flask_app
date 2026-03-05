@@ -241,9 +241,15 @@
             camera.position.set(0, maxDim * 0.2, cameraZ);
             camera.lookAt(0, 0, 0);
 
+            const clock = new THREE.Clock();
+
             function animate() {
               requestAnimationFrame(animate);
-              trophy.rotation.y += 0.005;
+
+              const delta = clock.getDelta();
+
+              trophy.rotation.y += delta * 0.4;
+
               renderer.render(scene, camera);
             }
 
