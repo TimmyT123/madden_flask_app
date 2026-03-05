@@ -190,6 +190,7 @@
 
         const canvas = document.getElementById("trophyCanvas");
         const scene = new THREE.Scene();
+        scene.environment = new THREE.Color(0xffffff);
         const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
 
         const renderer = new THREE.WebGLRenderer({
@@ -217,6 +218,14 @@
         const keyLight = new THREE.DirectionalLight(0xffffff, 3);
         keyLight.position.set(6, 10, 6);
         scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        fillLight.position.set(-6, 5, 4);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 2);
+        rimLight.position.set(0, 8, -8);
+        scene.add(rimLight);
 
         const loader = new GLTFLoader();
 
