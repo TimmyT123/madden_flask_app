@@ -2080,12 +2080,30 @@ def process_webhook_data(data, subpath, headers, body):
         season_index = "global"
         week_index = "global"
 
+    print(f"📦 subpath raw: {subpath}")
+
     phase = None
-    week_from_path = None
-    m = re.search(r'week/(reg|post|pre)/(\d+)', subpath or "")
-    if m:
-        phase = m.group(1)
-        week_from_path = int(m.group(2))
+    week_index_int_path = None
+
+    # Detect from subpath
+    if subpath:
+        m = re.search(r'week/(reg|post|pre)/(\d+)', subpath)
+        if m:
+            phase = m.group(1)
+            week_index_int_path = int(m.group(2))
+        else:
+            print("⚠️ Could not detect phase from subpath")
+
+    # Fallback detection
+    if not phase:
+        stage = data.get("stage") or data.get("seasonStage")
+        if stage and str(stage).lower().startswith("pre"):
+            phase = "pre"
+            print("🟡 Fallback detected preseason from payload")
+
+    print(f"📊 FINAL PHASE: {phase}")
+    print(f"📊 PATH WEEK: {week_index_int_path}")
+    print(f"📊 PAYLOAD WEEK: {week_index_int_payload}")
 
     if "gameScheduleInfoList" in data and isinstance(data["gameScheduleInfoList"], list):
         for game in data["gameScheduleInfoList"]:
@@ -2118,15 +2136,17 @@ def process_webhook_data(data, subpath, headers, body):
         season_str = f"season_{season_index_int}"
         week_str = f"week_{display_week}"
 
-        league_data["latest_league"] = league_id
-        league_data["latest_season"] = season_str
-        league_data["latest_week"] = week_str
+        # 🚫 Skip preseason from becoming "latest"
+        if not (phase and phase.startswith("pre")):
+            league_data["latest_league"] = league_id
+            league_data["latest_season"] = season_str
+            league_data["latest_week"] = week_str
 
-        print(
-            f"🔒 Authoritative set → league={league_id} "
-            f"season={season_str} week={week_str}",
-            flush=True
-        )
+            print(
+                f"🔒 Authoritative set → league={league_id} "
+                f"season={season_str} week={week_str}",
+                flush=True
+            )
 
         # 💾 Persist latest league across restarts
         latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
@@ -2150,13 +2170,38 @@ def process_webhook_data(data, subpath, headers, body):
         season_dir = f"season_{season_index_int}"
 
         effective_week = display_week if display_week is not None else week_index_int_payload
-        if effective_week is None:
-            print("⚠️ No valid week; skipping default_week update.")
+
+        if phase and phase.startswith("pre"):
+            pre_week = week_index_int_path or week_index_int_payload
+
+            if pre_week is None:
+                print("⚠️ No valid preseason week")
+                return
+
+            week_dir = f"pre_week_{pre_week}"
+            print(f"🟡 Preseason detected → {week_dir}")
+
+        else:
+            if effective_week is None:
+                print("⚠️ No valid week; skipping")
+                return
+
+            week_dir = f"week_{effective_week}"
+
+        # ✅ SAFETY CHECK (NOW VALID)
+        if phase and phase.startswith("pre") and week_dir.startswith("week_"):
+            print("🚨 ERROR: Preseason misrouted — blocking write")
             return
 
-        week_dir = f"week_{effective_week}"
-        print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
-        update_default_week(season_index_int, effective_week)
+        else:
+            if effective_week is None:
+                print("⚠️ No valid week; skipping default_week update.")
+                return
+
+            week_dir = f"week_{effective_week}"
+        if not (phase and phase.startswith("pre")):
+            print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
+            update_default_week(season_index_int, effective_week)
 
     league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, season_dir, week_dir)
     os.makedirs(league_folder, exist_ok=True)
@@ -2188,11 +2233,12 @@ def process_webhook_data(data, subpath, headers, body):
         print(f"🛡️ DEBUG: Detected defensive stats for season={season_index}, week={week_index}")
         parse_defense_stats(league_id, data, league_folder)
         try:
-            generate_week_summaries_if_ready(
-                league_id=league_id,
-                season_dir=season_dir,
-                week_dir=week_dir
-            )
+            if not (phase and phase.startswith("pre")):
+                generate_week_summaries_if_ready(
+                    league_id=league_id,
+                    season_dir=season_dir,
+                    week_dir=week_dir
+                )
         except Exception as e:
             print(f"❌ Summary generation failed: {e}")
 
