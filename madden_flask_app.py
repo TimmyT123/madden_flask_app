@@ -826,16 +826,6 @@ def compute_display_week(phase: str | None, week_number: int | None) -> int | No
     #     return None
     return week_number
 
-def get_default_season_week():
-    league_id = league_data.get("latest_league", "3264906")
-    path = os.path.join("uploads", league_id, "default_week.json")
-    try:
-        with open(path) as f:
-            data = json.load(f)
-            return data.get("season", "season_0"), data.get("week", "week_0")
-    except:
-        return "season_0", "week_0"
-
 def _load_json(p):
     with open(p, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -1263,7 +1253,7 @@ def flyer_game():
     home_id = request.args.get("home")
     away_id = request.args.get("away")
 
-    # 2️⃣ If league/season/week missing → load from disk (_latest.json)
+    # 2️⃣ fallback if needed
     if not all([league, season, week]):
         latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
 
@@ -1275,7 +1265,6 @@ def flyer_game():
                     season = season or saved.get("season")
                     week = week or saved.get("week")
 
-                    # optional: restore memory cache
                     league_data["latest_league"] = league
                     league_data["latest_season"] = season
                     league_data["latest_week"] = week
@@ -1285,9 +1274,19 @@ def flyer_game():
                     "error": f"Failed reading _latest.json: {e}"
                 }), 500
 
-    # 3️⃣ Final validation
-    if not all([league, season, week, home_id, away_id]):
-        return jsonify({"error": "Missing league/season/week/home/away"}), 400
+    # 🔒 ALWAYS validate (this is the key improvement)
+    if not season or not str(season).startswith("season_"):
+        print(f"🚨 Invalid season loaded: {season}")
+        return jsonify({"error": "Invalid season"}), 400
+
+    if not week or not str(week).startswith("week_"):
+        print(f"🚨 Invalid week loaded: {week}")
+        return jsonify({"error": "Invalid week"}), 400
+
+    # 3️⃣ final check
+    if not all([league, season, week]):
+        print("🚨 Missing core state → league/season/week")
+        return jsonify({"error": "Missing core state"}), 400
 
     # --- Load core data ---
     root = os.path.join(app.config["UPLOAD_FOLDER"], league)
@@ -2103,7 +2102,6 @@ def process_webhook_data(data, subpath, headers, body):
 
     print(f"📊 FINAL PHASE: {phase}")
     print(f"📊 PATH WEEK: {week_index_int_path}")
-    print(f"📊 PAYLOAD WEEK: {week_index_int_payload}")
 
     if "gameScheduleInfoList" in data and isinstance(data["gameScheduleInfoList"], list):
         for game in data["gameScheduleInfoList"]:
@@ -2127,9 +2125,10 @@ def process_webhook_data(data, subpath, headers, body):
 
     season_index_int = to_int_or_none(season_index)
     week_index_int_payload = to_int_or_none(week_index)
-    week_index_int_path = to_int_or_none(week_from_path)
     raw_week_for_display = week_index_int_path if week_index_int_path is not None else week_index_int_payload
     display_week = compute_display_week(phase, raw_week_for_display)
+
+    print(f"📊 PAYLOAD WEEK: {week_index_int_payload}")
 
     # 🔒 AUTHORITATIVE STATE UPDATE (ONE SOURCE OF TRUTH)
     if season_index_int is not None and display_week is not None:
