@@ -599,6 +599,7 @@ def _validate_payload(form: dict):
         "schedule_handling": _clean_field(form.get("schedule_handling"), 400),
         "rule_disagreement": _clean_field(form.get("rule_disagreement"), 400),
         "ack_rules": form.get("ack_rules"),
+        "ack_connection": form.get("ack_connection"),
         "referrer": _clean_field(form.get("referrer"), 100),
         "website": _clean_field(form.get("website"), 60),  # honeypot
     }
@@ -621,6 +622,8 @@ def _validate_payload(form: dict):
         errors["rule_disagreement"] = "This question is required."
     if clean["ack_rules"] != "yes":
         errors["ack_rules"] = "You must acknowledge the league rules."
+    if clean["ack_connection"] != "yes":
+        errors["ack_connection"] = "You must confirm you have a stable internet connection."
     if clean["website"]:
         errors["__spam__"] = "Spam detected."
 

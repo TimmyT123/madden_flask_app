@@ -144,6 +144,12 @@
             <span>I understand scheduling is a commitment and commissioner rulings are final.</span>
           </label>
           {% if errors.ack_rules %}<div class="err">{{ errors.ack_rules }}</div>{% endif %}
+
+          <label class="checkbox" style="margin-top:10px;">
+            <input type="checkbox" name="ack_connection" value="yes" required>
+            <span>I confirm I have a stable internet connection (preferably wired). Repeated disconnects or poor connection may result in removal at commissioner discretion.</span>
+          </label>
+          {% if errors.ack_connection %}<div class="err">{{ errors.ack_connection }}</div>{% endif %}
         </div>
 
         <!-- Honeypot field (bots will fill it) -->
