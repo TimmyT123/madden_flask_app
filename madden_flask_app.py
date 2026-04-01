@@ -2152,12 +2152,11 @@ def process_webhook_data(data, subpath, headers, body):
 
         # 💾 Persist latest league across restarts
         latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
-        with open(latest_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "league": league_id,
-                "season": season_str,
-                "week": week_str
-            }, f)
+        _atomic_write_json(latest_path, {
+            "league": league_id,
+            "season": season_str,
+            "week": week_str
+        })
 
     # 8) Destination folder (non-roster)
     if (season_index == "global" and week_index == "global") or \
