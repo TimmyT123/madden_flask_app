@@ -157,6 +157,7 @@ _roster_lock = Lock()
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "change-me")  # set in systemd env
 
 AP_USERS_PATH = Path("/home/pi/projects/time_madden_old/ap_users.json")
+trigger_path = AP_USERS_PATH.parent / "_ap_trigger.json"
 AP_USERS_LOCK = AP_USERS_PATH.with_suffix(".lock")
 
 UID_RE = re.compile(r"^\d{16,22}$")  # Discord snowflakes are 17–19 digits typically
@@ -315,10 +316,14 @@ def ap_users_upsert():
         abort(401)
     try:
         payload = request.get_json(force=True) or {}
-        # force string user_id
         if "user_id" in payload:
             payload["user_id"] = _uid_str(payload["user_id"])
+
         saved = _ap_upsert(payload)
+
+        # 🔥 TRIGGER HERE
+        _atomic_write_json(str(trigger_path), {"ts": time()})
+
         return jsonify(saved), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
