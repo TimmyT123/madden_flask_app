@@ -50,6 +50,13 @@
         <input id="display" type="text" placeholder="e.g. FALCONS jr.(awholelottablues) PT" />
       </div>
       <div>
+        <label>Start (optional)</label>
+        <input id="start" type="date" />
+      </div>
+    </div>
+
+    <div class="row3">
+      <div>
         <label>Until (YYYY-MM-DD)</label>
         <input id="until" type="date" min="2024-01-01" />
       </div>
@@ -112,6 +119,7 @@
       $('#user_id').value = '';
       $('#display').value = '';
       $('#reason').value = '';
+      $('#start').value = '';
       $('#until').value = '';
       $('#notes').value = '';
     }
@@ -169,6 +177,7 @@
       $('#user_id').value = user_id;
       $('#display').value = tds[1].textContent;
       $('#reason').value  = tds[2].textContent;
+      $('#start').value = ''; // default blank
       $('#until').value   = tds[3].textContent;
       $('#notes').value   = tds[4].textContent;
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -195,6 +204,12 @@
         until:   untilStr,                               // YYYY-MM-DD from input[type=date]
         notes:   $('#notes').value.trim()
       };
+
+      // ✅ ONLY include start if user set it
+      const startVal = $('#start').value;
+      if (startVal) {
+        payload.start = startVal;
+      }
 
       if (!payload.display || !payload.reason || !payload.until) {
         alert('user_id, display, reason, until are required.'); return;
