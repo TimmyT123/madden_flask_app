@@ -326,8 +326,7 @@ def ap_users_upsert():
 
         saved = _ap_upsert(payload)
 
-        # 🔥 TRIGGER HERE
-        _atomic_write_json(str(trigger_path), {"ts": time()})
+        set_ap_trigger_ready()
 
         return jsonify(saved), 200
     except Exception as e:
@@ -349,7 +348,7 @@ def ap_users_update(user_id):
         if not saved:
             return jsonify({"error": "not found"}), 404
 
-        _atomic_write_json(str(trigger_path), {"ts": time()})
+        set_ap_trigger_ready()
 
         return jsonify(saved), 200
     except Exception as e:
@@ -361,6 +360,10 @@ def ap_users_delete(user_id):
     if not _admin_ok():
         abort(401)
     ok = _ap_remove(_uid_str(user_id))
+
+    if ok:
+        set_ap_trigger_ready()
+
     return ("", 204) if ok else (jsonify({"error": "not found"}), 404)
 
 
@@ -436,6 +439,24 @@ def _atomic_write_json(path, obj):
         try: os.remove(tmp)
         except: pass
         raise
+
+def set_ap_trigger_ready():
+    try:
+        # Ensure file exists
+        if not trigger_path.exists():
+            _atomic_write_json(str(trigger_path), {"ready": False})
+
+        with open(trigger_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data["ready"] = True
+
+        _atomic_write_json(str(trigger_path), data)
+
+        print("🔥 AP trigger set to READY")
+
+    except Exception as e:
+        print(f"❌ Failed to set AP trigger: {e}")
 
 def _upsert_rosters(league_folder: str, incoming: list[dict]) -> list[dict]:
     """Merge incoming roster batch with existing league-wide rosters.json."""
