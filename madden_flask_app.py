@@ -316,8 +316,13 @@ def ap_users_upsert():
         abort(401)
     try:
         payload = request.get_json(force=True) or {}
+
         if "user_id" in payload:
             payload["user_id"] = _uid_str(payload["user_id"])
+
+        # ✅ FIX: set start date if missing/blank
+        if not payload.get("start"):
+            payload["start"] = datetime.now().strftime("%Y-%m-%d")
 
         saved = _ap_upsert(payload)
 
@@ -336,9 +341,16 @@ def ap_users_update(user_id):
     try:
         user_id = _uid_str(user_id)
         fields = request.get_json(force=True) or {}
+
+        if "start" in fields and not fields.get("start"):
+            fields["start"] = datetime.now().strftime("%Y-%m-%d")
+
         saved = _ap_update_fields(user_id, **fields)
         if not saved:
             return jsonify({"error": "not found"}), 404
+
+        _atomic_write_json(str(trigger_path), {"ts": time()})
+
         return jsonify(saved), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
