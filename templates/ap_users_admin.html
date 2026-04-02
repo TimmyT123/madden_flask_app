@@ -91,6 +91,7 @@
           <th>User</th>
           <th>Display</th>
           <th>Reason</th>
+          <th>Start</th>
           <th>Until</th>
           <th>Notes</th>
           <th>Actions</th>
@@ -144,6 +145,7 @@
           <td><span class="badge">${esc(uid)}</span></td>
           <td>${esc(r.display)}</td>
           <td>${esc(r.reason)}</td>
+          <td>${esc(r.start || '')}</td>
           <td>${esc(r.until)}</td>
           <td>${esc(r.notes)}</td>
           <td>
