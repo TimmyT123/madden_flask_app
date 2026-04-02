@@ -1200,7 +1200,7 @@ def home():
         current_week = 0
 
     #print("DEBUG leagues:", leagues, flush=True)
-    print("DEBUG latest:", latest_league_id, latest_season, latest_week, flush=True)
+    # print("DEBUG latest:", latest_league_id, latest_season, latest_week, flush=True)
 
     return render_template(
         'index.html',
