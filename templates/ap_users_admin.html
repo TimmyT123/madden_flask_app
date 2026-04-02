@@ -1,3 +1,4 @@
+<!-- VERSION: TIM_001 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -43,7 +44,7 @@
     <div class="row3">
       <div>
         <label>User ID (Discord numeric)</label>
-        <input id="user_id" type="text" inputmode="numeric" pattern="[0-9]{6,20}" placeholder="e.g. 792929559900061697" />
+        <input id="user_id" type="text" pattern="^[0-9]{16,22}$" placeholder="e.g. 792925959900061697" />
       </div>
       <div>
         <label>Display</label>
@@ -198,7 +199,7 @@
       }
 
       const payload = {
-        user_id: Number(uidStr),                         // server expects int
+        user_id: uidStr,                        
         display: $('#display').value.trim(),
         reason:  $('#reason').value.trim(),
         until:   untilStr,                               // YYYY-MM-DD from input[type=date]
