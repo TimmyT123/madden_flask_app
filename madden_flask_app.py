@@ -1243,19 +1243,21 @@ def get_teams():
     if not league:
         return jsonify({'error': 'No league loaded'}), 404
 
-    path = os.path.join(
-        app.config['UPLOAD_FOLDER'],
-        league,
+    root = str(os.path.join(app.config['UPLOAD_FOLDER'], league))
+
+    league_info_path = os.path.join(
+        root,
         "season_global",
         "week_global",
         "parsed_league_info.json"
     )
 
-    if not os.path.exists(path):
+    if not os.path.exists(league_info_path):
         return jsonify({'error': 'parsed_league_info.json missing'}), 404
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        # ---- load teams ----
+        with open(league_info_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         teams = (
@@ -1263,6 +1265,22 @@ def get_teams():
             or data.get("teamInfoList")
             or []
         )
+
+        # ---- load standings ----
+        records = load_team_records(root)  # <-- YOU ALREADY HAVE THIS FUNCTION
+
+        # ---- enrich teams with records ----
+        for team in teams:
+            tid = str(team.get("teamId") or team.get("id") or "")
+
+            w, l, t = records.get(tid, (0, 0, 0))
+
+            team["wins"] = w
+            team["losses"] = l
+            team["ties"] = t
+
+            total = w + l + t
+            team["winPct"] = round(w / total, 3) if total > 0 else 0
 
         return jsonify(teams)
 
