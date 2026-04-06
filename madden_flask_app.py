@@ -1291,8 +1291,18 @@ def get_teams():
 @app.route('/teams/<team_name>', methods=['GET'])
 def get_team(team_name):
     for team in league_data.get('teams', []):
-        if team['name'].lower() == team_name.lower():
+
+        team_name_field = (
+            team.get('name') or
+            team.get('teamName') or
+            team.get('displayName') or
+            team.get('teamAbbrev') or
+            ''
+        )
+
+        if team_name_field.lower() == team_name.lower():
             return jsonify(team)
+
     return jsonify({'message': 'Team not found'}), 404
 
 
