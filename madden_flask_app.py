@@ -744,6 +744,15 @@ def new_recruit():
         return render_template("register_result.html", success=True, message="Thanks! Our admins will review and contact you soon.")
     return render_template("register.html", tz_list=TIMEZONES, errors={}, data={})
 
+ADVANCE_INFO_FILE = "/home/pi/projects/advance_info.json"
+
+def load_advance_info():
+    try:
+        with open(ADVANCE_INFO_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return None
+
 def team_logo(team_id):
     """Return /static/logos/<TeamName>.png (fallback to wurd_logo.png)."""
     league_id = league_data.get("latest_league")
@@ -1100,6 +1109,8 @@ def wurd_champions_api():
 def home():
     base_path = app.config['UPLOAD_FOLDER']
 
+    advance_info = load_advance_info()
+
     # ✅ authoritative values (set by webhooks)
     latest_league_id = league_data.get("latest_league")
     latest_season    = league_data.get("latest_season")
@@ -1209,7 +1220,8 @@ def home():
         latest_season=latest_season,
         latest_week=latest_week,
         latest_week_display=latest_week_display,
-        current_week=current_week
+        current_week=current_week,
+        advance_info=advance_info
     )
 
 

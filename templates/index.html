@@ -180,6 +180,14 @@
             color: #209BD4 !important;
         }
 
+        .advance-banner {
+            margin-top: 10px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 2px 2px 6px black;
+        }
+
     </style>
 </head>
 <body>
@@ -205,6 +213,10 @@
             Week {{ current_week }}
           {% endif %}
         </p>
+
+        <div class="advance-banner">
+            ⏰ {{ advance_info.status_text }}
+        </div>
 
         <form id="navForm" method="get" onsubmit="return false;">
             <label for="season">Season:</label>
