@@ -13,6 +13,8 @@ import re
 
 from config import UPLOAD_FOLDER
 
+import services.webhook_helpers as webhook_helpers
+
 from parsers.schedule_parser import parse_schedule_data
 from parsers.rosters_parser import parse_rosters_data, rebuild_parsed_rosters
 from parsers.league_parser import parse_league_info_data
@@ -21,13 +23,14 @@ from parsers.standings_parser import parse_standings_data
 from parsers.defense_parser import parse_defense_stats
 from parsers.enrich_helpers import enrich_with_pos_jersey
 
+from services.webhook_helpers import _atomic_write_json
+
 from flask import render_template
 from urllib.parse import urlparse, parse_qs
 
 from collections import Counter, defaultdict
 
 from pathlib import Path
-from datetime import datetime
 
 import csv
 from html import escape
@@ -43,6 +46,8 @@ import tempfile
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"), override=True)
 
+from services.webhook_service import process_webhook_data
+
 
 print("🚀 Running Madden Flask App!")
 
@@ -53,7 +58,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-current_stats_hash = None
+
 
 def rehydrate_latest_state():
     latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
@@ -118,8 +123,6 @@ league_data = {}
 rehydrate_latest_state()
 validate_rosters_on_boot()
 
-ROSTER_DEBOUNCE_SEC = 10.0   # try 8s; tweak to 10–12s if needed
-_roster_acc = {}            # {league_id: {"players_by_key": {}, "timer": Timer | None}}
 
 batch_written = {
     "league": False,
@@ -127,17 +130,6 @@ batch_written = {
     "roster": False
 }
 
-webhook_buffer = {
-    "league": [],
-    "stats": [],
-    "roster": []
-}
-last_webhook_time = {
-    "league": 0,
-    "stats": 0,
-    "roster": 0
-}
-batch_timers = {}
 
 POST_ROUND_TO_WEEK = {
     1: 19,  # Wild Card
@@ -367,6 +359,13 @@ def ap_users_delete(user_id):
     return ("", 204) if ok else (jsonify({"error": "not found"}), 404)
 
 
+def _load_json_safe(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
 def _hash_bytes(b: bytes) -> str:
     return sha256(b).hexdigest()
 
@@ -428,17 +427,6 @@ def _queue_roster_write(league_id: str, data: dict, raw_body: bytes, output_dir:
         _roster_timers[league_id].start()
 
 
-def _atomic_write_json(path, obj):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(suffix=".json", dir=os.path.dirname(path))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(obj, f, indent=2)
-        os.replace(tmp, path)
-    except Exception:
-        try: os.remove(tmp)
-        except: pass
-        raise
 
 def set_ap_trigger_ready():
     try:
@@ -493,117 +481,8 @@ def _upsert_rosters(league_folder: str, incoming: list[dict]) -> list[dict]:
     print(f"🧩 Upserted rosters: had {len(current)}, added/updated {len(incoming or [])}, now {len(merged)}")
     return merged
 
-def _player_key(p: dict) -> str:
-    """Stable key for merging players from many team payloads."""
-    for k in ("rosterId", "playerId", "id", "personaId", "uniqueId"):
-        v = p.get(k)
-        if v not in (None, "", 0):
-            return str(v)
-    # fallback if exporter doesn’t provide an id
-    first = p.get("firstName") or p.get("first_name") or ""
-    last  = p.get("lastName")  or p.get("last_name")  or ""
-    pos   = p.get("position")  or p.get("pos")        or ""
-    team  = p.get("teamId")    or p.get("teamID")     or p.get("team") or ""
-    return f"{first}.{last}.{pos}.{team}".lower()
 
-def _get_roster_acc(league_id: str) -> dict:
-    acc = _roster_acc.get(league_id)
-    if not acc:
-        acc = {"players_by_key": {}, "timer": None}
-        _roster_acc[league_id] = acc
-    return acc
 
-def _add_roster_chunk(league_id: str, players: list[dict]) -> tuple[int, int]:
-    acc = _get_roster_acc(league_id)
-    pbk = acc["players_by_key"]
-    added = 0
-    for p in players or []:
-        k = _player_key(p)
-        if not k:
-            continue
-        pbk[k] = p
-        added += 1
-    return added, len(pbk)
-
-def _flush_roster(league_id: str, dest_folder: str):
-    """Debounce flush → write merged rosters.json and parsed_rosters.json."""
-    acc = _roster_acc.get(league_id)
-    if not acc:
-        return
-    merged_map = acc["players_by_key"]
-    merged = list(merged_map.values())
-
-    # Union with previous parsed_rosters to avoid shrinking on partial cycles
-    parsed_path = os.path.join(dest_folder, "parsed_rosters.json")
-    if os.path.exists(parsed_path):
-        try:
-            with open(parsed_path, "r", encoding="utf-8") as f:
-                prev = json.load(f)
-
-            # handle both raw-list and wrapped-dict formats
-            if isinstance(prev, dict):
-                prev_players = prev.get("rosterInfoList") or prev.get("players") or []
-            elif isinstance(prev, list):
-                prev_players = prev
-            else:
-                prev_players = []
-
-            for p in prev_players:
-                k = _player_key(p)
-                if k not in merged_map:
-                    merged.append(p)
-
-            print(f"🧬 Unioned {len(prev_players)} previous players for fallback safety")
-
-        except Exception as e:
-            print(f"⚠️ Couldn’t union previous parsed_rosters.json: {e}")
-
-    # Write a raw-style rosters.json and then run the parser on the merged data
-    out_raw = {"rosterInfoList": merged}
-    os.makedirs(dest_folder, exist_ok=True)
-    raw_path = os.path.join(dest_folder, "rosters.json")
-
-    _atomic_write_json(raw_path, out_raw)
-
-    print(f"✅ Roster merged → {raw_path} (players={len(merged)})")
-
-    output_folder = os.path.join(
-        app.config["UPLOAD_FOLDER"],
-        league_id,
-        "season_global",
-        "week_global"
-    )
-
-    # 🔧 FINAL, AUTHORITATIVE rebuild from per-team files
-    rebuild_parsed_rosters(output_folder)
-
-    valid_team_ids = {
-        str(tid) for tid in _load_team_map(league_id).keys()
-        if str(tid) not in {"0", "-1", "32", "1000"}
-    }
-
-    team_counts = Counter(str(p.get("teamId")) for p in merged)
-
-    missing = valid_team_ids - set(team_counts.keys())
-    if missing:
-        print(f"🚨 WARNING: Missing teams in roster snapshot: {sorted(missing)}")
-    else:
-        print("✅ All teams present in roster snapshot")
-
-    # Drive the existing parser (keeps rosters.html reading parsed_rosters.json)
-    parse_rosters_data(out_raw, "debounced/merge", dest_folder)
-
-    # Helpful per-team log
-    team_counts = Counter(str(p.get("teamId") or p.get("team") or 0) for p in merged)
-    non_fa = {tid: c for tid, c in team_counts.items() if tid != "0"}
-    print(f"📊 Roster coverage: teams={len(non_fa)} + FA={team_counts.get('0', 0)} players")
-    if non_fa:
-        top = sorted(non_fa.items(), key=lambda kv: kv[1], reverse=True)[:10]
-        print("   top teams:", ", ".join(f"{tid}:{cnt}" for tid, cnt in top))
-
-    # reset accumulator
-    merged_map.clear()
-    acc["timer"] = None
 
 def _load_team_map(league_id):
     p = os.path.join(app.config['UPLOAD_FOLDER'], str(league_id), 'team_map.json')
@@ -854,27 +733,6 @@ def jersey_num(player):
 app.jinja_env.globals.update(jersey_num=jersey_num, team_logo=team_logo)
 
 
-def compute_display_week(phase: str | None, week_number: int | None) -> int | None:
-    """
-    Convert season phase + week_number into a single display week index.
-    REG: use week_number directly (1..18)
-    POST: map rounds to 19..22
-    PRE: return None (we don't display preseason in your UI)
-    """
-    if week_number is None:
-        return None
-    if not phase:
-        return week_number
-
-    phase_l = phase.lower()
-    if phase_l.startswith("reg"):
-        return week_number
-    if phase_l.startswith("post"):
-        return POST_ROUND_TO_WEEK.get(int(week_number), 18 + int(week_number))
-    # (Optional) if you ever want to handle preseason explicitly
-    # if phase_l.startswith("pre"):
-    #     return None
-    return week_number
 
 def _load_json(p):
     with open(p, "r", encoding="utf-8") as f:
@@ -1000,8 +858,6 @@ def _format_member_name(members: dict, user_id: str) -> str:
         return info
     return user_id
 
-def is_team_id(value: str) -> bool:
-    return isinstance(value, str) and value.isdigit() and value.startswith("774")
 
 def build_leaderboards(champions, members=None):
     from collections import Counter
@@ -1490,7 +1346,14 @@ def webhook(subpath):
     body = request.data
 
     # 🚫 Removed threading — now it runs immediately in order
-    process_webhook_data(data, subpath, headers, body)
+    process_webhook_data(
+        data,
+        subpath,
+        headers,
+        body,
+        app,
+        league_data
+    )
 
     return 'OK', 200
 
@@ -1541,21 +1404,6 @@ def get_latest_season_week():
 
     return None
 
-def update_default_week(season_index, week_index):
-    try:
-        league_id = league_data.get("latest_league", "3264906")
-        default_path = os.path.join("uploads", league_id, "default_week.json")
-        season_str = f"season_{season_index}"
-        week_str = f"week_{week_index}"
-        default_data = {
-            "season": season_str,
-            "week": week_str
-        }
-        with open(default_path, "w") as f:
-            json.dump(default_data, f, indent=2)
-        print(f"🆕 Default week updated: {season_str}, {week_str}")
-    except Exception as e:
-        print(f"⚠️ Failed to update default week: {e}")
 
 def find_league_in_subpath(subpath):
     candidates = [
@@ -1564,76 +1412,6 @@ def find_league_in_subpath(subpath):
     ]
     return candidates[-1] if candidates else None
 
-def resolve_league_id(payload: dict, subpath: str | None = None) -> str | None:
-    # Try payload fields first
-    lid = (
-        payload.get("leagueId")
-        or payload.get("leagueInfo", {}).get("leagueId")
-        or payload.get("franchiseInfo", {}).get("leagueId")
-    )
-    if lid:
-        return str(lid)
-
-    # Then parse from URL
-    lid = find_league_in_subpath(subpath)
-    if lid:
-        return lid
-
-    # Then in-memory cache
-    lid = league_data.get("latest_league") or league_data.get("league_id")
-    if lid:
-        return str(lid)
-
-    # Optional dev fallback via .env
-    env_default = os.getenv("DEFAULT_LEAGUE_ID")
-    return str(env_default) if env_default else None
-
-def _safe_int(x, default=0):
-    try:
-        return int(x)
-    except Exception:
-        return default
-
-def _safe_float(x, default=0.0):
-    try:
-        return float(x)
-    except Exception:
-        return default
-
-def _load_json_safe_path(path, default):
-    try:
-        if not os.path.exists(path):
-            return default
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return default
-
-def _team_name(team_map: dict, tid: str) -> str:
-    return (team_map.get(str(tid), {}) or {}).get("name") or f"Team {tid}"
-
-def _pick_winner(home_id, away_id, home_score, away_score):
-    if home_score > away_score:
-        return str(home_id), str(away_id)
-    if away_score > home_score:
-        return str(away_id), str(home_id)
-    return None, None  # tie
-
-def _tone_from_scores(home_score: int, away_score: int) -> str:
-    diff = abs(home_score - away_score)
-    total = home_score + away_score
-
-    if diff <= 3:
-        return "a nail-biter"
-    if diff <= 7:
-        return "a tight battle"
-    if diff >= 35:
-        return "a complete blowout"
-    if diff >= 21:
-        return "a dominant win"
-    if total >= 70:
-        return "an offensive shootout"
-    return "a convincing win"
 
 def _fmt_player(name, pos=None, jersey=None):
     name = name or "Unknown"
@@ -1646,694 +1424,8 @@ def _fmt_player(name, pos=None, jersey=None):
     p = f" ({pos})" if pos else ""
     return f"{name}{j}{p}"
 
-def _best_offense_player(team_id: str, passing_rows: list, rushing_rows: list):
-    """
-    Returns (player_dict, score_float, blurb_str)
-    """
-    team_id = str(team_id)
-    candidates = []
 
-    # Passing candidates
-    for p in passing_rows or []:
-        if str(p.get("teamId")) != team_id:
-            continue
-        name = p.get("playerName") or p.get("fullName") or p.get("name")
-        yds  = _safe_int(p.get("passYds") or p.get("passingYards") or p.get("yards") or 0)
-        tds  = _safe_int(p.get("passTDs") or p.get("passingTDs") or p.get("tds") or 0)
-        ints = _safe_int(p.get("int") or p.get("ints") or p.get("interceptions") or 0)
-        comp = _safe_int(p.get("completions") or p.get("comp") or 0)
-        att  = _safe_int(p.get("attempts") or p.get("att") or 0)
-
-        # Simple POG score
-        score = (yds / 25.0) + (tds * 6.0) - (ints * 5.0)
-        blurb = f"{yds} pass yds, {tds} TD, {ints} INT" + (f" ({comp}/{att})" if att else "")
-        candidates.append(("pass", p, score, name, blurb))
-
-    # Rushing candidates
-    for r in rushing_rows or []:
-        if str(r.get("teamId")) != team_id:
-            continue
-        name = r.get("playerName") or r.get("fullName") or r.get("name")
-        yds  = _safe_int(r.get("rushYds") or r.get("rushingYards") or r.get("yards") or 0)
-        tds  = _safe_int(r.get("rushTDs") or r.get("rushingTDs") or r.get("tds") or 0)
-        att  = _safe_int(r.get("rushAtt") or r.get("attempts") or r.get("att") or 0)
-
-        score = (yds / 12.0) + (tds * 6.0)
-        blurb = f"{yds} rush yds, {tds} TD" + (f" ({att} carries)" if att else "")
-        candidates.append(("rush", r, score, name, blurb))
-
-    if not candidates:
-        return None, 0.0, ""
-
-    _, row, score, name, blurb = max(candidates, key=lambda x: x[2])
-    return row, float(score), f"{name}: {blurb}"
-
-
-def _impact_defenders(team_id: str, defense_rows: list, top_n: int = 3):
-    """
-    Returns list of small blurbs like:
-      "J. Smith: 2 sacks, 1 INT"
-    """
-    team_id = str(team_id)
-    defenders = []
-
-    for d in defense_rows or []:
-        if str(d.get("teamId")) != team_id:
-            continue
-        name = d.get("playerName") or d.get("fullName") or d.get("name")
-
-        sacks = _safe_float(d.get("sacks") or d.get("sack") or 0)
-        ints  = _safe_int(d.get("ints") or d.get("int") or d.get("interceptions") or 0)
-        tfl   = _safe_float(d.get("tfl") or d.get("tacklesForLoss") or 0)
-        ff    = _safe_int(d.get("forcedFumbles") or d.get("ff") or 0)
-        td    = _safe_int(d.get("defTDs") or d.get("td") or 0)
-
-        # Impact score: prioritize sacks + picks
-        score = (sacks * 4.0) + (ints * 5.0) + (tfl * 2.0) + (ff * 3.0) + (td * 6.0)
-        if score <= 0:
-            continue
-
-        bits = []
-        if sacks: bits.append(f"{sacks:g} sacks")
-        if ints:  bits.append(f"{ints} INT")
-        if tfl:   bits.append(f"{tfl:g} TFL")
-        if ff:    bits.append(f"{ff} FF")
-        if td:    bits.append(f"{td} DEF TD")
-
-        defenders.append((score, f"{name}: " + ", ".join(bits)))
-
-    defenders.sort(key=lambda x: x[0], reverse=True)
-    return [txt for _, txt in defenders[:top_n]]
-
-def post_summary_to_discord(summary, week_number, league_id, season_dir, week_dir):
-    base_url = os.getenv("SITE_BASE_URL", "https://wurd-madden.com")
-
-    recap_url = f"{base_url}/summary/{summary['gameId']}?league={league_id}&season={season_dir}&week={week_dir}"
-
-    separator = "\n══════════════════════\n"
-
-    message = (
-        f"{separator}\n"
-        f"📰 **WURD Game Recap – Week {week_number}**\n\n"
-        f"**{summary['headline']}**\n\n"
-        f"🌐 Read the full recap:\n{recap_url}"
-    )
-
-    try:
-        response = requests.post(DISCORD_RECAP_WEBHOOK_URL, json={"content": message})
-        if response.status_code in (200, 204):
-            print("✅ Recap teaser posted to Discord")
-        else:
-            print(f"❌ Failed to post recap teaser: {response.status_code} {response.text}")
-    except Exception as e:
-        print(f"❌ Discord recap error: {e}")
-
-def generate_week_summaries_if_ready(league_id: str, season_dir: str, week_dir: str):
-    """
-    Generates one summary per completed game.
-    Runs after defensive stats webhook (stats complete signal).
-    """
-
-    base_path = os.path.join(
-        app.config["UPLOAD_FOLDER"],
-        league_id,
-        season_dir,
-        week_dir
-    )
-
-    week_number = int(str(week_dir).replace("week_", ""))
-
-    schedule_path = os.path.join(base_path, "parsed_schedule.json")
-    passing_path  = os.path.join(base_path, "passing.json")
-    rushing_path  = os.path.join(base_path, "parsed_rushing.json")
-    defense_path  = os.path.join(base_path, "parsed_defense.json")
-
-    passing_data = _load_json_safe_path(passing_path, {})
-    passing_rows = passing_data.get("playerPassingStatInfoList", []) if isinstance(passing_data, dict) else (
-                passing_data or [])
-
-    rushing_data = _load_json_safe_path(rushing_path, {})
-    rushing_rows = rushing_data.get("playerRushingStatInfoList", []) if isinstance(rushing_data, dict) else (
-                rushing_data or [])
-
-    defense_data = _load_json_safe_path(defense_path, {})
-    defense_rows = defense_data.get("playerDefensiveStatInfoList", []) if isinstance(defense_data, dict) else (
-                defense_data or [])
-
-    if not os.path.exists(schedule_path):
-        print("⚠️ No schedule found. Skipping summaries.")
-        return
-
-    # Load schedule
-    with open(schedule_path, "r", encoding="utf-8") as f:
-        schedule = json.load(f)
-
-    # Load summaries file (if exists)
-    summaries_path = os.path.join(base_path, "game_summaries.json")
-
-    if os.path.exists(summaries_path):
-        with open(summaries_path, "r", encoding="utf-8") as f:
-            summaries_data = json.load(f)
-    else:
-        summaries_data = {"games": []}
-
-    existing_ids = {g["gameId"] for g in summaries_data.get("games", [])}
-
-    # Load team_map
-    team_map_path = os.path.join(
-        app.config["UPLOAD_FOLDER"],
-        league_id,
-        "team_map.json"
-    )
-
-    team_map = {}
-    if os.path.exists(team_map_path):
-        with open(team_map_path, "r", encoding="utf-8") as f:
-            team_map = json.load(f)
-
-    new_games_added = False
-
-    for game in schedule:
-        game_id = str(game.get("scheduleId") or game.get("gameId"))
-        if not game_id:
-            continue
-
-        if game_id in existing_ids:
-            continue
-
-        home_id = str(game.get("homeTeamId"))
-        away_id = str(game.get("awayTeamId"))
-        home_score = _safe_int(game.get("homeScore"))
-        away_score = _safe_int(game.get("awayScore"))
-
-        # Skip incomplete games
-        if home_score == 0 and away_score == 0:
-            continue
-
-        winner_id, loser_id = _pick_winner(home_id, away_id, home_score, away_score)
-
-        home_name = _team_name(team_map, home_id)
-        away_name = _team_name(team_map, away_id)
-
-        if winner_id is None:
-            # 🟡 TIE GAME
-            headline = f"{home_name} and {away_name} tie {home_score}–{away_score}"
-            narr = (
-                f"In a hard-fought battle, {home_name} and {away_name} "
-                f"finished deadlocked at {home_score}–{away_score}."
-            )
-
-            pog_blurb = None
-            impact = []
-
-        else:
-            winner_name = _team_name(team_map, winner_id)
-            loser_name = _team_name(team_map, loser_id)
-
-            if winner_id == str(home_id):
-                winner_score = home_score
-                loser_score = away_score
-            else:
-                winner_score = away_score
-                loser_score = home_score
-
-            tone = _tone_from_scores(home_score, away_score)
-
-            headline = f"{winner_name} defeat {loser_name} {winner_score}–{loser_score}"
-
-            pog_row, pog_score, pog_blurb = _best_offense_player(
-                winner_id, passing_rows, rushing_rows
-            )
-
-            impact = _impact_defenders(winner_id, defense_rows, top_n=3)
-
-            narr = f"In {tone}, {winner_name} took down {loser_name} {winner_score}–{loser_score}."
-
-            if pog_blurb:
-                narr += f" Player of the Game: {pog_blurb}."
-            if impact:
-                narr += " Defensive impact: " + "; ".join(impact) + "."
-
-        summary_obj = {
-            "gameId": game_id,
-            "homeTeamId": home_id,
-            "awayTeamId": away_id,
-            "homeScore": home_score,
-            "awayScore": away_score,
-            "headline": headline,
-            "narrative": narr,
-            "player_of_game": pog_blurb or None,
-            "impact_defense": impact or []
-        }
-
-        summaries_data["games"].append(summary_obj)
-        post_summary_to_discord(
-            summary_obj,
-            week_number,
-            league_id,
-            season_dir,
-            week_dir
-        )
-        new_games_added = True
-
-        print(f"📝 Generated summary for game {game_id}")
-
-    # Write file only if new games added
-    if new_games_added:
-        with open(summaries_path, "w", encoding="utf-8") as f:
-            json.dump(summaries_data, f, indent=2)
-
-
-def process_webhook_data(data, subpath, headers, body):
-    # ✅ detect simulator replays (headers dict is passed in from the request)
-    is_replay = (headers.get("X-Replay") == "1" or headers.get("x-replay") == "1")
-
-    # ✅ 1. Save debug snapshot (skip for replays so we don't rewrite during sims)
-    if not is_replay:
-        debug_path = os.path.join(app.config['UPLOAD_FOLDER'], 'webhook_debug.txt')
-        with open(debug_path, 'w', encoding='utf-8') as f:
-            f.write(f"SUBPATH: {subpath}\n\nHEADERS:\n")
-            for k, v in headers.items():
-                f.write(f"{k}: {v}\n")
-            f.write("\nBODY:\n")
-            f.write(body.decode('utf-8', errors='replace'))
-
-    # ✅ 2. Determine storage path (league id)
-    league_id = resolve_league_id(data, subpath)
-    if not league_id:
-        app.logger.error("No league_id found")
-        return
-
-    # ✅ FORCE STRING (prevents path bugs)
-    league_id = str(league_id)
-
-    # 🔒 ABSOLUTE NORMALIZATION
-    if is_team_id(league_id):
-        real_league = (
-                data.get("leagueId")
-                or data.get("franchiseInfo", {}).get("leagueId")
-                or league_data.get("latest_league")
-        )
-        if not real_league:
-            # 🔁 FINAL fallback: extract leagueId from URL path
-            # subpath example:
-            # /rosters/ps5/3264906/team/774242331/roster
-            parts = (subpath or "").split("/")
-            try:
-                idx = parts.index("ps5")
-                real_league = parts[idx + 1]
-                print(f"🧭 Fallback league from path → {real_league}")
-            except Exception:
-                raise RuntimeError(f"Cannot resolve real league for teamId {league_id}")
-
-        print(f"🧭 Normalizing teamId {league_id} → league {real_league}")
-        team_id = league_id
-        league_id = str(real_league)
-    else:
-        team_id = None
-
-    # 🔒 Invariant: after normalization, league_id must NOT be a teamId
-    if is_team_id(league_id):
-        raise RuntimeError(f"🚨 INTERNAL ERROR: league_id still a teamId after normalization: {league_id}")
-
-    league_data["latest_league"] = league_id
-    print(f"📎 Using league_id: {league_id}")
-
-    # 3) Classify batch for debug batching (kept as-is: based on subpath)
-    if "league" in (subpath or ""):
-        batch_type = "league"
-        filename = "webhook_debug_league.txt"
-    elif any(x in (subpath or "") for x in ["passing", "kicking", "rushing", "receiving", "defense"]):
-        batch_type = "stats"
-        filename = "webhook_debug_stats.txt"
-    elif "roster" in (subpath or ""):
-        batch_type = "roster"
-        filename = "webhook_debug_roster.txt"
-    else:
-        batch_type = "other"
-        filename = "webhook_debug_misc.txt"
-
-    # If this is a replay, redirect logs to a separate *_replay.txt file
-    if is_replay:
-        base, ext = os.path.splitext(filename)
-        filename = f"{base}_replay{ext}"
-
-    debug_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-    # 4) Debug logging
-    if batch_type not in ["league", "stats", "roster"]:
-        # non-batched logs → just append (replay or normal)
-        with open(debug_path, 'a', encoding='utf-8') as f:
-            f.write(f"\n===== NEW WEBHOOK: {subpath} =====\n")
-            f.write("HEADERS:\n")
-            for k, v in headers.items():
-                f.write(f"{k}: {v}\n")
-            f.write("\nBODY:\n")
-            f.write(body.decode('utf-8', errors='replace'))
-            f.write("\n\n")
-    else:
-        if is_replay:
-            # For replays, write immediately to *_replay.txt (no batching/timers)
-            with open(debug_path, 'a', encoding='utf-8') as f:
-                f.write(f"\n===== NEW WEBHOOK: {subpath} =====\n")
-                f.write("HEADERS:\n")
-                for k, v in headers.items():
-                    f.write(f"{k}: {v}\n")
-                f.write("\nBODY:\n")
-                f.write(body.decode('utf-8', errors='replace'))
-                f.write("\n\n")
-        else:
-            # Normal path: buffered batching with timer
-            last_webhook_time[batch_type] = time()
-            webhook_buffer[batch_type].append({
-                "subpath": subpath,
-                "headers": headers,
-                "body": body.decode('utf-8', errors='replace'),
-            })
-
-            if batch_timers.get(batch_type):
-                batch_timers[batch_type].cancel()
-
-            def flush_batch(bt=batch_type):
-                debug_path_flush = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                # NOTE: this still overwrites on each flush; switch to 'a' to append history
-                with open(debug_path_flush, 'w', encoding='utf-8') as f:
-                    for entry in webhook_buffer[bt]:
-                        f.write(f"\n===== NEW WEBHOOK: {entry['subpath']} =====\n")
-                        f.write("HEADERS:\n")
-                        for k, v in entry['headers'].items():
-                            f.write(f"{k}: {v}\n")
-                        f.write("\nBODY:\n")
-                        f.write(entry['body'])
-                        f.write("\n\n")
-                print(f"✅ Flushed {bt} batch with {len(webhook_buffer[bt])} webhooks.")
-                webhook_buffer[bt] = []
-
-            batch_timers[batch_type] = Timer(5.0, flush_batch)
-            batch_timers[batch_type].start()
-
-    # 5) Companion error?
-    if 'error' in data:
-        print(f"⚠️ Companion App Error: {data['error']}")
-        error_filename = f"{subpath.replace('/', '_')}_error.json"
-        with open(os.path.join(app.config['UPLOAD_FOLDER'], error_filename), 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4)
-        return
-
-    # 6) Determine type-specific handling
-    if "playerPassingStatInfoList" in data:
-        filename = "passing.json"
-    elif "playerReceivingStatInfoList" in data:
-        filename = "receiving.json"
-    elif "playerDefensiveStatInfoList" in data:
-        filename = "defense.json"
-    elif "gameScheduleInfoList" in data:
-        filename = "schedule.json"
-    elif "rosterInfoList" in data:
-        # 🔒 SAFETY ASSERT — normalization must already be done
-        if is_team_id(league_id):
-            raise RuntimeError(
-                f"🚨 INTERNAL ERROR: league_id still a teamId inside roster handler: {league_id}"
-            )
-
-        # ✳️ Debug FA payloads specifically
-        if "freeagents" in (subpath or "").lower():
-            fa_count = len(data.get("rosterInfoList") or [])
-            print(
-                f"🧲 Free Agents payload: success={data.get('success')} "
-                f"count={fa_count} "
-                f"message={data.get('message') or data.get('error')}"
-            )
-
-            dump_root = Path(app.config["UPLOAD_FOLDER"])
-            dump_dir = dump_root / str(league_id) / "season_global" / "week_global"
-            dump_dir.mkdir(parents=True, exist_ok=True)
-
-            raw_path = dump_dir / "freeagents_last_raw.json"
-            with raw_path.open("w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-
-            print(f"🧲 Free Agents payload: wrote → {raw_path}")
-
-        if data.get("success") is False and not data.get("rosterInfoList"):
-            print("⚠️ Skipping roster write: export failed / empty list.")
-            return
-
-        league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
-
-        # 🔒 ROSTERS ARE GLOBAL SNAPSHOTS
-        # They must ONLY ever write to season_global/week_global
-        # Weekly season_X/week_Y folders must NEVER contain roster data
-
-        if not league_folder.endswith(os.path.join("season_global", "week_global")):
-            raise RuntimeError(
-                f"🚨 INVALID ROSTER WRITE TARGET: {league_folder}"
-            )
-
-        os.makedirs(league_folder, exist_ok=True)
-
-        roster_list = data.get("rosterInfoList") or []
-
-        rosters_by_team_dir = os.path.join(
-            app.config['UPLOAD_FOLDER'],
-            league_id,
-            "season_global",
-            "week_global",
-            "rosters_by_team"
-        )
-        os.makedirs(rosters_by_team_dir, exist_ok=True)
-
-        # If this payload is team-scoped, persist it
-        if team_id:
-            team_path = os.path.join(rosters_by_team_dir, f"{team_id}.json")
-            with open(team_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-
-        added, total = _add_roster_chunk(league_id, roster_list)
-        print(f"📥 Roster chunk received ({len(roster_list)}); merged so far={total} (added={added}).")
-
-        acc = _get_roster_acc(league_id)
-        if acc["timer"]:
-            acc["timer"].cancel()
-        acc["timer"] = Timer(ROSTER_DEBOUNCE_SEC, _flush_roster, args=[league_id, league_folder])
-        acc["timer"].start()
-
-        return
-    elif "teamInfoList" in data or "leagueTeamInfoList" in data:
-        filename = "league.json"
-        print("🏈 League Info received and saved!")
-        if "leagueTeamInfoList" in data and "teamInfoList" not in data:
-            data["teamInfoList"] = data["leagueTeamInfoList"]
-        if "teamInfoList" in data:
-            league_data["teams"] = data["teamInfoList"]
-    elif "teamStandingInfoList" in data:
-        filename = "standings.json"
-        print("📊 Standings data received and saved!")
-    else:
-        filename = f"{subpath.replace('/', '_')}.json"
-
-    # 7) Work out season/week (unchanged for non-roster)
-    season_index = data.get("seasonIndex") or data.get("season")
-    week_index = data.get("weekIndex") or data.get("week")
-
-    stat_lists = [
-        "gameScheduleInfoList",
-        "playerPassingStatInfoList",
-        "playerReceivingStatInfoList",
-        "playerRushingStatInfoList",
-        "playerKickingStatInfoList",
-        "playerPuntingStatInfoList",
-        "playerDefensiveStatInfoList",
-        "teamStatInfoList",
-    ]
-    for key in stat_lists:
-        if key in data and isinstance(data[key], list) and data[key]:
-            first = data[key][0]
-            if isinstance(first, dict):
-                if not isinstance(season_index, int):
-                    season_index = first.get("seasonIndex") or first.get("season")
-                if not isinstance(week_index, int):
-                    week_index = first.get("weekIndex") or first.get("week")
-            break
-
-    if "teamInfoList" in data or "leagueTeamInfoList" in data:
-        season_index = "global"
-        week_index = "global"
-
-    print(f"📦 subpath raw: {subpath}")
-
-    phase = None
-    week_index_int_path = None
-
-    # Detect from subpath
-    if subpath:
-        m = re.search(r'week/(reg|post|pre)/(\d+)', subpath)
-        if m:
-            phase = m.group(1)
-            week_index_int_path = int(m.group(2))
-        else:
-            print("⚠️ Could not detect phase from subpath")
-
-    # Fallback detection
-    if not phase:
-        stage = data.get("stage") or data.get("seasonStage")
-        if stage and str(stage).lower().startswith("pre"):
-            phase = "pre"
-            print("🟡 Fallback detected preseason from payload")
-
-    print(f"📊 FINAL PHASE: {phase}")
-    print(f"📊 PATH WEEK: {week_index_int_path}")
-
-    if "gameScheduleInfoList" in data and isinstance(data["gameScheduleInfoList"], list):
-        for game in data["gameScheduleInfoList"]:
-            if isinstance(game, dict):
-                season_index = season_index or game.get("seasonIndex")
-                week_index = week_index or game.get("weekIndex")
-                break
-
-    if "teamStandingInfoList" in data and isinstance(data["teamStandingInfoList"], list):
-        for t in data["teamStandingInfoList"]:
-            if isinstance(t, dict):
-                season_index = season_index or t.get("seasonIndex")
-                week_index = week_index or t.get("weekIndex")
-                break
-
-    def to_int_or_none(v):
-        try:
-            return int(v)
-        except Exception:
-            return None
-
-    season_index_int = to_int_or_none(season_index)
-    week_index_int_payload = to_int_or_none(week_index)
-    raw_week_for_display = week_index_int_path if week_index_int_path is not None else week_index_int_payload
-    display_week = compute_display_week(phase, raw_week_for_display)
-
-    print(f"📊 PAYLOAD WEEK: {week_index_int_payload}")
-
-    # 🔒 AUTHORITATIVE STATE UPDATE (ONE SOURCE OF TRUTH)
-    if season_index_int is not None and display_week is not None:
-        season_str = f"season_{season_index_int}"
-        week_str = f"week_{display_week}"
-
-        # 🚫 Skip preseason from becoming "latest"
-        if not (phase and phase.startswith("pre")):
-            league_data["latest_league"] = league_id
-            league_data["latest_season"] = season_str
-            league_data["latest_week"] = week_str
-
-            print(
-                f"🔒 Authoritative set → league={league_id} "
-                f"season={season_str} week={week_str}",
-                flush=True
-            )
-
-        # 💾 Persist latest league across restarts
-        latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
-        _atomic_write_json(latest_path, {
-            "league": league_id,
-            "season": season_str,
-            "week": week_str
-        })
-
-    # 8) Destination folder (non-roster)
-    if (season_index == "global" and week_index == "global") or \
-       ("leagueteams" in (subpath or "")) or \
-       ("standings" in (subpath or "")):
-        season_dir = "season_global"
-        week_dir = "week_global"
-    else:
-        if season_index_int is None:
-            print("⚠️ No valid season_index; skipping default_week update.")
-            return
-        season_dir = f"season_{season_index_int}"
-
-        effective_week = display_week if display_week is not None else week_index_int_payload
-
-        if phase and phase.startswith("pre"):
-            pre_week = week_index_int_path or week_index_int_payload
-
-            if pre_week is None:
-                print("⚠️ No valid preseason week")
-                return
-
-            week_dir = f"pre_week_{pre_week}"
-            print(f"🟡 Preseason detected → {week_dir}")
-
-        else:
-            if effective_week is None:
-                print("⚠️ No valid week; skipping")
-                return
-
-            week_dir = f"week_{effective_week}"
-
-        # ✅ SAFETY CHECK (NOW VALID)
-        if phase and phase.startswith("pre") and week_dir.startswith("week_"):
-            print("🚨 ERROR: Preseason misrouted — blocking write")
-            return
-
-        else:
-            if effective_week is None:
-                print("⚠️ No valid week; skipping default_week update.")
-                return
-
-            week_dir = f"week_{effective_week}"
-        if not (phase and phase.startswith("pre")):
-            print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
-            update_default_week(season_index_int, effective_week)
-
-    league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, season_dir, week_dir)
-    os.makedirs(league_folder, exist_ok=True)
-
-    # 9) Write + parse (non-roster)
-    if filename == "league.json":
-        parse_league_info_data(data, subpath, league_folder)
-
-    # Generic write for non-roster payloads
-    output_path = os.path.join(league_folder, filename)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
-    print(f"✅ Data saved to {output_path}")
-
-    # Type-specific parse
-    if "playerPassingStatInfoList" in data:
-        parse_passing_stats(league_id, data, league_folder)
-    elif "gameScheduleInfoList" in data:
-        parse_schedule_data(data, subpath, league_folder)
-    elif "teamInfoList" in data or "leagueTeamInfoList" in data:
-        parse_league_info_data(data, subpath, league_folder)
-    elif "teamStandingInfoList" in data:
-        parse_standings_data(data, subpath, league_folder)
-    elif "playerRushingStatInfoList" in data:
-        from parsers.rushing_parser import parse_rushing_stats
-        print(f"🐛 DEBUG: Detected rushing stats for season={season_index}, week={week_index}")
-        parse_rushing_stats(league_id, data, league_folder)
-    elif "playerDefensiveStatInfoList" in data:
-        print(f"🛡️ DEBUG: Detected defensive stats for season={season_index}, week={week_index}")
-        parse_defense_stats(league_id, data, league_folder)
-        try:
-            if not (phase and phase.startswith("pre")):
-                generate_week_summaries_if_ready(
-                    league_id=league_id,
-                    season_dir=season_dir,
-                    week_dir=week_dir
-                )
-        except Exception as e:
-            print(f"❌ Summary generation failed: {e}")
-
-    # 10) Cache copy
-    league_data[subpath] = data
-
-    # 🔐 Update stats hash after stats write
-    try:
-        global current_stats_hash
-        current_stats_hash = sha256(
-            json.dumps(data, sort_keys=True).encode()
-        ).hexdigest()
-        print(f"🔄 Stats hash updated → {current_stats_hash}")
-    except Exception as e:
-        print(f"⚠️ Failed to update stats hash: {e}")
-
+#  PROCESS_WEBHOOK_DATA was here
 
 @app.route('/debug', methods=['GET'])
 def get_debug_file():
@@ -2417,7 +1509,7 @@ def ui_player(p, _dev_to_label):
 
 @app.get("/stats-hash")
 def stats_hash():
-    return jsonify({"hash": current_stats_hash})
+    return jsonify({"hash": webhook_helpers.current_stats_hash})
 
 
 @app.route('/stats')
@@ -2728,13 +1820,6 @@ def show_defense_stats():
                            prev_week=prev_week,
                            next_week=next_week)
 
-
-def _load_json_safe(path):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
 
 def load_standings_map(league_id: str) -> dict[str, dict]:
     """
