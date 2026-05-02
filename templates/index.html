@@ -215,9 +215,11 @@
           {% endif %}
         </p>
 
-        <div class="advance-banner">
-            ⏰ {{ advance_info.status_text }}
-        </div>
+        {% if show_advance_info and advance_info %}
+            <div class="advance-banner">
+                ⏰ {{ advance_info.status_text }}
+            </div>
+        {% endif %}
 
         <form id="navForm" method="get" onsubmit="return false;">
             <label for="season">Season:</label>

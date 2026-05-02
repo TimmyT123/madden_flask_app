@@ -138,6 +138,8 @@ POST_ROUND_TO_WEEK = {
     4: 22,  # Super Bowl (some leagues may use 4 here)
 }
 
+PLAYOFF_ADVANCE_HIDDEN_WEEKS = {19, 20, 21, 22, 23}
+
 # --- Roster debounce state ---
 _roster_pending: dict[str, list] = {}   # {league_id: [ {data, raw, len} , ... ]}
 _roster_timers: dict[str, Timer] = {}   # {league_id: Timer}
@@ -1066,6 +1068,8 @@ def home():
         latest_week_display = "?"
         current_week = 0
 
+    show_advance_info = current_week not in PLAYOFF_ADVANCE_HIDDEN_WEEKS
+
     #print("DEBUG leagues:", leagues, flush=True)
     # print("DEBUG latest:", latest_league_id, latest_season, latest_week, flush=True)
 
@@ -1077,7 +1081,8 @@ def home():
         latest_week=latest_week,
         latest_week_display=latest_week_display,
         current_week=current_week,
-        advance_info=advance_info
+        advance_info=advance_info,
+        show_advance_info=show_advance_info
     )
 
 
