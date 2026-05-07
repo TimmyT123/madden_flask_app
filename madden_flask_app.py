@@ -1520,7 +1520,7 @@ def stats_hash():
 @app.route('/stats')
 def show_stats():
     # Get league/season/week from query or cache
-    league = request.args.get("league") or league_data.get("latest_league") or "3264906"
+    league = request.args.get("league") or league_data.get("latest_league") or "26969931"
 
     if not league_data.get("latest_season") or not league_data.get("latest_week"):
         get_latest_season_week()
@@ -1907,7 +1907,7 @@ def fmt_signed(n):
 
 @app.route("/teams")
 def show_teams():
-    league_id = "3264906"
+    league_id = "26969931"
     path = f"uploads/{league_id}/season_global/week_global/parsed_league_info.json"
 
     try:
@@ -2254,7 +2254,7 @@ DEV_LABELS = {0: "Normal", 1: "Star", 2: "Superstar", 3: "X-Factor"}
 
 @app.route("/rosters")
 def rosters():
-    league = request.args.get("league") or league_data.get("latest_league") or "3264906"
+    league = request.args.get("league") or league_data.get("latest_league") or "26969931"
     team   = request.args.get("team", "NFL")
     pos    = request.args.get("pos", "ALL")
     page   = max(int(request.args.get("page", 1)), 1)
@@ -2383,7 +2383,7 @@ def rosters():
 
 @app.route('/schedule')
 def show_schedule():
-    league_id = league_data.get("latest_league", "3264906")
+    league_id = league_data.get("latest_league", "26969931")
     season = request.args.get("season") or league_data.get("latest_season")
     week = request.args.get("week") or league_data.get("latest_week")
 
@@ -2451,7 +2451,7 @@ def show_schedule():
 @app.route("/standings")
 def show_standings():
     try:
-        league_id = "3264906"
+        league_id = "26969931"
         folder = f"uploads/{league_id}/season_global/week_global"
         standings_file = os.path.join(folder, "parsed_standings.json")
 
