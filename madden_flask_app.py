@@ -2011,11 +2011,28 @@ def rookie_preseason_stats():
     for p in roster_players:
         raw = p.get("_raw") or {}
 
-        years_pro = (
-            p.get("yearsPro")
-            or raw.get("yearsPro")
-            or raw.get("proYears")
-            or raw.get("years")
+        def first_present(*values):
+            """
+            Return the first value that is not None and not blank.
+            Important: keep 0, because yearsPro=0 means rookie.
+            """
+            for v in values:
+                if v is not None and str(v).strip() != "":
+                    return v
+            return None
+
+        years_pro = first_present(
+            p.get("yearsPro"),
+            raw.get("yearsPro"),
+            p.get("proYears"),
+            raw.get("proYears"),
+            p.get("years"),
+            raw.get("years"),
+        )
+
+        rookie_year = first_present(
+            p.get("rookieYear"),
+            raw.get("rookieYear"),
         )
 
         is_rookie = False
@@ -2023,18 +2040,23 @@ def rookie_preseason_stats():
         try:
             is_rookie = int(years_pro) == 0
         except Exception:
-            # Fallback if Madden uses a boolean/string field
-            is_rookie = bool(
-                p.get("isRookie")
-                or raw.get("isRookie")
-                or str(p.get("devTrait") or "").lower() == "rookie"
-            )
+            # fallback if yearsPro is missing but rookieYear exists
+            try:
+                is_rookie = int(rookie_year) >= 2025
+            except Exception:
+                is_rookie = False
 
         if is_rookie:
             key = player_key_from_roster(p)
             rookie_lookup[key] = {
                 "key": key,
-                "name": p.get("name") or raw.get("fullName") or raw.get("playerName") or "Unknown",
+                "name": (
+                    p.get("name")
+                    or p.get("fullName")
+                    or p.get("playerName")
+                    or f"{p.get('firstName', '')} {p.get('lastName', '')}".strip()
+                    or "Unknown"
+                ),
                 "teamId": str(p.get("teamId") or raw.get("teamId") or ""),
                 "pos": p.get("pos") or p.get("position") or raw.get("position") or "",
                 "jersey": p.get("jerseyNum") or raw.get("jerseyNum") or "",
