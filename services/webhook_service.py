@@ -349,6 +349,15 @@ def process_webhook_data(
 
     season_index_int = to_int_or_none(season_index)
     week_index_int_payload = to_int_or_none(week_index)
+
+    # ✅ If stats payload has no seasonIndex, fall back to latest season or season_0.
+    # Preseason stat payloads may only tell us the week from the URL path.
+    if season_index_int is None:
+        latest_season = league_data.get("latest_season") or "season_0"
+        m = re.match(r"^season_(\d+)$", str(latest_season))
+        season_index_int = int(m.group(1)) if m else 0
+        print(f"🟡 Missing season_index; fallback season → season_{season_index_int}")
+
     raw_week_for_display = week_index_int_path if week_index_int_path is not None else week_index_int_payload
     display_week = compute_display_week(phase, raw_week_for_display)
 
