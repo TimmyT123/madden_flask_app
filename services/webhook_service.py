@@ -367,13 +367,31 @@ def process_webhook_data(
     if season_index_int is not None and display_week is not None:
         season_str = f"season_{season_index_int}"
 
-        # 🚫 Do NOT let preseason become latest regular-season week
+        # 🔒 AUTHORITATIVE STATE UPDATE FOR WEBSITE CURRENT PERIOD
         if phase and phase.startswith("pre"):
-            print(
-                f"🟡 Preseason detected; not updating latest/default week. "
-                f"league={league_id} season={season_str}",
-                flush=True
-            )
+            pre_week = week_index_int_path if week_index_int_path is not None else week_index_int_payload
+
+            if pre_week is None:
+                print("⚠️ Preseason detected but no valid pre_week for latest state.")
+            else:
+                week_str = f"pre_{pre_week}"
+
+                league_data["latest_league"] = league_id
+                league_data["latest_season"] = season_str
+                league_data["latest_week"] = week_str
+
+                print(
+                    f"🔒 Authoritative set → league={league_id} "
+                    f"season={season_str} week={week_str}",
+                    flush=True
+                )
+
+                latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
+                _atomic_write_json(latest_path, {
+                    "league": league_id,
+                    "season": season_str,
+                    "week": week_str
+                })
 
         else:
             week_str = f"week_{display_week}"
@@ -388,7 +406,6 @@ def process_webhook_data(
                 flush=True
             )
 
-            # 💾 Persist latest league across restarts
             latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
             _atomic_write_json(latest_path, {
                 "league": league_id,

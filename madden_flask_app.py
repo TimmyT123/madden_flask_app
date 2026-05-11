@@ -1101,12 +1101,20 @@ def home():
     #print("DEBUG leagues:", leagues, flush=True)
     # print("DEBUG latest:", latest_league_id, latest_season, latest_week, flush=True)
 
+    latest_week_label = period_display_name(latest_week) if latest_week else "Unknown"
+
+    if latest_week and latest_week.startswith("week_"):
+        current_week = int(latest_week.replace("week_", ""))
+    else:
+        current_week = 0
+
     return render_template(
         'index.html',
         leagues=leagues,
         latest_league=latest_league_id,
         latest_season=latest_season,
         latest_week=latest_week,
+        latest_week_label=latest_week_label,
         latest_week_display=latest_week_display,
         current_week=current_week,
         advance_info=advance_info,
