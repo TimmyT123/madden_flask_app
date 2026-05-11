@@ -1,3 +1,4 @@
+# webhook_service.py
 import os
 import json
 import re
@@ -181,6 +182,8 @@ def process_webhook_data(
         filename = "passing.json"
     elif "playerReceivingStatInfoList" in data:
         filename = "receiving.json"
+    elif "playerRushingStatInfoList" in data:
+        filename = "rushing.json"
     elif "playerDefensiveStatInfoList" in data:
         filename = "defense.json"
     elif "gameScheduleInfoList" in data:
@@ -354,10 +357,18 @@ def process_webhook_data(
     # 🔒 AUTHORITATIVE STATE UPDATE (ONE SOURCE OF TRUTH)
     if season_index_int is not None and display_week is not None:
         season_str = f"season_{season_index_int}"
-        week_str = f"week_{display_week}"
 
-        # 🚫 Skip preseason from becoming "latest"
-        if not (phase and phase.startswith("pre")):
+        # 🚫 Do NOT let preseason become latest regular-season week
+        if phase and phase.startswith("pre"):
+            print(
+                f"🟡 Preseason detected; not updating latest/default week. "
+                f"league={league_id} season={season_str}",
+                flush=True
+            )
+
+        else:
+            week_str = f"week_{display_week}"
+
             league_data["latest_league"] = league_id
             league_data["latest_season"] = season_str
             league_data["latest_week"] = week_str
@@ -368,57 +379,56 @@ def process_webhook_data(
                 flush=True
             )
 
-        # 💾 Persist latest league across restarts
-        latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
-        _atomic_write_json(latest_path, {
-            "league": league_id,
-            "season": season_str,
-            "week": week_str
-        })
+            # 💾 Persist latest league across restarts
+            latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
+            _atomic_write_json(latest_path, {
+                "league": league_id,
+                "season": season_str,
+                "week": week_str
+            })
 
     # 8) Destination folder (non-roster)
     if (season_index == "global" and week_index == "global") or \
-       ("leagueteams" in (subpath or "")) or \
-       ("standings" in (subpath or "")):
+            ("leagueteams" in (subpath or "")) or \
+            ("standings" in (subpath or "")):
         season_dir = "season_global"
         week_dir = "week_global"
+
     else:
         if season_index_int is None:
-            print("⚠️ No valid season_index; skipping default_week update.")
+            print("⚠️ No valid season_index; skipping write.")
             return
+
         season_dir = f"season_{season_index_int}"
 
-        effective_week = display_week if display_week is not None else week_index_int_payload
-
+        # ✅ PRESEASON: save separately as pre_1, pre_2, pre_3, pre_4
         if phase and phase.startswith("pre"):
-            pre_week = week_index_int_path or week_index_int_payload
+            pre_week = week_index_int_path if week_index_int_path is not None else week_index_int_payload
 
             if pre_week is None:
-                print("⚠️ No valid preseason week")
+                print("⚠️ No valid preseason week; skipping write.")
                 return
 
-            week_dir = f"pre_week_{pre_week}"
-            print(f"🟡 Preseason detected → {week_dir}")
+            week_dir = f"pre_{pre_week}"
+            print(f"🟡 Preseason detected → {season_dir}/{week_dir}")
 
+            # ✅ Safety check: preseason should never save into week_#
+            if week_dir.startswith("week_"):
+                print("🚨 ERROR: Preseason misrouted — blocking write")
+                return
+
+            # 🚫 Do NOT update default_week.json for preseason
+
+        # ✅ REGULAR / POSTSEASON: save as week_#
         else:
+            effective_week = display_week if display_week is not None else week_index_int_payload
+
             if effective_week is None:
-                print("⚠️ No valid week; skipping")
+                print("⚠️ No valid week; skipping write.")
                 return
 
             week_dir = f"week_{effective_week}"
 
-        # ✅ SAFETY CHECK (NOW VALID)
-        if phase and phase.startswith("pre") and week_dir.startswith("week_"):
-            print("🚨 ERROR: Preseason misrouted — blocking write")
-            return
-
-        else:
-            if effective_week is None:
-                print("⚠️ No valid week; skipping default_week update.")
-                return
-
-            week_dir = f"week_{effective_week}"
-        if not (phase and phase.startswith("pre")):
             print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
             update_default_week(season_index_int, effective_week, league_data)
 

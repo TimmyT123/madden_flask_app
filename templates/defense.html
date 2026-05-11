@@ -13,17 +13,39 @@
   <div class="week-nav">
     {% if prev_week %}
       <a class="arrow" href="{{ url_for('show_defense_stats', league=league, season=season, week=prev_week) }}">&larr; Prev</a>
-    {% else %}<span class="arrow disabled">&larr;</span>{% endif %}
-    <span class="wk">Week {{ week.replace('week_', '') }}</span>
+    {% else %}
+      <span class="arrow disabled">&larr;</span>
+    {% endif %}
+
+    <span class="wk">
+      {% if week.startswith('pre_') %}
+        Preseason Week {{ week.replace('pre_', '') }}
+      {% elif week.startswith('week_') %}
+        Week {{ week.replace('week_', '') }}
+      {% else %}
+        {{ week }}
+      {% endif %}
+    </span>
+
     {% if next_week %}
       <a class="arrow" href="{{ url_for('show_defense_stats', league=league, season=season, week=next_week) }}">Next &rarr;</a>
-    {% else %}<span class="arrow disabled">&rarr;</span>{% endif %}
+    {% else %}
+      <span class="arrow disabled">&rarr;</span>
+    {% endif %}
   </div>
 
   <h1>Defensive Stats</h1>
 
   <div style="margin-bottom: 20px; font-size: 1.2em; font-weight: bold;">
-    Season: {{ season | replace('season_', '') }} &nbsp; &nbsp; Week: {{ week | replace('week_', '') }}
+    Season: {{ season | replace('season_', '') }} &nbsp; &nbsp;
+
+    {% if week.startswith('pre_') %}
+      Preseason Week: {{ week.replace('pre_', '') }}
+    {% elif week.startswith('week_') %}
+      Week: {{ week.replace('week_', '') }}
+    {% else %}
+      Week: {{ week }}
+    {% endif %}
   </div>
 
   <div class="table-wrap">

@@ -59,6 +59,23 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
+def normalize_period(value, default="week_1"):
+    if value is None:
+        return default
+
+    value = str(value).strip().lower()
+
+    if value.startswith("pre_") or value.startswith("week_"):
+        return value
+
+    # Optional shortcuts:
+    # ?week=pre4 or ?week=pre-4
+    if value.startswith("pre"):
+        num = re.sub(r"\D", "", value)
+        return f"pre_{num}" if num else default
+
+    # Plain number means regular season week
+    return f"week_{value}"
 
 def rehydrate_latest_state():
     latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
@@ -791,20 +808,31 @@ def load_team_records(root_dir: str) -> dict[str, tuple[int,int,int]]:
 
     return records
 
-def get_prev_next_week(league_id: str, season: str, week: str) -> tuple[str|None, str|None]:
+def get_prev_next_week(league_id: str, season: str, week: str) -> tuple[str | None, str | None]:
     """
-    Return ('week_<prev>', 'week_<next>') that actually exist on disk
-    for the given league/season, or None when at the boundary.
+    Works for:
+    pre_1 -> pre_2 -> pre_3 -> pre_4 -> week_1 -> week_2...
     """
     try:
         season_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(league_id), season)
-        weeks = [w for w in os.listdir(season_dir) if re.match(r'^week_\d+$', w)]
-        nums = sorted(int(w[5:]) for w in weeks)
-        cur = int(str(week).replace("week_", ""))
-        prev_num = max((n for n in nums if n < cur), default=None)
-        next_num = min((n for n in nums if n > cur), default=None)
-        return (f"week_{prev_num}" if prev_num is not None else None,
-                f"week_{next_num}" if next_num is not None else None)
+
+        periods = [
+            p for p in os.listdir(season_dir)
+            if os.path.isdir(os.path.join(season_dir, p))
+            and is_valid_period(p)
+        ]
+
+        periods.sort(key=period_sort_key)
+
+        if week not in periods:
+            return (None, None)
+
+        i = periods.index(week)
+        prev_period = periods[i - 1] if i > 0 else None
+        next_period = periods[i + 1] if i < len(periods) - 1 else None
+
+        return prev_period, next_period
+
     except Exception:
         return (None, None)
 
@@ -1025,9 +1053,9 @@ def home():
                 weeks = [
                     w for w in os.listdir(season_path)
                     if os.path.isdir(os.path.join(season_path, w))
-                    and re.match(r'^week_\d+$', w)
+                       and is_valid_period(w)
                 ]
-                weeks.sort(key=lambda x: int(x.replace("week_", "")))
+                weeks.sort(key=period_sort_key)
 
                 seasons.append({'name': season, 'weeks': weeks})
 
@@ -1048,8 +1076,8 @@ def home():
             season_path = os.path.join(league_path, latest_season)
 
             weeks = sorted(
-                [w for w in os.listdir(season_path) if re.match(r'^week_\d+$', w)],
-                key=lambda x: int(x.replace("week_", "")),
+                [w for w in os.listdir(season_path) if is_valid_period(w)],
+                key=period_sort_key,
                 reverse=True
             )
 
@@ -1190,7 +1218,9 @@ def flyer_game():
     # 1️⃣ Query params first
     league = request.args.get("league")
     season = request.args.get("season")
-    week   = request.args.get("week")
+    week = normalize_period(
+        request.args.get("week") or league_data.get("latest_week") or "week_1"
+    )
 
     home_id = request.args.get("home")
     away_id = request.args.get("away")
@@ -1221,7 +1251,7 @@ def flyer_game():
         print(f"🚨 Invalid season loaded: {season}")
         return jsonify({"error": "Invalid season"}), 400
 
-    if not week or not str(week).startswith("week_"):
+    if not week or not is_valid_period(week):
         print(f"🚨 Invalid week loaded: {week}")
         return jsonify({"error": "Invalid week"}), 400
 
@@ -1264,7 +1294,9 @@ def flyer_game():
     return jsonify({
         "league": league,
         "season": season,
-        "week": int(str(week).replace("week_", "")),
+        "week": period_number(week),
+        "period": week,
+        "period_label": period_display_name(week),
         "home": team_block(home_id),
         "away": team_block(away_id)
     })
@@ -1363,8 +1395,39 @@ def webhook(subpath):
     return 'OK', 200
 
 
-WEEK_RE = re.compile(r"^week_(\d+)$")
+PERIOD_RE = re.compile(r"^(pre|week)_(\d+)$")
 SEASON_RE = re.compile(r"^season_(\d+)$")
+
+def period_sort_key(period: str):
+    """
+    Sort order:
+    pre_1, pre_2, pre_3, pre_4, week_1, week_2, ...
+    """
+    m = PERIOD_RE.match(str(period))
+    if not m:
+        return (99, 999)
+
+    phase, num = m.group(1), int(m.group(2))
+    phase_order = 0 if phase == "pre" else 1
+    return (phase_order, num)
+
+def is_valid_period(period: str) -> bool:
+    return bool(PERIOD_RE.match(str(period)))
+
+def period_display_name(period: str) -> str:
+    m = PERIOD_RE.match(str(period))
+    if not m:
+        return str(period)
+
+    phase, num = m.group(1), int(m.group(2))
+    return f"Preseason Week {num}" if phase == "pre" else f"Week {num}"
+
+def period_number(period: str) -> int:
+    m = PERIOD_RE.match(str(period))
+    return int(m.group(2)) if m else 0
+
+def is_preseason(period: str) -> bool:
+    return str(period).startswith("pre_")
 
 def get_latest_season_week():
     base_path = app.config['UPLOAD_FOLDER']
@@ -1392,17 +1455,16 @@ def get_latest_season_week():
         if not os.path.isdir(weeks_path):
             continue
 
-        # Only weeks that match week_<digits>, sort numerically
-        week_entries = []
+        period_entries = []
         for w in os.listdir(weeks_path):
-            m = WEEK_RE.match(w)
-            if m:
-                week_entries.append((int(m.group(1)), w))
-        if not week_entries:
+            if is_valid_period(w):
+                period_entries.append((period_sort_key(w), w))
+
+        if not period_entries:
             continue
 
-        week_entries.sort(key=lambda t: t[0], reverse=True)
-        latest_week_num, latest_week_name = week_entries[0]
+        period_entries.sort(key=lambda t: t[0], reverse=True)
+        latest_week_name = period_entries[0][1]
 
         # ⚠️ READ-ONLY helper: DO NOT mutate league_data here
         return league_id, latest_season, latest_week_name
@@ -1526,10 +1588,12 @@ def show_stats():
         get_latest_season_week()
 
     season = request.args.get("season") or league_data.get("latest_season") or "season_0"
-    week   = request.args.get("week")   or league_data.get("latest_week")   or "week_0"
+    week = normalize_period(
+        request.args.get("week") or league_data.get("latest_week") or "week_1"
+    )
 
-    season = season if season.startswith("season_") else f"season_{season}"
-    week   = week   if week.startswith("week_")     else f"week_{week}"
+    season = season if str(season).startswith("season_") else f"season_{season}"
+    week = normalize_period(week)
 
     try:
         base_path = os.path.join(app.config['UPLOAD_FOLDER'], league, season, week)
@@ -1581,12 +1645,14 @@ def show_receiving_stats():
     if not league_data.get("latest_season") or not league_data.get("latest_week"):
         get_latest_season_week()
 
-    season = request.args.get("season") or league_data.get("latest_season")
-    week = request.args.get("week") or league_data.get("latest_week")
-
     # Fix folder names
-    season = "season_" + season if not season.startswith("season_") else season
-    week = "week_" + week if not week.startswith("week_") else week
+    season = request.args.get("season") or league_data.get("latest_season") or "season_0"
+    week = normalize_period(
+        request.args.get("week") or league_data.get("latest_week") or "week_1"
+    )
+
+    season = season if str(season).startswith("season_") else f"season_{season}"
+    week = normalize_period(week)
 
     print(f"league: {league}")
     print(f"season: {season}")
@@ -1645,12 +1711,13 @@ def show_rushing_stats():
     if not league_data.get("latest_season") or not league_data.get("latest_week"):
         get_latest_season_week()
 
-    season = request.args.get("season") or league_data.get("latest_season")
-    week = request.args.get("week") or league_data.get("latest_week")
+    season = request.args.get("season") or league_data.get("latest_season") or "season_0"
+    week = normalize_period(
+        request.args.get("week") or league_data.get("latest_week") or "week_1"
+    )
 
-    # Normalize folder names
-    season = "season_" + season if not season.startswith("season_") else season
-    week = "week_" + week if not week.startswith("week_") else week
+    season = season if str(season).startswith("season_") else f"season_{season}"
+    week = normalize_period(week)
 
     print(f"league: {league}")
     print(f"season: {season}")
@@ -1709,12 +1776,13 @@ def show_defense_stats():
     if not league_data.get("latest_season") or not league_data.get("latest_week"):
         get_latest_season_week()
 
-    season = request.args.get("season") or league_data.get("latest_season")
-    week   = request.args.get("week")   or league_data.get("latest_week")
+    season = request.args.get("season") or league_data.get("latest_season") or "season_0"
+    week = normalize_period(
+        request.args.get("week") or league_data.get("latest_week") or "week_1"
+    )
 
-    # Normalize folder names
-    season = "season_" + season if not str(season).startswith("season_") else str(season)
-    week   = "week_"   + week   if not str(week).startswith("week_")     else str(week)
+    season = season if str(season).startswith("season_") else f"season_{season}"
+    week = normalize_period(week)
 
     if not league or not season or not week:
         return "Missing league, season, or week", 400
@@ -2383,9 +2451,15 @@ def rosters():
 
 @app.route('/schedule')
 def show_schedule():
-    league_id = league_data.get("latest_league", "26969931")
-    season = request.args.get("season") or league_data.get("latest_season")
-    week = request.args.get("week") or league_data.get("latest_week")
+    league_id = request.args.get("league") or league_data.get("latest_league") or "26969931"
+
+    season = request.args.get("season") or league_data.get("latest_season") or "season_0"
+    week = normalize_period(
+        request.args.get("week") or league_data.get("latest_week") or "week_1"
+    )
+
+    season = season if str(season).startswith("season_") else f"season_{season}"
+    week = normalize_period(week)
 
     parsed_schedule = []
     if league_id and season and week:
@@ -2425,15 +2499,19 @@ def show_schedule():
 
     # ✅ Compute BYE teams once (and hide in playoffs). Include record in BYE label too.
     bye_teams = []
-    try:
-        week_num = int(str(week).replace("week_", ""))
-        if week_num <= 18:
-            all_team_ids = set(team_map.keys())  # keys are strings
-            teams_played = {str(g.get("homeTeamId")) for g in parsed_schedule} | {str(g.get("awayTeamId")) for g in parsed_schedule}
-            bye_team_ids = all_team_ids - teams_played
-            bye_teams = sorted([make_label_with_record(tid, team_map, records, prefer=prefer) for tid in bye_team_ids])
-    except ValueError:
-        print(f"⚠️ Could not parse week value: {week}")
+
+    if str(week).startswith("week_"):
+        try:
+            week_num = int(str(week).replace("week_", ""))
+            if week_num <= 18:
+                all_team_ids = set(team_map.keys())
+                teams_played = {str(g.get("homeTeamId")) for g in parsed_schedule} | {str(g.get("awayTeamId")) for g in
+                                                                                      parsed_schedule}
+                bye_team_ids = all_team_ids - teams_played
+                bye_teams = sorted(
+                    [make_label_with_record(tid, team_map, records, prefer=prefer) for tid in bye_team_ids])
+        except ValueError:
+            print(f"⚠️ Could not parse week value: {week}")
 
     prev_week, next_week = get_prev_next_week(league_id, season, week)
 

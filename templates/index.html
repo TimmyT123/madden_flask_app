@@ -241,9 +241,15 @@
                         {% if season.name == latest_season %}
                             {% for w in season.weeks %}
                                 <!-- DEBUG: w = {{ w }}, latest_week = {{ latest_week }} -->
-                                <option value="{{ w | replace('week_', '') }}"
+                                <option value="{{ w }}"
                                     {% if w == latest_week %}selected{% endif %}>
-                                    {{ w }}
+                                    {% if w.startswith('pre_') %}
+                                        Preseason Week {{ w.replace('pre_', '') }}
+                                    {% elif w.startswith('week_') %}
+                                        Week {{ w.replace('week_', '') }}
+                                    {% else %}
+                                        {{ w }}
+                                    {% endif %}
                                 </option>
                             {% endfor %}
                         {% endif %}
@@ -319,10 +325,19 @@
             if (!season) return;
 
             season.weeks.forEach(w => {
-                const weekVal = w.replace("week_", "");
                 const opt = document.createElement("option");
-                opt.value = weekVal;
-                opt.text = w;
+
+                // Keep full folder name: pre_4 or week_4
+                opt.value = w;
+
+                if (w.startsWith("pre_")) {
+                    opt.text = "Preseason Week " + w.replace("pre_", "");
+                } else if (w.startsWith("week_")) {
+                    opt.text = "Week " + w.replace("week_", "");
+                } else {
+                    opt.text = w;
+                }
+
                 if (w === latestWeek) opt.selected = true;
                 weekSelect.appendChild(opt);
             });
@@ -371,7 +386,7 @@
                 alert("Please select Season and Week.");
                 return;
             }
-            window.location.href = `/schedule?season=season_${season}&week=week_${week}`;
+            window.location.href = `/schedule?league=${latestLeague}&season=season_${season}&week=${week}`;
         }
 
         function goToStandings() {
@@ -380,7 +395,7 @@
                 alert("Please select Season and Week.");
                 return;
             }
-            window.location.href = `/standings?season=season_${season}&week=week_${week}`;
+            window.location.href = `/standings?league=${latestLeague}&season=season_${season}&week=${week}`;
         }
 
         window.onload = populateSeasons;
