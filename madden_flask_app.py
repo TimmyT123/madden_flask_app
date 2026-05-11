@@ -1981,6 +1981,208 @@ def fmt_signed(n):
     except Exception:
         return "—"
 
+@app.route("/rookies")
+def rookie_preseason_stats():
+    league = request.args.get("league") or league_data.get("latest_league") or "26969931"
+    season = request.args.get("season") or league_data.get("latest_season") or "season_0"
+
+    season = season if str(season).startswith("season_") else f"season_{season}"
+
+    # Preseason Week 4 is cut week, so use real preseason game weeks
+    preseason_weeks = ["pre_1", "pre_2", "pre_3"]
+
+    # Load roster index
+    roster_index = load_roster_index(league)
+    roster_players = roster_index.get("players", [])
+
+    rookie_lookup = {}
+
+    def player_key_from_roster(p):
+        raw = p.get("_raw") or {}
+        return str(
+            raw.get("rosterId")
+            or raw.get("playerId")
+            or p.get("rosterId")
+            or p.get("playerId")
+            or f"{p.get('name')}_{p.get('teamId')}"
+        )
+
+    # Build rookie lookup from rosters
+    for p in roster_players:
+        raw = p.get("_raw") or {}
+
+        years_pro = (
+            p.get("yearsPro")
+            or raw.get("yearsPro")
+            or raw.get("proYears")
+            or raw.get("years")
+        )
+
+        is_rookie = False
+
+        try:
+            is_rookie = int(years_pro) == 0
+        except Exception:
+            # Fallback if Madden uses a boolean/string field
+            is_rookie = bool(
+                p.get("isRookie")
+                or raw.get("isRookie")
+                or str(p.get("devTrait") or "").lower() == "rookie"
+            )
+
+        if is_rookie:
+            key = player_key_from_roster(p)
+            rookie_lookup[key] = {
+                "key": key,
+                "name": p.get("name") or raw.get("fullName") or raw.get("playerName") or "Unknown",
+                "teamId": str(p.get("teamId") or raw.get("teamId") or ""),
+                "pos": p.get("pos") or p.get("position") or raw.get("position") or "",
+                "jersey": p.get("jerseyNum") or raw.get("jerseyNum") or "",
+            }
+
+    # Load team names
+    team_map_path = os.path.join(app.config["UPLOAD_FOLDER"], league, "team_map.json")
+    team_map = {}
+    if os.path.exists(team_map_path):
+        with open(team_map_path, "r", encoding="utf-8") as f:
+            team_map = json.load(f)
+
+    def team_name(team_id):
+        return (team_map.get(str(team_id), {}) or {}).get("name", "Unknown")
+
+    def stat_player_key(row):
+        return str(
+            row.get("rosterId")
+            or row.get("playerId")
+            or row.get("id")
+            or f"{row.get('playerName') or row.get('name')}_{row.get('teamId')}"
+        )
+
+    leaders = {}
+
+    def ensure_player(key, row):
+        info = rookie_lookup.get(key)
+        if not info:
+            return None
+
+        if key not in leaders:
+            leaders[key] = {
+                "name": info["name"],
+                "team": team_name(info["teamId"]),
+                "pos": info["pos"],
+                "jersey": info["jersey"],
+                "passYds": 0,
+                "passTDs": 0,
+                "passINTs": 0,
+                "rushYds": 0,
+                "rushTDs": 0,
+                "recYds": 0,
+                "recTDs": 0,
+                "tackles": 0,
+                "sacks": 0,
+                "ints": 0,
+                "totalYds": 0,
+                "totalTDs": 0,
+            }
+
+        return leaders[key]
+
+    for week in preseason_weeks:
+        base_path = os.path.join(app.config["UPLOAD_FOLDER"], league, season, week)
+
+        # Passing
+        passing_path = os.path.join(base_path, "passing.json")
+        if os.path.exists(passing_path):
+            with open(passing_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for row in data.get("playerPassingStatInfoList", []) or []:
+                key = stat_player_key(row)
+                player = ensure_player(key, row)
+                if not player:
+                    continue
+
+                player["passYds"] += int(row.get("passYds") or 0)
+                player["passTDs"] += int(row.get("passTDs") or 0)
+                player["passINTs"] += int(row.get("passINTs") or 0)
+                player["totalYds"] += int(row.get("passYds") or 0)
+                player["totalTDs"] += int(row.get("passTDs") or 0)
+
+        # Rushing
+        rushing_path = os.path.join(base_path, "parsed_rushing.json")
+        if os.path.exists(rushing_path):
+            with open(rushing_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            rows = data if isinstance(data, list) else data.get("playerRushingStatInfoList", [])
+            for row in rows or []:
+                key = stat_player_key(row)
+                player = ensure_player(key, row)
+                if not player:
+                    continue
+
+                yds = int(row.get("rushYds") or row.get("yards") or row.get("yds") or 0)
+                tds = int(row.get("rushTDs") or row.get("td") or row.get("tds") or 0)
+
+                player["rushYds"] += yds
+                player["rushTDs"] += tds
+                player["totalYds"] += yds
+                player["totalTDs"] += tds
+
+        # Receiving
+        receiving_path = os.path.join(base_path, "receiving.json")
+        if os.path.exists(receiving_path):
+            with open(receiving_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for row in data.get("playerReceivingStatInfoList", []) or []:
+                key = stat_player_key(row)
+                player = ensure_player(key, row)
+                if not player:
+                    continue
+
+                yds = int(row.get("recYds") or row.get("receivingYds") or row.get("yards") or 0)
+                tds = int(row.get("recTDs") or row.get("recTds") or row.get("tds") or 0)
+
+                player["recYds"] += yds
+                player["recTDs"] += tds
+                player["totalYds"] += yds
+                player["totalTDs"] += tds
+
+        # Defense
+        defense_path = os.path.join(base_path, "parsed_defense.json")
+        if os.path.exists(defense_path):
+            with open(defense_path, "r", encoding="utf-8") as f:
+                rows = json.load(f) or []
+            for row in rows:
+                key = stat_player_key(row)
+                player = ensure_player(key, row)
+                if not player:
+                    continue
+
+                player["tackles"] += int(row.get("tackles") or 0)
+                player["sacks"] += float(row.get("sacks") or 0)
+                player["ints"] += int(row.get("ints") or 0)
+
+    rookie_rows = list(leaders.values())
+
+    # Main ranking: total yards + TDs for offense, plus defensive impact
+    rookie_rows.sort(
+        key=lambda p: (
+            p["totalTDs"],
+            p["totalYds"],
+            p["sacks"],
+            p["ints"],
+            p["tackles"]
+        ),
+        reverse=True
+    )
+
+    return render_template(
+        "rookies.html",
+        league=league,
+        season=season,
+        weeks=preseason_weeks,
+        rookies=rookie_rows
+    )
+
 @app.route("/teams")
 def show_teams():
     league_id = "26969931"
