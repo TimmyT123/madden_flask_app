@@ -2703,6 +2703,64 @@ def rosters():
     )
 
 
+def build_schedule_id_fallback_map(league_id: str, parsed_schedule: list) -> dict:
+    """
+    Some older saved leagues have schedule team IDs that do not match league/team_map IDs.
+    This builds a fallback map by matching sorted schedule IDs to leagueTeamInfoList order.
+    """
+    league_info_path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        str(league_id),
+        "season_global",
+        "week_global",
+        "league.json"
+    )
+
+    if not os.path.exists(league_info_path):
+        return {}
+
+    try:
+        with open(league_info_path, "r", encoding="utf-8") as f:
+            league_info = json.load(f)
+    except Exception:
+        return {}
+
+    teams = league_info.get("leagueTeamInfoList") or league_info.get("teamInfoList") or []
+
+    schedule_team_ids = set()
+
+    for game in parsed_schedule:
+        for key in ("awayTeamId", "homeTeamId", "awayTeam", "homeTeam", "awayId", "homeId"):
+            value = game.get(key)
+            if value not in (None, "", 0):
+                schedule_team_ids.add(str(value))
+
+    schedule_ids_sorted = sorted(schedule_team_ids, key=lambda x: int(x))
+
+    fallback = {}
+
+    for schedule_id, team in zip(schedule_ids_sorted, teams):
+        name = (
+            team.get("displayName")
+            or team.get("nickName")
+            or team.get("teamName")
+            or team.get("cityName")
+            or f"Team {schedule_id}"
+        )
+
+        abbr = team.get("abbrName") or team.get("teamAbbr") or ""
+
+        fallback[str(schedule_id)] = {
+            "name": name,
+            "abbr": abbr,
+            "userName": team.get("userName") or "CPU",
+            "displayName": name,
+            "cityName": team.get("cityName", ""),
+            "nickName": team.get("nickName", "")
+        }
+
+    return fallback
+
 @app.route('/schedule')
 def show_schedule():
     league_id = request.args.get("league") or league_data.get("latest_league") or "26969931"
@@ -2737,6 +2795,13 @@ def show_schedule():
     if os.path.exists(team_map_path):
         with open(team_map_path, encoding="utf-8") as f:
             team_map = json.load(f)
+
+    # Fallback for old leagues where schedule team IDs do not match team_map IDs
+    schedule_fallback_map = build_schedule_id_fallback_map(league_id, parsed_schedule)
+
+    for tid, info in schedule_fallback_map.items():
+        if tid not in team_map:
+            team_map[tid] = info
 
     # Load records once (from season_global/week_global)
     root_dir = os.path.join(app.config['UPLOAD_FOLDER'], league_id)
