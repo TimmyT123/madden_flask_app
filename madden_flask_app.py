@@ -58,6 +58,10 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+DEFAULT_LEAGUE_ID = "26969931"
+DEFAULT_SEASON = "season_0"
+DEFAULT_WEEK = "week_1"
+
 
 def normalize_period(value, default="week_1"):
     if value is None:
@@ -1018,16 +1022,34 @@ def home():
         except Exception as e:
             print(f"⚠️ Failed to load _latest.json: {e}", flush=True)
 
+    selected_league = request.args.get("league")
+    selected_season = request.args.get("season")
+    selected_week = request.args.get("week")
+
+    if selected_league:
+        latest_league_id = selected_league
+
+    if selected_season:
+        latest_season = selected_season
+
+    if selected_week:
+        latest_week = normalize_period(selected_week)
+
     # 🔁 Fallback ONLY if app has never seen a webhook
     if not latest_league_id:
         league_dirs = [
             d for d in os.listdir(base_path)
-            if os.path.isdir(os.path.join(base_path, d)) and d.isdigit() and not d.startswith("774")
+            if os.path.isdir(os.path.join(base_path, d))
+               and d.isdigit()
+               and not d.startswith("774")
         ]
 
-        if league_dirs:
-            # pick numerically highest league ID (EA IDs increase over time)
-            league_dirs.sort(key=int, reverse=True)
+        if DEFAULT_LEAGUE_ID in league_dirs:
+            latest_league_id = DEFAULT_LEAGUE_ID
+            latest_season = latest_season or DEFAULT_SEASON
+            latest_week = latest_week or DEFAULT_WEEK
+        elif league_dirs:
+            league_dirs.sort()
             latest_league_id = league_dirs[0]
             # DO NOT write into league_data here
 
