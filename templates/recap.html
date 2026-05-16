@@ -28,11 +28,6 @@
             padding-bottom: 10px;
         }
 
-        .score {
-            font-size: 32px;
-            margin: 15px 0;
-        }
-
         .narrative {
             margin-top: 20px;
             line-height: 1.6;
@@ -59,6 +54,14 @@
         .back {
             margin-top: 30px;
         }
+
+        .defense-team {
+            margin-top: 12px;
+        }
+
+        .defense-team ul {
+            margin-top: 6px;
+        }
     </style>
 </head>
 <body>
@@ -66,10 +69,6 @@
 <div class="container">
 
     <h1>{{ game.headline }}</h1>
-
-    <div class="score">
-        {{ game.homeScore }} - {{ game.awayScore }}
-    </div>
 
     <div class="narrative">
         {{ game.narrative }}
@@ -85,11 +84,27 @@
     {% if game.impact_defense %}
     <div class="defense">
         <strong>🛡 Defensive Impact</strong>
-        <ul>
-            {% for player in game.impact_defense %}
-                <li>{{ player }}</li>
+
+        {% if game.impact_defense.items %}
+            {% for team, players in game.impact_defense.items() %}
+                {% if players %}
+                    <div class="defense-team">
+                        <strong>{{ team }}</strong>
+                        <ul>
+                            {% for player in players %}
+                                <li>{{ player }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
             {% endfor %}
-        </ul>
+        {% else %}
+            <ul>
+                {% for player in game.impact_defense %}
+                    <li>{{ player }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
     </div>
     {% endif %}
 

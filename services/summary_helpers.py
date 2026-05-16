@@ -1,3 +1,4 @@
+# summary_helpers.py
 
 import os
 import json
@@ -67,7 +68,13 @@ def _best_offense_player(team_id: str, passing_rows: list, rushing_rows: list):
         name = p.get("playerName") or p.get("fullName") or p.get("name")
         yds  = _safe_int(p.get("passYds") or p.get("passingYards") or p.get("yards") or 0)
         tds  = _safe_int(p.get("passTDs") or p.get("passingTDs") or p.get("tds") or 0)
-        ints = _safe_int(p.get("int") or p.get("ints") or p.get("interceptions") or 0)
+        ints = _safe_int(
+            p.get("passINTs")
+            or p.get("int")
+            or p.get("ints")
+            or p.get("interceptions")
+            or 0
+        )
         comp = _safe_int(p.get("completions") or p.get("comp") or 0)
         att  = _safe_int(p.get("attempts") or p.get("att") or 0)
 
@@ -109,7 +116,13 @@ def _impact_defenders(team_id: str, defense_rows: list, top_n: int = 3):
         name = d.get("playerName") or d.get("fullName") or d.get("name")
 
         sacks = _safe_float(d.get("sacks") or d.get("sack") or 0)
-        ints  = _safe_int(d.get("ints") or d.get("int") or d.get("interceptions") or 0)
+        ints = _safe_int(
+            d.get("passINTs")
+            or d.get("int")
+            or d.get("ints")
+            or d.get("interceptions")
+            or 0
+        )
         tfl   = _safe_float(d.get("tfl") or d.get("tacklesForLoss") or 0)
         ff    = _safe_int(d.get("forcedFumbles") or d.get("ff") or 0)
         td    = _safe_int(d.get("defTDs") or d.get("td") or 0)

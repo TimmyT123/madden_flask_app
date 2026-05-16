@@ -1,4 +1,4 @@
-
+#summary_service.py
 
 import os
 import json
@@ -110,7 +110,7 @@ def generate_week_summaries_if_ready(league_id, season_dir, week_dir, upload_fol
             )
 
             pog_blurb = None
-            impact = []
+            impact = {}
 
         else:
             winner_name = _team_name(team_map, winner_id)
@@ -131,14 +131,29 @@ def generate_week_summaries_if_ready(league_id, season_dir, week_dir, upload_fol
                 winner_id, passing_rows, rushing_rows
             )
 
-            impact = _impact_defenders(winner_id, defense_rows, top_n=3)
+            winner_impact = _impact_defenders(winner_id, defense_rows, top_n=3)
+            loser_impact = _impact_defenders(loser_id, defense_rows, top_n=3)
 
             narr = f"In {tone}, {winner_name} took down {loser_name} {winner_score}–{loser_score}."
 
             if pog_blurb:
                 narr += f" Player of the Game: {pog_blurb}."
-            if impact:
-                narr += " Defensive impact: " + "; ".join(impact) + "."
+
+            defense_bits = []
+
+            if winner_impact:
+                defense_bits.append(f"{winner_name}: " + "; ".join(winner_impact))
+
+            if loser_impact:
+                defense_bits.append(f"{loser_name}: " + "; ".join(loser_impact))
+
+            if defense_bits:
+                narr += " Defensive impact: " + " | ".join(defense_bits) + "."
+
+            impact = {
+                winner_name: winner_impact,
+                loser_name: loser_impact
+            }
 
         summary_obj = {
             "gameId": game_id,
@@ -149,7 +164,7 @@ def generate_week_summaries_if_ready(league_id, season_dir, week_dir, upload_fol
             "headline": headline,
             "narrative": narr,
             "player_of_game": pog_blurb or None,
-            "impact_defense": impact or []
+            "impact_defense": impact or {}
         }
 
         summaries_data["games"].append(summary_obj)
