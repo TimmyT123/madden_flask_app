@@ -882,14 +882,18 @@ def _normalize(records):
 
 def _format_member_name(members: dict, user_id: str) -> str:
     info = members.get(user_id)
+
     if isinstance(info, dict):
-        nick = info.get("nickname") or info.get("display_name") or info.get("username") or ""
-        user = info.get("username") or ""
-        if user and user != nick:
-            return f"{nick} ({user})"
-        return nick or user or user_id
+        return (
+            info.get("nickname")
+            or info.get("display_name")
+            or info.get("username")
+            or user_id
+        )
+
     if isinstance(info, str):
         return info
+
     return user_id
 
 
