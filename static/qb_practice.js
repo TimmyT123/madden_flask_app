@@ -46,20 +46,24 @@ const xboxButtons = [
 startBtn.addEventListener("click", startGame);
 
 document.addEventListener("keydown", function(event) {
-    if (!gameRunning) return;
+    if (!gameRunning || drillComplete) return;
 
     const mode = modeSelect.value;
 
     if (!mode.startsWith("keyboard")) return;
 
     const key = event.key.toLowerCase();
+    const validKeys = getButtonSet().map(button => button.key);
+
+    // Ignore keys that are not part of the drill controls
+    if (!validKeys.includes(key)) return;
 
     if (currentTarget && key === currentTarget.key && !pressedCorrectButton) {
         pressedCorrectButton = true;
         lineMoving = true;
         feedback.textContent = "Release near the target zone!";
     } else if (currentTarget && key !== currentTarget.key) {
-        feedback.textContent = "Wrong button!";
+        wrongButton();
     }
 });
 
@@ -181,6 +185,23 @@ function checkRelease() {
     }
 }
 
+function wrongButton() {
+    if (drillComplete) return;
+
+    lineMoving = false;
+    pressedCorrectButton = false;
+    attempts++;
+
+    feedback.textContent = "Wrong button!";
+    updateScoreboard();
+
+    if (isDrillFinished()) {
+        finishDrill();
+    } else {
+        setTimeout(nextRound, 700);
+    }
+}
+
 function isDrillFinished() {
     if (drillLength === "free") {
         return false;
@@ -217,27 +238,36 @@ function checkControllerInput() {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
     const gamepad = gamepads[0];
 
-    if (!gamepad || !currentTarget) return;
+    if (!gamepad || !currentTarget || drillComplete) return;
 
-    const buttonIndex = currentTarget.controllerButton;
-    const button = gamepad.buttons[buttonIndex];
+    const validButtons = getButtonSet().map(button => button.controllerButton);
+    const correctButtonIndex = currentTarget.controllerButton;
 
-    if (!button) return;
+    for (const buttonIndex of validButtons) {
+        const button = gamepad.buttons[buttonIndex];
+        if (!button) continue;
 
-    const wasPressed = lastControllerButtons[buttonIndex] || false;
-    const isPressed = button.pressed;
+        const wasPressed = lastControllerButtons[buttonIndex] || false;
+        const isPressed = button.pressed;
 
-    if (isPressed && !wasPressed) {
-        pressedCorrectButton = true;
-        lineMoving = true;
-        feedback.textContent = "Release near the target zone!";
+        // Button was just pressed
+        if (isPressed && !wasPressed) {
+            if (buttonIndex === correctButtonIndex && !pressedCorrectButton) {
+                pressedCorrectButton = true;
+                lineMoving = true;
+                feedback.textContent = "Release near the target zone!";
+            } else if (buttonIndex !== correctButtonIndex) {
+                wrongButton();
+            }
+        }
+
+        // Correct button was just released
+        if (!isPressed && wasPressed && buttonIndex === correctButtonIndex && pressedCorrectButton) {
+            checkRelease();
+        }
+
+        lastControllerButtons[buttonIndex] = isPressed;
     }
-
-    if (!isPressed && wasPressed && pressedCorrectButton) {
-        checkRelease();
-    }
-
-    lastControllerButtons[buttonIndex] = isPressed;
 }
 
 window.addEventListener("gamepadconnected", function(event) {
