@@ -8,6 +8,7 @@ const scoreEl = document.getElementById("score");
 const attemptsEl = document.getElementById("attempts");
 const accuracyEl = document.getElementById("accuracy");
 const drillLengthSelect = document.getElementById("drillLengthSelect");
+const speedSelect = document.getElementById("speedSelect");
 
 let currentTarget = null;
 let linePosition = 0;
@@ -24,6 +25,8 @@ let attempts = 0;
 
 let pressedCorrectButton = false;
 let lastControllerButtons = [];
+
+let roundLocked = false;
 
 const ps5Buttons = [
     { label: "△", key: "w", controllerButton: 3 },
@@ -125,6 +128,7 @@ function nextRound() {
     movingLine.style.left = "0%";
     pressedCorrectButton = false;
     lineMoving = false;
+    roundLocked = false;
 }
 
 function gameLoop() {
@@ -133,7 +137,8 @@ function gameLoop() {
     if (lineMoving) {
         linePosition += lineSpeed;
 
-        if (linePosition > 100) {
+        if (linePosition > 100 && !roundLocked) {
+            roundLocked = true;
             lineMoving = false;
             attempts++;
             feedback.textContent = "Too late!";
@@ -157,8 +162,9 @@ function gameLoop() {
 }
 
 function checkRelease() {
-    if (drillComplete) return;
+    if (drillComplete || roundLocked) return;
 
+    roundLocked = true;
     lineMoving = false;
     attempts++;
 
@@ -186,8 +192,9 @@ function checkRelease() {
 }
 
 function wrongButton() {
-    if (drillComplete) return;
+    if (drillComplete || roundLocked) return;
 
+    roundLocked = true;
     lineMoving = false;
     pressedCorrectButton = false;
     attempts++;
