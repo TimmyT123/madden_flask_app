@@ -970,6 +970,10 @@ def load_wurd_champions():
     data.sort(key=lambda x: x["year"], reverse=True)
     return data
 
+@app.route("/qb-practice")
+def qb_practice():
+    return render_template("qb_practice.html")
+
 @app.route("/wurd_champions")
 def wurd_champions():
     m24_raw = _read_json_from_app_root("wurd_champions_m24.json", [])

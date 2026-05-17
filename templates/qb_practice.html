@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WURD QB Passing Practice</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='qb_practice.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <h1>WURD QB Passing Practice</h1>
+
+    <p class="intro">
+        For best results, connect your PS5 or Xbox controller to your laptop/PC.
+        Keyboard mode is available, but controller mode is recommended for real Madden muscle memory.
+    </p>
+
+    <div class="settings">
+        <label>Practice Mode:</label>
+        <select id="modeSelect">
+            <option value="controller_ps5" selected>PS5 Controller</option>
+            <option value="controller_xbox">Xbox Controller</option>
+            <option value="keyboard_ps5">PC Keyboard - PS5 Icons</option>
+            <option value="keyboard_xbox">PC Keyboard - Xbox Icons</option>
+        </select>
+
+        <label>Line Speed:</label>
+        <select id="speedSelect">
+            <option value="1.6">Slow</option>
+            <option value="2.2" selected>Normal</option>
+            <option value="2.8">Fast</option>
+            <option value="3.4">Very Fast</option>
+        </select>
+
+        <label>Drill Length:</label>
+        <select id="drillLengthSelect">
+            <option value="free" selected>Free Practice</option>
+            <option value="10">10 Throws</option>
+            <option value="20">20 Throws</option>
+            <option value="30">30 Throws</option>
+            <option value="50">50 Throws</option>
+        </select>
+
+        <button id="startBtn">Start Practice</button>
+    </div>
+
+    <div class="keyboard-help">
+        <h3>Keyboard Controls</h3>
+        <p>Triangle/Y = W</p>
+        <p>Square/X = A</p>
+        <p>X/A = S</p>
+        <p>Circle/B = D</p>
+        <p>R1/RB = E</p>
+        <p>L1/LB = Q</p>
+    </div>
+
+    <div id="gameArea" class="game-area hidden">
+        <div class="scoreboard">
+            <span>Score: <strong id="score">0</strong></span>
+            <span>Attempts: <strong id="attempts">0</strong></span>
+            <span>Accuracy: <strong id="accuracy">0%</strong></span>
+        </div>
+
+        <div id="targetButton" class="target-button">△</div>
+
+        <div class="meter">
+            <div class="safe-zone"></div>
+            <div id="movingLine" class="moving-line"></div>
+        </div>
+
+        <div id="feedback" class="feedback">Wait for the icon...</div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='qb_practice.js') }}"></script>
+</body>
+</html>

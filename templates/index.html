@@ -189,6 +189,19 @@
             margin-bottom: 30px;
         }
 
+        .practice-link {
+            color: #00ff99;
+            font-size: 24px;
+            font-weight: bold;
+            text-decoration: none;
+            text-shadow: 2px 2px 4px black;
+        }
+
+        .practice-link:hover {
+            color: #66ffcc;
+            text-decoration: underline;
+        }
+
     </style>
 </head>
 <body>
@@ -246,6 +259,7 @@
         <div class="links">
           <a href="{{ url_for('wurd_champions') }}" class="champions-link">👑 Champions</a>
           <a href="#" onclick="goToStreamers()" class="streamers-link btn">🎥 Streamers</a>
+          <a href="{{ url_for('qb_practice') }}" class="practice-link">🎯 QB Passing Practice</a>
         </div>
 
         <div class="link-grid">
