@@ -974,6 +974,26 @@ def load_wurd_champions():
 def qb_practice():
     return render_template("qb_practice.html")
 
+@app.route("/api/qb-practice-start", methods=["POST"])
+def qb_practice_start():
+    data = request.get_json(silent=True) or {}
+
+    log_entry = {
+        "time": datetime.now().isoformat(timespec="seconds"),
+        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "user_agent": request.headers.get("User-Agent"),
+        "mode": data.get("mode"),
+        "speed": data.get("speed"),
+        "drill_length": data.get("drillLength"),
+    }
+
+    os.makedirs("logs", exist_ok=True)
+
+    with open("logs/qb_practice.log", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+    return jsonify({"ok": True})
+
 @app.route("/wurd_champions")
 def wurd_champions():
     m24_raw = _read_json_from_app_root("wurd_champions_m24.json", [])

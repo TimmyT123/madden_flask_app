@@ -89,6 +89,20 @@ function startGame() {
     drillLength = drillLengthSelect.value;
     drillComplete = false;
 
+    fetch("/api/qb-practice-start", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            mode: modeSelect.value,
+            speed: speedSelect.value,
+            drillLength: drillLengthSelect.value
+        })
+    }).catch(error => {
+        console.log("Practice tracking failed:", error);
+    });
+
     score = 0;
     attempts = 0;
     updateScoreboard();
