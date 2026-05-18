@@ -12,7 +12,7 @@ const speedSelect = document.getElementById("speedSelect");
 
 let currentTarget = null;
 let linePosition = 0;
-let lineSpeed = 2.2;
+let lineSpeed = 3.4;
 let gameRunning = false;
 let animationId = null;
 let lineMoving = false;
