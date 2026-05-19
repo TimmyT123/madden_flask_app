@@ -1004,7 +1004,8 @@ def wurd_champions():
     m25 = _normalize(m25_raw)
     m26 = _normalize(m26_raw)
 
-    members = _read_json_from_app_root("discord_members.json", {})  # {"123...": "Display Name"}
+    DISCORD_MEMBERS_FILE = "/home/pi/projects/discord_members.json"
+    members = _read_json_from_app_root(DISCORD_MEMBERS_FILE, {})  # {"123...": "Display Name"}
 
     # ✅ add names to the era lists too
     m24 = enrich_with_names(m24, members)
