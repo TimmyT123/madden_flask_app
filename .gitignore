@@ -23,6 +23,11 @@ uploads/**
 
 # PyCharm
 .idea/
+.run/
+
+# Local generated/shared files
+weekly_lineups.csv
+discord_members.json
 
 # macOS
 .DS_Store
