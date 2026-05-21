@@ -202,6 +202,31 @@
             text-decoration: underline;
         }
 
+        .join-wurd-btn {
+            display: inline-block;
+            background: #f5c542;
+            color: #111 !important;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-decoration: none;
+            font-size: 18px;
+            text-shadow: none;
+            box-shadow: 0 0 18px rgba(245, 197, 66, 0.45);
+        }
+
+        .join-wurd-btn:hover {
+            background: #ffd95c;
+            color: #111 !important;
+        }
+
+        .join-wurd-note {
+            margin-top: 8px;
+            font-size: 14px;
+            color: #ddd;
+            text-shadow: 1px 1px 3px black;
+        }
+
     </style>
 </head>
 <body>
@@ -209,6 +234,14 @@
     <div class="content">
 
     <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
+    <div style="text-align:center; margin: 20px 0;">
+        <a href="{{ url_for('join_wurd') }}" class="join-wurd-btn">
+            Start Recruit Process
+        </a>
+        <div class="join-wurd-note">
+            New users enter a restricted recruit area first. Full league access requires commissioner approval.
+        </div>
+    </div>
     <div style="font-size: 1.5rem; line-height: 1.5;">
         <h1>🏈 Welcome to <span class="wurd-stroke"><span class="wurd-fill">WURD</span></span> Madden Franchise!</h1>
         <p style="margin-bottom: 0.2rem;">

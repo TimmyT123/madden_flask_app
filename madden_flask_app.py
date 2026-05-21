@@ -54,6 +54,8 @@ print("🚀 Running Madden Flask App!")
 DISCORD_HIGHLIGHT_WEBHOOK_URL = os.getenv("DISCORD_HIGHLIGHT_WEBHOOK_URL")
 DISCORD_RECAP_WEBHOOK_URL = os.getenv("DISCORD_RECAP_WEBHOOK_URL")
 
+WURD_RECRUIT_DISCORD_INVITE = os.getenv("WURD_RECRUIT_DISCORD_INVITE", "")
+
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -1022,6 +1024,13 @@ def wurd_champions():
 @app.route("/api/wurd/champions")
 def wurd_champions_api():
     return jsonify(load_wurd_champions())
+
+@app.route("/join")
+def join_wurd():
+    return render_template(
+        "join.html",
+        discord_invite=WURD_RECRUIT_DISCORD_INVITE
+    )
 
 
 @app.route('/')
