@@ -29,21 +29,21 @@ let lastControllerButtons = [];
 let roundLocked = false;
 
 const ps5Buttons = [
-    { label: "△", key: "w", controllerButton: 3 },
-    { label: "□", key: "a", controllerButton: 2 },
-    { label: "X", key: "s", controllerButton: 0 },
-    { label: "O", key: "d", controllerButton: 1 },
-    { label: "R1", key: "e", controllerButton: 5 },
-    { label: "L1", key: "q", controllerButton: 4 },
+    { label: "△", key: "w", controllerButton: 3, className: "symbol-triangle" },
+    { label: "□", key: "a", controllerButton: 2, className: "symbol-square" },
+    { label: "X", key: "s", controllerButton: 0, className: "symbol-x" },
+    { label: "O", key: "d", controllerButton: 1, className: "symbol-circle" },
+    { label: "R1", key: "e", controllerButton: 5, className: "symbol-r1" },
+    { label: "L1", key: "q", controllerButton: 4, className: "symbol-l1" },
 ];
 
 const xboxButtons = [
-    { label: "Y", key: "w", controllerButton: 3 },
-    { label: "X", key: "a", controllerButton: 2 },
-    { label: "A", key: "s", controllerButton: 0 },
-    { label: "B", key: "d", controllerButton: 1 },
-    { label: "RB", key: "e", controllerButton: 5 },
-    { label: "LB", key: "q", controllerButton: 4 },
+    { label: "Y", key: "w", controllerButton: 3, className: "symbol-triangle" },
+    { label: "X", key: "a", controllerButton: 2, className: "symbol-square" },
+    { label: "A", key: "s", controllerButton: 0, className: "symbol-x" },
+    { label: "B", key: "d", controllerButton: 1, className: "symbol-circle" },
+    { label: "RB", key: "e", controllerButton: 5, className: "symbol-r1" },
+    { label: "LB", key: "q", controllerButton: 4, className: "symbol-l1" },
 ];
 
 startBtn.addEventListener("click", startGame);
@@ -136,6 +136,8 @@ function nextRound() {
     currentTarget = buttons[Math.floor(Math.random() * buttons.length)];
 
     targetButton.textContent = currentTarget.label;
+    targetButton.className = "target-button " + currentTarget.className;
+
     feedback.textContent = "Press and hold " + currentTarget.label;
 
     linePosition = 0;

@@ -80,9 +80,35 @@ button {
 
 .target-button {
     font-size: 90px;
-    color: #22c55e;
     margin-bottom: 50px;
     font-weight: bold;
+}
+
+.symbol-triangle {
+    color: #2dd4bf;
+}
+
+.symbol-square {
+    color: #d946ef;
+}
+
+.symbol-x {
+    color: #38bdf8;
+}
+
+.symbol-circle {
+    color: #ec4899;
+}
+
+.symbol-r1,
+.symbol-l1 {
+    color: white;
+    background: #111;
+    border: 3px solid white;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 52px;
+    display: inline-block;
 }
 
 .meter {
