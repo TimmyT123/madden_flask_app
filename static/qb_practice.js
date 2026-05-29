@@ -16,6 +16,26 @@ perfectSound.volume = 0.7;
 const wrongSound = new Audio("/static/sounds/wrong.mp3");
 wrongSound.volume = 0.6;
 
+const tempoBtn = document.getElementById("tempoBtn");
+
+const knockSound = new Audio("/static/sounds/knock.mp3");
+knockSound.volume = 0.40;
+
+let tempoEnabled = false;
+let tempoIntervalId = null;
+
+let tempoMs = 1400;         // slower starting tempo
+let minTempoMs = 450;       // fastest allowed
+let maxTempoMs = 1800;      // slowest allowed
+
+let perfectsNeededForSpeedUp = 4;
+let tempoSpeedUpAmount = 100;
+let tempoSlowDownAmount = 200;
+let perfectsSinceSpeedUp = 0;
+let lastKnockTime = 0;
+let pressedOnBeat = false;
+let beatWindowMs = 500; // how close to the knock the release must be
+
 let currentTarget = null;
 let linePosition = 0;
 let lineSpeed = 4.4;
@@ -69,8 +89,14 @@ document.addEventListener("keydown", function(event) {
 
     if (currentTarget && key === currentTarget.key && !pressedCorrectButton) {
         pressedCorrectButton = true;
+        pressedOnBeat = isOnBeat();
         lineMoving = true;
-        feedback.textContent = "Release near the target zone!";
+
+        if (tempoEnabled && !pressedOnBeat) {
+            feedback.textContent = "Good button, but missed the knock!";
+        } else {
+            feedback.textContent = "On beat! Release near the target zone!";
+        }
     } else if (currentTarget && key !== currentTarget.key) {
         wrongButton();
     }
@@ -113,6 +139,13 @@ function startGame() {
     attempts = 0;
     updateScoreboard();
 
+    tempoMs = 1400;
+    perfectsSinceSpeedUp = 0;
+
+    if (tempoEnabled) {
+        startTempo();
+    }
+
     gameArea.classList.remove("hidden");
     gameRunning = true;
 
@@ -149,6 +182,7 @@ function nextRound() {
     linePosition = 0;
     movingLine.style.left = "0%";
     pressedCorrectButton = false;
+    pressedOnBeat = false;
     lineMoving = false;
     roundLocked = false;
 }
@@ -191,21 +225,38 @@ function checkRelease() {
     attempts++;
 
     // Target zone is 68% to 80%
-    if (linePosition >= 68 && linePosition <= 80) {
+    if (linePosition >= 68 && linePosition <= 80 && pressedOnBeat) {
         score++;
+        perfectsSinceSpeedUp++;
+
         feedback.textContent = "Perfect!";
 
         perfectSound.currentTime = 0;
         perfectSound.play().catch(error => {
             console.log("Perfect sound failed:", error);
         });
+
+        if (perfectsSinceSpeedUp >= perfectsNeededForSpeedUp) {
+            perfectsSinceSpeedUp = 0;
+            speedUpTempo();
+        } else if (tempoEnabled) {
+            tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms | Perfects: " + perfectsSinceSpeedUp + "/" + perfectsNeededForSpeedUp;
+        }
+    } else if (linePosition >= 68 && linePosition <= 80 && !pressedOnBeat) {
+        perfectsSinceSpeedUp = 0;
+        feedback.textContent = "Good release, but missed the beat!";
+        slowDownTempo();
     } else if (linePosition >= 60 && linePosition < 68) {
+        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Early!";
     } else if (linePosition > 80 && linePosition <= 88) {
+        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Late!";
     } else if (linePosition > 88) {
+        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Overthrown!";
     } else {
+        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Way too early!";
     }
 
@@ -227,6 +278,9 @@ function wrongButton() {
     attempts++;
 
     feedback.textContent = "Wrong button!";
+
+    perfectsSinceSpeedUp = 0;
+    slowDownTempo();
 
     wrongSound.currentTime = 0;
     wrongSound.play().catch(error => {
@@ -294,8 +348,14 @@ function checkControllerInput() {
         if (isPressed && !wasPressed) {
             if (buttonIndex === correctButtonIndex && !pressedCorrectButton) {
                 pressedCorrectButton = true;
+                pressedOnBeat = isOnBeat();
                 lineMoving = true;
-                feedback.textContent = "Release near the target zone!";
+
+                if (tempoEnabled && !pressedOnBeat) {
+                    feedback.textContent = "Good button, but late on the beat!";
+                } else {
+                    feedback.textContent = "Release near the target zone!";
+                }
             } else if (buttonIndex !== correctButtonIndex) {
                 wrongButton();
             }
@@ -308,6 +368,82 @@ function checkControllerInput() {
 
         lastControllerButtons[buttonIndex] = isPressed;
     }
+}
+
+tempoBtn.addEventListener("click", toggleTempo);
+
+function toggleTempo() {
+    tempoEnabled = !tempoEnabled;
+
+    if (tempoEnabled) {
+        tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
+        playKnock();
+        startTempo();
+    } else {
+        tempoBtn.textContent = "Tempo: Off";
+        stopTempo();
+    }
+}
+
+function restartTempoAfterChange() {
+    stopTempo();
+
+    if (!tempoEnabled) return;
+
+    tempoIntervalId = setInterval(() => {
+        playKnock();
+    }, tempoMs);
+}
+
+function startTempo() {
+    stopTempo();
+
+    if (!tempoEnabled) return;
+
+    tempoIntervalId = setInterval(() => {
+        playKnock();
+    }, tempoMs);
+}
+
+function stopTempo() {
+    if (tempoIntervalId) {
+        clearInterval(tempoIntervalId);
+        tempoIntervalId = null;
+    }
+}
+
+function playKnock() {
+    lastKnockTime = performance.now();
+
+    knockSound.currentTime = 0;
+    knockSound.play().catch(error => {
+        console.log("Knock sound failed:", error);
+    });
+}
+
+function isOnBeat() {
+    if (!tempoEnabled) {
+        return true; // normal mode still works without tempo
+    }
+
+    const now = performance.now();
+    const timeSinceKnock = now - lastKnockTime;
+
+    return timeSinceKnock <= beatWindowMs;
+}
+
+function speedUpTempo() {
+    tempoMs = Math.max(minTempoMs, tempoMs - tempoSpeedUpAmount);
+    tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
+
+    restartTempoAfterChange();
+}
+
+function slowDownTempo() {
+    tempoMs = Math.min(maxTempoMs, tempoMs + tempoSlowDownAmount);
+    tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
+
+    restartTempoAfterChange();
 }
 
 window.addEventListener("gamepadconnected", function(event) {
