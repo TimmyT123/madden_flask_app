@@ -11,6 +11,22 @@ body {
     padding: 25px;
 }
 
+.home-btn {
+    display: inline-block;
+    padding: 10px 14px;
+    font-size: 16px;
+    border-radius: 6px;
+    border: none;
+    background: #22c55e;
+    color: #000;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.home-btn:hover {
+    opacity: 0.85;
+}
+
 h1 {
     text-align: center;
 }
