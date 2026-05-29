@@ -13,6 +13,9 @@ const speedSelect = document.getElementById("speedSelect");
 const perfectSound = new Audio("/static/sounds/perfect.mp3");
 perfectSound.volume = 0.7;
 
+const wrongSound = new Audio("/static/sounds/wrong.mp3");
+wrongSound.volume = 0.6;
+
 let currentTarget = null;
 let linePosition = 0;
 let lineSpeed = 4.4;
@@ -224,12 +227,18 @@ function wrongButton() {
     attempts++;
 
     feedback.textContent = "Wrong button!";
+
+    wrongSound.currentTime = 0;
+    wrongSound.play().catch(error => {
+        console.log("Wrong sound failed:", error);
+    });
+
     updateScoreboard();
 
     if (isDrillFinished()) {
         finishDrill();
     } else {
-        setTimeout(nextRound, 250);
+        setTimeout(nextRound, 350);
     }
 }
 
