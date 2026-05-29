@@ -211,7 +211,7 @@ function checkRelease() {
     if (isDrillFinished()) {
         finishDrill();
     } else {
-        setTimeout(nextRound, 700);
+        setTimeout(nextRound, 250);
     }
 }
 
@@ -229,7 +229,7 @@ function wrongButton() {
     if (isDrillFinished()) {
         finishDrill();
     } else {
-        setTimeout(nextRound, 300);
+        setTimeout(nextRound, 250);
     }
 }
 
