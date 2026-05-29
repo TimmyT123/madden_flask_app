@@ -10,6 +10,9 @@ const accuracyEl = document.getElementById("accuracy");
 const drillLengthSelect = document.getElementById("drillLengthSelect");
 const speedSelect = document.getElementById("speedSelect");
 
+const perfectSound = new Audio("/static/sounds/perfect.mp3");
+perfectSound.volume = 0.7;
+
 let currentTarget = null;
 let linePosition = 0;
 let lineSpeed = 4.4;
@@ -188,6 +191,11 @@ function checkRelease() {
     if (linePosition >= 68 && linePosition <= 80) {
         score++;
         feedback.textContent = "Perfect!";
+
+        perfectSound.currentTime = 0;
+        perfectSound.play().catch(error => {
+            console.log("Perfect sound failed:", error);
+        });
     } else if (linePosition >= 60 && linePosition < 68) {
         feedback.textContent = "Early!";
     } else if (linePosition > 80 && linePosition <= 88) {
@@ -221,7 +229,7 @@ function wrongButton() {
     if (isDrillFinished()) {
         finishDrill();
     } else {
-        setTimeout(nextRound, 700);
+        setTimeout(nextRound, 300);
     }
 }
 
