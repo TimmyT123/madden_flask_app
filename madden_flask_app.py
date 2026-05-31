@@ -1501,6 +1501,23 @@ def webhook(subpath):
         league_data
     )
 
+    try:
+        league = league_data.get("latest_league") or find_league_in_subpath(subpath)
+        season = league_data.get("latest_season")
+        week = league_data.get("latest_week")
+
+        if league:
+            build_power_rankings(
+                upload_folder=app.config["UPLOAD_FOLDER"],
+                league_id=league,
+                season=season,
+                week=week,
+                top_n=10
+            )
+            print(f"✅ Power rankings rebuilt for league {league} {season} {week}")
+    except Exception as e:
+        print(f"⚠️ Power rankings rebuild skipped/failed: {e}")
+
     return 'OK', 200
 
 
