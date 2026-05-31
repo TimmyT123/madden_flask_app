@@ -14,6 +14,7 @@ import re
 from config import UPLOAD_FOLDER
 
 import services.webhook_helpers as webhook_helpers
+from services.power_rankings import build_power_rankings
 
 from parsers.schedule_parser import parse_schedule_data
 from parsers.rosters_parser import parse_rosters_data, rebuild_parsed_rosters
@@ -1202,6 +1203,24 @@ def upload_file():
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.get("/api/power-rankings/build")
+def api_build_power_rankings():
+    league = request.args.get("league") or league_data.get("latest_league") or DEFAULT_LEAGUE_ID
+    season = request.args.get("season") or league_data.get("latest_season")
+    week = request.args.get("week") or league_data.get("latest_week")
+
+    try:
+        data = build_power_rankings(
+            upload_folder=app.config["UPLOAD_FOLDER"],
+            league_id=league,
+            season=season,
+            week=week,
+            top_n=10
+        )
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/teams', methods=['GET'])
