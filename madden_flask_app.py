@@ -1222,6 +1222,28 @@ def api_build_power_rankings():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.get("/api/power-rankings")
+def api_power_rankings():
+    league = request.args.get("league") or league_data.get("latest_league") or DEFAULT_LEAGUE_ID
+
+    path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        str(league),
+        "power_rankings.json"
+    )
+
+    if not os.path.exists(path):
+        return jsonify({
+            "error": "power_rankings.json not found",
+            "league": league
+        }), 404
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/api/teams', methods=['GET'])
 def get_teams():
