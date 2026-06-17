@@ -11,10 +11,10 @@ const drillLengthSelect = document.getElementById("drillLengthSelect");
 const speedSelect = document.getElementById("speedSelect");
 
 const perfectSound = new Audio("/static/sounds/perfect.mp3");
-perfectSound.volume = 0.7;
+perfectSound.volume = 0.6;
 
 const wrongSound = new Audio("/static/sounds/wrong.mp3");
-wrongSound.volume = 0.6;
+wrongSound.volume = 0.5;
 
 const tempoBtn = document.getElementById("tempoBtn");
 
@@ -25,16 +25,16 @@ let tempoEnabled = false;
 let tempoIntervalId = null;
 
 let tempoMs = 1400;         // slower starting tempo
-let minTempoMs = 450;       // fastest allowed
-let maxTempoMs = 1800;      // slowest allowed
+let minTempoMs = 800;       // fastest allowed
+let maxTempoMs = 1500;      // slowest allowed
 
 let perfectsNeededForSpeedUp = 4;
-let tempoSpeedUpAmount = 100;
-let tempoSlowDownAmount = 200;
+let tempoSpeedUpAmount = 75;
+let tempoSlowDownAmount = 150;
 let perfectsSinceSpeedUp = 0;
 let lastKnockTime = 0;
 let pressedOnBeat = false;
-let beatWindowMs = 500; // how close to the knock the release must be
+let beatWindowMs = 400; // how close to the knock the release must be
 
 let currentTarget = null;
 let linePosition = 0;
@@ -60,7 +60,6 @@ const ps5Buttons = [
     { label: "X", key: "s", controllerButton: 0, className: "symbol-x" },
     { label: "O", key: "d", controllerButton: 1, className: "symbol-circle" },
     { label: "R1", key: "e", controllerButton: 5, className: "symbol-r1" },
-    { label: "L1", key: "q", controllerButton: 4, className: "symbol-l1" },
 ];
 
 const xboxButtons = [
@@ -69,7 +68,6 @@ const xboxButtons = [
     { label: "A", key: "s", controllerButton: 0, className: "symbol-x" },
     { label: "B", key: "d", controllerButton: 1, className: "symbol-circle" },
     { label: "RB", key: "e", controllerButton: 5, className: "symbol-r1" },
-    { label: "LB", key: "q", controllerButton: 4, className: "symbol-l1" },
 ];
 
 startBtn.addEventListener("click", startGame);
@@ -400,14 +398,22 @@ function startTempo() {
 
     if (!tempoEnabled) return;
 
-    tempoIntervalId = setInterval(() => {
+    function tempoLoop() {
+        if (!tempoEnabled) return;
+
         playKnock();
-    }, tempoMs);
+
+        tempoIntervalId = setTimeout(() => {
+            tempoLoop();
+        }, tempoMs);
+    }
+
+    tempoLoop();
 }
 
 function stopTempo() {
     if (tempoIntervalId) {
-        clearInterval(tempoIntervalId);
+        clearTimeout(tempoIntervalId);
         tempoIntervalId = null;
     }
 }
@@ -423,27 +429,29 @@ function playKnock() {
 
 function isOnBeat() {
     if (!tempoEnabled) {
-        return true; // normal mode still works without tempo
+        return true;
     }
 
     const now = performance.now();
-    const timeSinceKnock = now - lastKnockTime;
+    const timeSinceLastKnock = now - lastKnockTime;
+    const timeUntilNextKnock = tempoMs - timeSinceLastKnock;
 
-    return timeSinceKnock <= beatWindowMs;
+    const nearestBeatDistance = Math.min(
+        Math.abs(timeSinceLastKnock),
+        Math.abs(timeUntilNextKnock)
+    );
+
+    return nearestBeatDistance <= beatWindowMs;
 }
 
 function speedUpTempo() {
     tempoMs = Math.max(minTempoMs, tempoMs - tempoSpeedUpAmount);
     tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
-
-    restartTempoAfterChange();
 }
 
 function slowDownTempo() {
     tempoMs = Math.min(maxTempoMs, tempoMs + tempoSlowDownAmount);
     tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
-
-    restartTempoAfterChange();
 }
 
 window.addEventListener("gamepadconnected", function(event) {
