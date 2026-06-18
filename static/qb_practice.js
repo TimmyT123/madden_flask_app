@@ -25,12 +25,12 @@ let tempoEnabled = false;
 let tempoIntervalId = null;
 
 let tempoMs = 1400;         // slower starting tempo
-let minTempoMs = 800;       // fastest allowed
+let minTempoMs = 950;       // fastest allowed
 let maxTempoMs = 1500;      // slowest allowed
 
 let perfectsNeededForSpeedUp = 4;
-let tempoSpeedUpAmount = 75;
-let tempoSlowDownAmount = 150;
+let tempoSpeedUpAmount = 50;
+let tempoSlowDownAmount = 20;
 let perfectsSinceSpeedUp = 0;
 let lastKnockTime = 0;
 let pressedOnBeat = false;
@@ -374,11 +374,35 @@ function toggleTempo() {
     tempoEnabled = !tempoEnabled;
 
     if (tempoEnabled) {
-        tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
-        playKnock();
-        startTempo();
+        stopTempo();
+
+        tempoBtn.disabled = true;
+        tempoBtn.textContent = "Tempo starting...";
+        feedback.textContent = "Tempo starting in 3...";
+
+        setTimeout(() => {
+            if (!tempoEnabled) return;
+            feedback.textContent = "Tempo starting in 2...";
+        }, 1000);
+
+        setTimeout(() => {
+            if (!tempoEnabled) return;
+            feedback.textContent = "Tempo starting in 1...";
+        }, 2000);
+
+        setTimeout(() => {
+            if (!tempoEnabled) return;
+
+            tempoBtn.disabled = false;
+            tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
+            feedback.textContent = "Go! Press on the knock.";
+
+            startTempo();
+        }, 3000);
+
     } else {
         tempoBtn.textContent = "Tempo: Off";
+        tempoBtn.disabled = false;
         stopTempo();
     }
 }
