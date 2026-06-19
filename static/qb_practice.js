@@ -28,9 +28,9 @@ let tempoMs = 1400;         // slower starting tempo
 let minTempoMs = 950;       // fastest allowed
 let maxTempoMs = 1500;      // slowest allowed
 
-let perfectsNeededForSpeedUp = 4;
-let tempoSpeedUpAmount = 50;
-let tempoSlowDownAmount = 20;
+let perfectsNeededForSpeedUp = 3;
+let tempoSpeedUpAmount = 30;
+let tempoSlowDownAmount = 10;
 let perfectsSinceSpeedUp = 0;
 let lastKnockTime = 0;
 let pressedOnBeat = false;
@@ -51,6 +51,8 @@ let attempts = 0;
 
 let pressedCorrectButton = false;
 let lastControllerButtons = [];
+let noPickTimeoutId = null;
+let noPickPenaltyMs = 3000;
 
 let roundLocked = false;
 
@@ -86,6 +88,8 @@ document.addEventListener("keydown", function(event) {
     if (!validKeys.includes(key)) return;
 
     if (currentTarget && key === currentTarget.key && !pressedCorrectButton) {
+        clearNoPickTimeout();
+
         pressedCorrectButton = true;
         pressedOnBeat = isOnBeat();
         lineMoving = true;
@@ -169,6 +173,8 @@ function getButtonSet() {
 }
 
 function nextRound() {
+    clearNoPickTimeout();
+
     const buttons = getButtonSet();
     currentTarget = buttons[Math.floor(Math.random() * buttons.length)];
 
@@ -183,6 +189,37 @@ function nextRound() {
     pressedOnBeat = false;
     lineMoving = false;
     roundLocked = false;
+
+    startNoPickTimeout();
+}
+
+function startNoPickTimeout() {
+    if (!gameRunning || drillComplete) return;
+
+    noPickTimeoutId = setTimeout(() => {
+        if (roundLocked || pressedCorrectButton || lineMoving || drillComplete) return;
+
+        roundLocked = true;
+        attempts++;
+        perfectsSinceSpeedUp = 0;
+
+        feedback.textContent = "No throw!";
+        slowDownTempo(30);
+        updateScoreboard();
+
+        if (isDrillFinished()) {
+            finishDrill();
+        } else {
+            setTimeout(nextRound, 500);
+        }
+    }, noPickPenaltyMs);
+}
+
+function clearNoPickTimeout() {
+    if (noPickTimeoutId) {
+        clearTimeout(noPickTimeoutId);
+        noPickTimeoutId = null;
+    }
 }
 
 function gameLoop() {
@@ -196,6 +233,7 @@ function gameLoop() {
             lineMoving = false;
             attempts++;
             feedback.textContent = "Too late!";
+            slowDownTempo(30);
             updateScoreboard();
 
             if (isDrillFinished()) {
@@ -247,15 +285,19 @@ function checkRelease() {
     } else if (linePosition >= 60 && linePosition < 68) {
         perfectsSinceSpeedUp = 0;
         feedback.textContent = "Early!";
+        slowDownTempo(10);
     } else if (linePosition > 80 && linePosition <= 88) {
         perfectsSinceSpeedUp = 0;
         feedback.textContent = "Late!";
+        slowDownTempo(10);
     } else if (linePosition > 88) {
         perfectsSinceSpeedUp = 0;
         feedback.textContent = "Overthrown!";
+        slowDownTempo(20);
     } else {
         perfectsSinceSpeedUp = 0;
         feedback.textContent = "Way too early!";
+        slowDownTempo(20);
     }
 
     updateScoreboard();
@@ -278,7 +320,7 @@ function wrongButton() {
     feedback.textContent = "Wrong button!";
 
     perfectsSinceSpeedUp = 0;
-    slowDownTempo();
+    slowDownTempo(150);
 
     wrongSound.currentTime = 0;
     wrongSound.play().catch(error => {
@@ -303,6 +345,8 @@ function isDrillFinished() {
 }
 
 function finishDrill() {
+    clearNoPickTimeout();
+
     drillComplete = true;
     gameRunning = false;
     lineMoving = false;
@@ -345,6 +389,8 @@ function checkControllerInput() {
         // Button was just pressed
         if (isPressed && !wasPressed) {
             if (buttonIndex === correctButtonIndex && !pressedCorrectButton) {
+                clearNoPickTimeout();
+
                 pressedCorrectButton = true;
                 pressedOnBeat = isOnBeat();
                 lineMoving = true;
@@ -473,8 +519,8 @@ function speedUpTempo() {
     tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
 }
 
-function slowDownTempo() {
-    tempoMs = Math.min(maxTempoMs, tempoMs + tempoSlowDownAmount);
+function slowDownTempo(amount = tempoSlowDownAmount) {
+    tempoMs = Math.min(maxTempoMs, tempoMs + amount);
     tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
 }
 
