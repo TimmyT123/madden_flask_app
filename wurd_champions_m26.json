@@ -1,8 +1,8 @@
 [
-  { "year": 2025, "team": "Las Vegas Raiders",   "discord_id": "960385056776527955" },
-  { "year": 2026, "team": "Las Vegas Raiders",   "discord_id": "960385056776527955" },
-  { "year": 2027, "team": "Las Vegas Raiders",   "discord_id": "960385056776527955" },
-  { "year": 2028, "team": "Chicago Bears",   "discord_id": "846273296630546482" },
-  { "year": 2029, "team": "Las Vegas Raiders",   "discord_id": "960385056776527955" },
-  { "year": 2025, "team": "Philadelphia Eagles",   "discord_id": "1274884416187007110" }
+  { "sort_order": 1, "year": 2025, "team": "Las Vegas Raiders",   "discord_id": "960385056776527955" },
+  { "sort_order": 2, "year": 2026, "team": "Las Vegas Raiders",   "discord_id": "960385056776527955" },
+  { "sort_order": 3, "year": 2027, "team": "Las Vegas Raiders",   "discord_id": "960385056776527955" },
+  { "sort_order": 4, "year": 2028, "team": "Chicago Bears",   "discord_id": "846273296630546482" },
+  { "sort_order": 5, "year": 2029, "team": "Las Vegas Raiders",   "discord_id": "960385056776527955" },
+  { "sort_order": 6, "year": 2025, "team": "Philadelphia Eagles",   "discord_id": "1274884416187007110" }
 ]

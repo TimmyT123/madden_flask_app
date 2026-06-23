@@ -872,15 +872,29 @@ def _read_json_from_app_root(filename, default=None):
 def _normalize(records):
     """Map mixed keys to a consistent shape for templates/leaderboards."""
     out = []
+
     for r in records or []:
         year = int(r.get("year", 0))
         team = r.get("team", "")
-        uid = r.get("id") or r.get("discord_id")  # prefer numeric id if present
+        uid = r.get("id") or r.get("discord_id")
         handle = r.get("handle")
         alias = r.get("alias", "")
-        out.append({"year": year, "team": team, "id": uid, "handle": handle, "alias": alias})
-    # sort ascending by year for sections
-    out.sort(key=lambda x: x["year"])
+
+        # Use sort_order when present, otherwise fall back to year
+        sort_order_raw = r.get("sort_order")
+        sort_order = int(sort_order_raw) if sort_order_raw not in (None, "") else year
+
+        out.append({
+            "year": year,
+            "sort_order": sort_order,
+            "team": team,
+            "id": uid,
+            "handle": handle,
+            "alias": alias
+        })
+
+    # sort ascending by sort_order, fallback already handled above
+    out.sort(key=lambda x: x["sort_order"])
     return out
 
 def _format_member_name(members: dict, user_id: str) -> str:
@@ -970,7 +984,7 @@ def load_wurd_champions():
         # expose "id" so templates/leaderboards can use it
         if c.get("discord_id") and not c.get("id"):
             c["id"] = c["discord_id"]
-    data.sort(key=lambda x: x["year"], reverse=True)
+    data.sort(key=lambda x: int(x.get("sort_order", x["year"])))
     return data
 
 @app.route("/qb-practice")
