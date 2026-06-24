@@ -1031,8 +1031,32 @@ def wurd_champions():
 
     team_rows, user_rows = build_leaderboards(m24 + m25 + m26, members)
 
+    latest_m26_champ = m26[-1] if m26 else None
+
+    latest_m26_titles = 0
+    if latest_m26_champ:
+        latest_key = (
+                latest_m26_champ.get("id")
+                or latest_m26_champ.get("handle")
+                or latest_m26_champ.get("alias")
+        )
+
+        latest_m26_titles = sum(
+            1 for c in m26
+            if latest_key and (
+                    c.get("id")
+                    or c.get("handle")
+                    or c.get("alias")
+            ) == latest_key
+        )
+
+        if latest_m26_titles == 0:
+            latest_m26_titles = 1
+
     return render_template("champions.html",
                            m24=m24, m25=m25, m26=m26,
+                           latest_m26_champ=latest_m26_champ,
+                           latest_m26_titles=latest_m26_titles,
                            team_rows=team_rows, user_rows=user_rows)
 
 # Optional: JSON API (kept as your m25 endpoint)

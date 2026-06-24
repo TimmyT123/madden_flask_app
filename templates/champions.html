@@ -46,6 +46,20 @@
       box-shadow: 0 0 0 2px rgba(255,213,74,0.35);
     }
 
+    .latest-champ-text {
+      display: block;
+      width: fit-content;
+      max-width: 460px;
+      text-align: center;
+      margin: 10px auto 28px auto;
+      padding: 14px 20px;
+      border-radius: 14px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.58);
+      border: 1px solid rgba(214, 180, 90, 0.55);
+      box-shadow: 0 0 18px rgba(214, 180, 90, 0.18);
+    }
+
     :root {
       --bg: #0f1221;
       --card: #171a2c;
@@ -85,6 +99,18 @@
   <section id="trophy-hero">
     <canvas id="trophyCanvas"></canvas>
   </section>
+
+  {% if latest_m26_champ %}
+  <div class="latest-champ-text">
+      <div class="latest-label">WURD BOWL CHAMPION</div>
+      <div class="latest-year">{{ latest_m26_champ.year }} WURD BOWL</div>
+      <div class="latest-team">{{ latest_m26_champ.team }}</div>
+      <div class="latest-owner">
+          {{ latest_m26_champ.alias or latest_m26_champ.name or latest_m26_champ.handle or "Champion" }}
+          - {{ latest_m26_titles }}X CHAMPION
+      </div>
+  </div>
+  {% endif %}
 
   <div class="wrap">
     <h2>👑 W.UR.D Champions</h2>
