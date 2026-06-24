@@ -1033,21 +1033,30 @@ def wurd_champions():
 
     latest_m26_champ = m26[-1] if m26 else None
 
+    all_champs = m24 + m25 + m26
+
+    def champ_owner_keys(c):
+        keys = set()
+
+        if c.get("id"):
+            keys.add(f"id:{str(c.get('id')).strip()}")
+
+        if c.get("alias"):
+            keys.add(f"alias:{str(c.get('alias')).strip().lower()}")
+
+        if c.get("handle"):
+            keys.add(f"handle:{str(c.get('handle')).strip().lower()}")
+
+        return keys
+
     latest_m26_titles = 0
+
     if latest_m26_champ:
-        latest_key = (
-                latest_m26_champ.get("id")
-                or latest_m26_champ.get("handle")
-                or latest_m26_champ.get("alias")
-        )
+        latest_keys = champ_owner_keys(latest_m26_champ)
 
         latest_m26_titles = sum(
-            1 for c in m26
-            if latest_key and (
-                    c.get("id")
-                    or c.get("handle")
-                    or c.get("alias")
-            ) == latest_key
+            1 for c in all_champs
+            if latest_keys and champ_owner_keys(c) & latest_keys
         )
 
         if latest_m26_titles == 0:
