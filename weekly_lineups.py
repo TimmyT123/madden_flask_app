@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 # Every new season...you'll have to make sure you change the league number.
-# 3264906 folder is the latest league 3-13-26 when the new one starts find the league number in uploads folder
+# 26969931 folder is the latest league 6-25-26 when the new one starts find the league number in uploads folder
 # From the madden_flask directory:
 # Run this on PI:
-# python weekly_lineups.py --root uploads\3264906 --season season_4 --out weekly_lineups.txt --csv weekly_lineups.csv
+# python weekly_lineups.py --root uploads\26969931 --season season_1 --out weekly_lineups.txt --csv weekly_lineups.csv
 # It will save to madden_flask and then copy and paste to laptop time_madden_old -> wurd24sched.csv and git push and then pull from PI
 
 import argparse
