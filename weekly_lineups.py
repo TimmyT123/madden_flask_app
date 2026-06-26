@@ -4,7 +4,7 @@
 # 26969931 folder is the latest league 6-25-26 when the new one starts find the league number in uploads folder
 # From the madden_flask directory:
 # Run this on PI:
-# python weekly_lineups.py --root uploads\26969931 --season season_1 --out weekly_lineups.txt --csv weekly_lineups.csv
+# python weekly_lineups.py --root uploads/26969931 --season season_1 --out weekly_lineups.txt --csv weekly_lineups.csv
 # It will save to madden_flask and then copy and paste to laptop time_madden_old -> wurd24sched.csv and git push and then pull from PI
 
 import argparse
@@ -153,37 +153,67 @@ def label_for_team(team_id, team_map, prefer="name"):
     # default: prefer name
     return name or abbr or f"Team{team_id}"
 
-def build_weekly_lineups(root_dir, season_name="season_4"):
+def build_weekly_lineups(root_dir, season_name="season_1"):
     """
-    Scans weeks, extracts REG-season games for weeks 1..18, returns OrderedDict:
-      {week:int -> [(AwayLabel, HomeLabel), ...]}
+    Scans weeks and extracts both PRE weeks 1..3 and REG weeks 1..18.
+
+    Returns:
+      {
+        "PRE": OrderedDict({1: [...], 2: [...], 3: [...]}),
+        "REG": OrderedDict({1: [...], ..., 18: [...]})
+      }
     """
     team_map = load_team_map(root_dir, season_name)
     season_dir = os.path.join(root_dir, season_name)
     if not os.path.isdir(season_dir):
         raise FileNotFoundError(f"Season folder not found: {season_dir}")
 
-    weeks = defaultdict(list)
+    pre_weeks = defaultdict(list)
+    reg_weeks = defaultdict(list)
 
-    for week_num, week_path in iter_week_dirs(season_dir):
-        if week_num < 1 or week_num > 18:
-            continue  # only REG 1..18
-
+    for folder_week_num, week_path in iter_week_dirs(season_dir):
         sch = load_week_schedule(week_path)
         if not sch:
             continue
 
         for g in normalize_games(sch):
             season_type = (g.get("seasonType") or g.get("weekType") or "").upper()
-            # Some parsed files may not include seasonType; assume REG for weeks 1..18
-            if season_type not in ("", "REG"):
+
+            # Madden/Companion sometimes uses numbers instead of words.
+            # Common possibilities:
+            # PRE, REG, POST, or blank.
+            if season_type in ("PRE", "PRESEASON"):
+                bucket = pre_weeks
+                max_week = 3
+            elif season_type in ("REG", "REGULAR", ""):
+                bucket = reg_weeks
+                max_week = 18
+            else:
                 continue
 
-            # Prefer game-provided week if present; else use folder week
-            wn = get_int(g.get("weekIndex") or g.get("weekNumber"), default=week_num)
-            if wn != week_num:
-                # If files are inconsistent, we still keep them under their folder's week
-                wn = week_num
+            # Use Madden's week number when available.
+            # Fall back to folder week number.
+            wn = get_int(
+                g.get("weekIndex")
+                or g.get("weekNumber")
+                or g.get("week")
+                or g.get("scheduleWeek"),
+                default=folder_week_num
+            )
+
+            if wn is None:
+                continue
+
+            # Some Madden exports may use 0,1,2 for preseason.
+            # Convert PRE 0,1,2 into PRE 1,2,3 if needed.
+            if bucket is pre_weeks and wn in (0, 1, 2):
+                # If it looks zero-based, shift it.
+                # This keeps PRE 1 as PRE 1 if the data already uses 1.
+                if wn == 0:
+                    wn = 1
+
+            if wn < 1 or wn > max_week:
+                continue
 
             home_id = get_int(g.get("homeTeamId") or g.get("homeTeam") or g.get("homeId"))
             away_id = get_int(g.get("awayTeamId") or g.get("awayTeam") or g.get("awayId"))
@@ -192,30 +222,46 @@ def build_weekly_lineups(root_dir, season_name="season_4"):
 
             home = label_for_team(home_id, team_map)
             away = label_for_team(away_id, team_map)
-            weeks[wn].append((away, home))
+            bucket[wn].append((away, home))
 
-    # Sort matchups alphabetically inside each week for stable output (optional)
-    ordered = OrderedDict()
+    ordered_pre = OrderedDict()
+    for w in range(1, 4):
+        ordered_pre[w] = pre_weeks.get(w, [])
+
+    ordered_reg = OrderedDict()
     for w in range(1, 19):
-        games = weeks.get(w, [])
-        #games.sort(key=lambda p: (p[0], p[1]))  # This will sort your games
-        ordered[w] = games
-    return ordered
+        ordered_reg[w] = reg_weeks.get(w, [])
+
+    return {
+        "PRE": ordered_pre,
+        "REG": ordered_reg,
+    }
+
 
 def write_txt(weekly, out_path):
     with open(out_path, "w", encoding="utf-8") as f:
-        for w in range(1, 19):
-            f.write(f"WEEK {w},\n")
-            for a, b in weekly.get(w, []):
+        for w in range(1, 4):
+            f.write(f"PRE {w},\n")
+            for a, b in weekly["PRE"].get(w, []):
                 f.write(f"{a},{b}\n")
 
-def write_csv(weekly, out_path):
-    # CSV with headers Week,Away,Home
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write("Week,Away,Home\n")
         for w in range(1, 19):
-            for away, home in weekly.get(w, []):
-                f.write(f"{w},{away},{home}\n")
+            f.write(f"WEEK {w},\n")
+            for a, b in weekly["REG"].get(w, []):
+                f.write(f"{a},{b}\n")
+
+
+def write_csv(weekly, out_path):
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("SeasonType,Week,Away,Home\n")
+
+        for w in range(1, 4):
+            for away, home in weekly["PRE"].get(w, []):
+                f.write(f"PRE,{w},{away},{home}\n")
+
+        for w in range(1, 19):
+            for away, home in weekly["REG"].get(w, []):
+                f.write(f"REG,{w},{away},{home}\n")
 
 def main():
     ap = argparse.ArgumentParser(description="Build Madden weekly lineups (Weeks 1–18) into a file.")
