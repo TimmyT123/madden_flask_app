@@ -392,6 +392,187 @@ def _load_json_safe(path):
     except Exception:
         return None
 
+def _standings_items(data):
+    if not data:
+        return []
+
+    if isinstance(data, dict):
+        return (
+            data.get("standings")
+            or data.get("parsed_standings")
+            or data.get("teamStandingsInfoList")
+            or data.get("teamStandingInfoList")
+            or data.get("teams")
+            or data.get("items")
+            or []
+        )
+
+    if isinstance(data, list):
+        return data
+
+    return []
+
+
+def standings_have_real_records(path: str) -> bool:
+    """
+    Prevents archiving new-season 0-0 standings.
+    At the start of Week 19, most/all teams should have real records.
+    """
+    data = _load_json_safe(path)
+    teams = _standings_items(data)
+
+    teams_with_games = 0
+
+    for team in teams:
+        if not isinstance(team, dict):
+            continue
+
+        try:
+            wins = int(team.get("wins") or 0)
+            losses = int(team.get("losses") or 0)
+            ties = int(team.get("ties") or 0)
+        except Exception:
+            wins = losses = ties = 0
+
+        if wins + losses + ties > 0:
+            teams_with_games += 1
+
+    # Use a high threshold so we do not archive early-season/new-season data.
+    return teams_with_games >= 20
+
+
+def final_snapshot_folder(root_dir: str, season: str) -> str:
+    return os.path.join(root_dir, str(season), "final")
+
+
+def final_snapshot_meta_path(root_dir: str, season: str) -> str:
+    return os.path.join(final_snapshot_folder(root_dir, season), "_archive_meta.json")
+
+
+def final_snapshot_exists(root_dir: str, season: str) -> bool:
+    if not season or not str(season).startswith("season_"):
+        return False
+
+    return os.path.exists(final_snapshot_meta_path(root_dir, season))
+
+
+def resolve_league_file(root_dir: str, season: str | None, filename: str) -> str:
+    """
+    Historical season:
+        Use uploads/<league>/season_X/final/<filename> if it exists.
+
+    Current season / no snapshot yet:
+        Use the normal global/current file.
+    """
+    if season and str(season).startswith("season_"):
+        snapshot_path = os.path.join(root_dir, season, "final", filename)
+
+        if os.path.exists(snapshot_path):
+            return snapshot_path
+
+    if filename == "team_map.json":
+        return os.path.join(root_dir, "team_map.json")
+
+    return os.path.join(root_dir, "season_global", "week_global", filename)
+
+
+def archive_season_final_snapshot(league_id: str, season: str) -> dict:
+    import shutil
+
+    league_id = str(league_id)
+    season = str(season)
+
+    root = os.path.join(app.config["UPLOAD_FOLDER"], league_id)
+    global_folder = os.path.join(root, "season_global", "week_global")
+    final_folder = final_snapshot_folder(root, season)
+    meta_path = final_snapshot_meta_path(root, season)
+
+    # Do not overwrite a good snapshot automatically.
+    if os.path.exists(meta_path):
+        return {
+            "skipped": True,
+            "reason": "snapshot already exists",
+            "meta_path": meta_path,
+        }
+
+    parsed_standings_path = os.path.join(global_folder, "parsed_standings.json")
+
+    if not standings_have_real_records(parsed_standings_path):
+        return {
+            "skipped": True,
+            "reason": "standings do not have real records yet",
+            "checked": parsed_standings_path,
+        }
+
+    os.makedirs(final_folder, exist_ok=True)
+
+    files_to_copy = [
+        # standings
+        (os.path.join(global_folder, "standings.json"), os.path.join(final_folder, "standings.json")),
+        (os.path.join(global_folder, "parsed_standings.json"), os.path.join(final_folder, "parsed_standings.json")),
+
+        # league/team info
+        (os.path.join(global_folder, "league.json"), os.path.join(final_folder, "league.json")),
+        (os.path.join(global_folder, "parsed_league_info.json"), os.path.join(final_folder, "parsed_league_info.json")),
+
+        # team map is at the league root
+        (os.path.join(root, "team_map.json"), os.path.join(final_folder, "team_map.json")),
+    ]
+
+    copied = []
+    missing = []
+
+    for src, dst in files_to_copy:
+        if os.path.exists(src):
+            shutil.copy2(src, dst)
+            copied.append(dst)
+        else:
+            missing.append(src)
+
+    meta = {
+        "league": league_id,
+        "season": season,
+        "trigger": "week_19_auto_snapshot",
+        "archived_at": datetime.now().isoformat(timespec="seconds"),
+        "copied": copied,
+        "missing": missing,
+    }
+
+    _atomic_write_json(meta_path, meta)
+
+    return meta
+
+
+def auto_archive_final_snapshot_if_ready(league_id: str, season: str, week: str):
+    """
+    Only snapshots at the beginning of playoffs, Week 19.
+    If no snapshot exists, old/current pages keep using global files.
+    """
+    if not league_id or not season or not week:
+        return None
+
+    week = normalize_period(week)
+
+    if week != "week_19":
+        return None
+
+    if not str(season).startswith("season_"):
+        return None
+
+    result = archive_season_final_snapshot(league_id, season)
+
+    if result:
+        if result.get("skipped"):
+            print(f"🟡 Final snapshot skipped: {result.get('reason')}")
+        else:
+            print(
+                f"✅ Auto-snapshotted final season files for "
+                f"{league_id} {season} {week}"
+            )
+
+    return result
+
+
 def _hash_bytes(b: bytes) -> str:
     return sha256(b).hexdigest()
 
@@ -764,35 +945,49 @@ def _load_json(p):
     with open(p, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def load_team_records(root_dir: str) -> dict[str, tuple[int,int,int]]:
+def load_team_records(root_dir: str, season: str | None = None) -> dict[str, tuple[int, int, int]]:
     """
     Returns {teamId(str): (wins, losses, ties)}.
-    Looks in uploads/<league_id>/season_global/week_global for parsed_standings.json or standings.json.
-    Robust to several common shapes.
+
+    If a season snapshot exists, use:
+        uploads/<league>/season_X/final/parsed_standings.json
+
+    Otherwise use current/global:
+        uploads/<league>/season_global/week_global/parsed_standings.json
     """
     candidates = [
-        os.path.join(root_dir, "season_global", "week_global", "parsed_standings.json"),
-        os.path.join(root_dir, "season_global", "week_global", "standings.json"),
+        resolve_league_file(root_dir, season, "parsed_standings.json"),
+        resolve_league_file(root_dir, season, "standings.json"),
     ]
-    records: dict[str, tuple[int,int,int]] = {}
+
+    # Remove duplicate paths while preserving order.
+    seen = set()
+    candidates = [p for p in candidates if not (p in seen or seen.add(p))]
+
+    records: dict[str, tuple[int, int, int]] = {}
 
     def coerce_int(x, default=0):
-        try: return int(x)
-        except: return default
+        try:
+            return int(x)
+        except Exception:
+            return default
 
     for path in candidates:
         if not os.path.exists(path):
             continue
+
         try:
             data = _load_json(path)
         except Exception:
             continue
 
         lists_to_scan = []
+
         if isinstance(data, dict):
-            for k in ("parsed_standings","standings","teams","teamStandingsInfoList","items"):
+            for k in ("parsed_standings", "standings", "teams", "teamStandingsInfoList", "teamStandingInfoList", "items"):
                 if isinstance(data.get(k), list):
                     lists_to_scan.append(data[k])
+
         if isinstance(data, list):
             lists_to_scan.append(data)
 
@@ -800,18 +995,22 @@ def load_team_records(root_dir: str) -> dict[str, tuple[int,int,int]]:
             for item in lst:
                 if not isinstance(item, dict):
                     continue
+
                 tid = item.get("teamId") or item.get("teamID") or item.get("id")
+
                 if tid is None:
                     continue
+
                 tid = str(tid)
 
                 w = item.get("wins") or item.get("overallWins") or item.get("totalWins") or 0
                 l = item.get("losses") or item.get("overallLosses") or item.get("totalLosses") or 0
                 t = item.get("ties") or item.get("overallTies") or item.get("totalTies") or 0
+
                 records[tid] = (coerce_int(w), coerce_int(l), coerce_int(t))
 
         if records:
-            break  # first file that yields data wins
+            break
 
     return records
 
@@ -1295,19 +1494,15 @@ def api_power_rankings():
 @app.route('/api/teams', methods=['GET'])
 def get_teams():
 
-    league = league_data.get("latest_league")
+    league = request.args.get("league") or league_data.get("latest_league") or DEFAULT_LEAGUE_ID
+    season = request.args.get("season") or league_data.get("latest_season")
 
     if not league:
         return jsonify({'error': 'No league loaded'}), 404
 
     root = str(os.path.join(app.config['UPLOAD_FOLDER'], league))
 
-    league_info_path = os.path.join(
-        root,
-        "season_global",
-        "week_global",
-        "parsed_league_info.json"
-    )
+    league_info_path = resolve_league_file(root, season, "parsed_league_info.json")
 
     if not os.path.exists(league_info_path):
         return jsonify({'error': 'parsed_league_info.json missing'}), 404
@@ -1324,7 +1519,7 @@ def get_teams():
         )
 
         # ---- load standings ----
-        records = load_team_records(root)  # <-- YOU ALREADY HAVE THIS FUNCTION
+        records = load_team_records(root, season)  # <-- YOU ALREADY HAVE THIS FUNCTION
 
         # ---- enrich teams with records ----
         for team in teams:
@@ -1553,6 +1748,8 @@ def webhook(subpath):
         season = league_data.get("latest_season")
         week = league_data.get("latest_week")
 
+        auto_archive_final_snapshot_if_ready(league, season, week)
+
         if league:
             build_power_rankings(
                 upload_folder=app.config["UPLOAD_FOLDER"],
@@ -1563,7 +1760,7 @@ def webhook(subpath):
             )
             print(f"✅ Power rankings rebuilt for league {league} {season} {week}")
     except Exception as e:
-        print(f"⚠️ Power rankings rebuild skipped/failed: {e}")
+        print(f"⚠️ final snapshot failed or Power rankings rebuild skipped/failed: {e}")
 
     return 'OK', 200
 
@@ -2067,12 +2264,12 @@ def show_defense_stats():
                            next_week=next_week)
 
 
-def load_standings_map(league_id: str) -> dict[str, dict]:
+def load_standings_map(league_id: str, season: str | None = None) -> dict[str, dict]:
     """
     Merge raw standings.json (rich fields) with parsed_standings.json (your summary).
     Raw adds fields like offPassYdsRank/defTotalYdsRank/tODiff, parsed adds wins/seed/etc.
     """
-    base = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
+    root = os.path.join(app.config['UPLOAD_FOLDER'], league_id)
 
     def _load(p):
         try:
@@ -2101,8 +2298,8 @@ def load_standings_map(league_id: str) -> dict[str, dict]:
                     out[tid] = it
         return out
 
-    raw_path    = os.path.join(base, "standings.json")
-    parsed_path = os.path.join(base, "parsed_standings.json")
+    raw_path = resolve_league_file(root, season, "standings.json")
+    parsed_path = resolve_league_file(root, season, "parsed_standings.json")
 
     raw_idx    = _index_items(_load(raw_path))       # has off*/def*/pts*Rank/tODiff/etc
     parsed_idx = _index_items(_load(parsed_path))    # has wins/losses/pct/seed/rank/etc
@@ -2110,7 +2307,7 @@ def load_standings_map(league_id: str) -> dict[str, dict]:
     if not raw_idx and not parsed_idx:
         # last-ditch: also check league files if someone saved teamStandingInfoList there
         for fn in ("parsed_league_info.json", "league.json"):
-            fall_idx = _index_items(_load(os.path.join(base, fn)))
+            fall_idx = _index_items(_load(resolve_league_file(root, season, fn)))
             if fall_idx:
                 return fall_idx
         return {}
@@ -2372,8 +2569,11 @@ def rookie_preseason_stats():
 
 @app.route("/teams")
 def show_teams():
-    league_id = "26969931"
-    path = f"uploads/{league_id}/season_global/week_global/parsed_league_info.json"
+    league_id = request.args.get("league") or league_data.get("latest_league") or DEFAULT_LEAGUE_ID
+    season = request.args.get("season") or league_data.get("latest_season")
+
+    root = os.path.join(app.config["UPLOAD_FOLDER"], str(league_id))
+    path = resolve_league_file(root, season, "parsed_league_info.json")
 
     try:
         with open(path, encoding="utf-8") as f:
@@ -2383,14 +2583,13 @@ def show_teams():
         return "League info not found", 404
 
     calendar_year = data.get("calendarYear", "Unknown")
-    teams = data.get("leagueTeamInfoList", [])
+    teams = data.get("leagueTeamInfoList", []) or data.get("teamInfoList", [])
 
-    # standings map for ranks/yards/TO diff, etc.
-    standings = load_standings_map(league_id)
+    standings = load_standings_map(league_id, season)
 
-    # Load team_map.json (id → {name,userName,ownerName,displayName,discord_id,...})
-    team_map_path = os.path.join("uploads", league_id, "team_map.json")
+    team_map_path = resolve_league_file(root, season, "team_map.json")
     team_map = {}
+
     if os.path.exists(team_map_path):
         with open(team_map_path, "r", encoding="utf-8") as f:
             team_map = json.load(f)
@@ -2991,19 +3190,29 @@ def show_schedule():
 @app.route("/standings")
 def show_standings():
     try:
-        league_id = "26969931"
-        folder = f"uploads/{league_id}/season_global/week_global"
-        standings_file = os.path.join(folder, "parsed_standings.json")
+        league_id = request.args.get("league") or league_data.get("latest_league") or DEFAULT_LEAGUE_ID
 
         if not league_data.get("latest_season") or not league_data.get("latest_week"):
             get_latest_season_week()
 
-        season = league_data.get("latest_season")
-        week = league_data.get("latest_week")
+        season = request.args.get("season") or league_data.get("latest_season")
+
+        root = os.path.join(app.config["UPLOAD_FOLDER"], str(league_id))
+
+        # If viewing an archived season and no week was provided, use week_18
+        # so playoff scores do not get mixed into regular-season PF/PA.
+        if request.args.get("week"):
+            week = normalize_period(request.args.get("week"))
+        elif final_snapshot_exists(root, season):
+            week = "week_18"
+        else:
+            week = normalize_period(league_data.get("latest_week") or "week_1")
+
+        standings_file = resolve_league_file(root, season, "parsed_standings.json")
+        team_map_path = resolve_league_file(root, season, "team_map.json")
 
         teams = []
         divisions = defaultdict(list)
-        team_map_path = os.path.join("uploads", league_id, "team_map.json")
         team_id_to_info = {}
 
         def safe_int(val):
@@ -3026,18 +3235,13 @@ def show_standings():
                 teams = standings_data.get("standings", [])
 
             # Update team_map with latest seed/rank
-            updated = False
             for team in teams:
                 tid = str(team["teamId"])
                 info = team_id_to_info.get(tid, {})
                 info["rank"] = team.get("rank")
                 info["seed"] = team.get("seed")
                 team_id_to_info[tid] = info
-                updated = True
 
-            if updated:
-                with open(team_map_path, "w") as f:
-                    json.dump(team_id_to_info, f, indent=2)
 
         # Accumulate pointsFor and pointsAgainst across weeks
         team_scores = defaultdict(lambda: {"pointsFor": 0, "pointsAgainst": 0})
@@ -3047,7 +3251,10 @@ def show_standings():
         except:
             week_number = 0
 
-        for w in range(1, week_number + 1):
+        # Standings should show regular-season PF/PA only.
+        score_week_limit = min(week_number, 18)
+
+        for w in range(1, score_week_limit + 1):
             week_folder = os.path.join("uploads", league_id, season, f"week_{w}")
             schedule_path = os.path.join(week_folder, "parsed_schedule.json")
 
