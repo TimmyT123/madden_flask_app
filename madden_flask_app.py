@@ -328,8 +328,96 @@ def ap_users_list():
         abort(401)
     return jsonify(_ap_read_all())
 
+
+def _normalize_ap_batch_row(raw: dict) -> dict:
+    """Validate and normalize one AP row for the Save All endpoint."""
+    if not isinstance(raw, dict):
+        raise ValueError("Each AP entry must be an object")
+
+    row = {
+        "user_id": _uid_str(raw.get("user_id", "")),
+        "display": str(raw.get("display", "")).strip(),
+        "reason": str(raw.get("reason", "")).strip(),
+        "start": str(raw.get("start", "")).strip(),
+        "until": str(raw.get("until", "")).strip(),
+        "notes": str(raw.get("notes", "")).strip(),
+    }
+
+    _validate_uid(row["user_id"])
+
+    if not row["display"]:
+        raise ValueError(f"Display is required for {row['user_id']}")
+    if not row["reason"]:
+        raise ValueError(f"Reason is required for {row['user_id']}")
+    if not row["until"]:
+        raise ValueError(f"Until date is required for {row['user_id']}")
+
+    until_date = datetime.strptime(row["until"], "%Y-%m-%d").date()
+
+    # Old entries may not have a recorded start date. Preserve that blank
+    # rather than inventing a historical date. New entries receive today in UI.
+    if row["start"]:
+        start_date = datetime.strptime(row["start"], "%Y-%m-%d").date()
+        if start_date > until_date:
+            raise ValueError(
+                f"Start date cannot be after until date for {row['user_id']}"
+            )
+
+    return row
+
+
+@app.put("/admin/ap-users/batch")
+def ap_users_save_all():
+    """
+    Replace the complete AP list atomically, then notify Discord exactly once.
+    The admin page stages edits/deletions locally until this endpoint is called.
+    """
+    if not _admin_ok():
+        abort(401)
+
+    try:
+        payload = request.get_json(force=True) or {}
+        raw_rows = payload.get("rows")
+
+        if not isinstance(raw_rows, list):
+            raise ValueError("rows must be a list")
+
+        rows = []
+        seen_user_ids = set()
+
+        for raw in raw_rows:
+            row = _normalize_ap_batch_row(raw)
+            uid = row["user_id"]
+
+            if uid in seen_user_ids:
+                raise ValueError(f"Duplicate user_id: {uid}")
+
+            seen_user_ids.add(uid)
+            rows.append(row)
+
+        def _inner():
+            _ap_write_all(rows)
+            return rows
+
+        saved_rows = _ap_lock_call(_inner)
+
+        # This is now the ONLY browser-admin action that tells the bot
+        # to publish a new AP bulletin to Discord.
+        set_ap_trigger_ready()
+
+        return jsonify({
+            "ok": True,
+            "count": len(saved_rows),
+            "rows": saved_rows,
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @app.post("/admin/ap-users")
 def ap_users_upsert():
+    """Legacy single-row save. It no longer triggers a Discord post."""
     if not _admin_ok():
         abort(401)
     try:
@@ -338,14 +426,10 @@ def ap_users_upsert():
         if "user_id" in payload:
             payload["user_id"] = _uid_str(payload["user_id"])
 
-        # ✅ FIX: set start date if missing/blank
         if not payload.get("start"):
             payload["start"] = datetime.now().strftime("%Y-%m-%d")
 
         saved = _ap_upsert(payload)
-
-        set_ap_trigger_ready()
-
         return jsonify(saved), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -353,6 +437,7 @@ def ap_users_upsert():
 
 @app.patch("/admin/ap-users/<user_id>")
 def ap_users_update(user_id):
+    """Legacy single-row edit. It no longer triggers a Discord post."""
     if not _admin_ok():
         abort(401)
     try:
@@ -366,8 +451,6 @@ def ap_users_update(user_id):
         if not saved:
             return jsonify({"error": "not found"}), 404
 
-        set_ap_trigger_ready()
-
         return jsonify(saved), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -375,13 +458,11 @@ def ap_users_update(user_id):
 
 @app.delete("/admin/ap-users/<user_id>")
 def ap_users_delete(user_id):
+    """Legacy single-row delete. It no longer triggers a Discord post."""
     if not _admin_ok():
         abort(401)
+
     ok = _ap_remove(_uid_str(user_id))
-
-    if ok:
-        set_ap_trigger_ready()
-
     return ("", 204) if ok else (jsonify({"error": "not found"}), 404)
 
 

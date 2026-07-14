@@ -1,4 +1,3 @@
-<!-- VERSION: TIM_001 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,148 +5,229 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>AP Users Admin</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 20px; }
-    h1 { margin: 0 0 12px; }
+    body { font-family: system-ui, sans-serif; margin: 20px; color: #111827; }
+    h1 { margin: 0 0 8px; }
     .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
     input, textarea, select, button { padding: 8px; font-size: 14px; }
-    input[type="text"], input[type="date"], input[type="number"], textarea { width: 100%; box-sizing: border-box; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { border: 1px solid #eee; padding: 8px; text-align: left; }
+    input[type="text"], input[type="date"], input[type="password"], textarea {
+      width: 100%; box-sizing: border-box;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 1100px; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
     tr:hover { background: #fafafa; }
+    .table-wrap { overflow-x: auto; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-    .muted { color: #777; }
+    .muted { color: #6b7280; }
+    .small { font-size: 12px; }
     .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .danger { background: #b00020; color: #fff; border: none; border-radius: 8px; padding: 8px 12px; }
     .primary { background: #0d6efd; color: #fff; border: none; border-radius: 8px; padding: 8px 12px; }
+    .success { background: #15803d; color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
     .ghost { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; }
     .badge { display: inline-block; padding: 2px 6px; background: #eef6ff; border: 1px solid #cfe3ff; border-radius: 999px; font-size: 12px; }
+    .pending { display: inline-block; padding: 4px 8px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .saved { display: inline-block; padding: 4px 8px; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 999px; font-size: 12px; font-weight: 700; }
     .grid { display: grid; gap: 8px; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
     @media (max-width: 720px) { .row, .row3 { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <h1>AP Users Admin</h1>
-  <p class="muted">Edit <code>ap_users.json</code> from your browser. Changes are atomic and locked.</p>
+  <p class="muted">
+    Edit the list here first. Discord is updated only when
+    <strong>Save All &amp; Post to Discord</strong> is pressed.
+  </p>
 
   <div class="card">
     <div class="flex">
       <label for="token"><strong>Admin Token</strong></label>
-      <input id="token" type="password" placeholder="Enter X-Admin-Token" />
+      <input id="token" type="password" placeholder="Enter X-Admin-Token" style="max-width:420px" />
       <button class="ghost" onclick="saveToken()">Save token</button>
       <span class="muted">Stored only in this browser’s localStorage.</span>
     </div>
   </div>
 
   <div class="card grid">
-    <strong>Add / Update (Upsert)</strong>
+    <strong>Add / Update AP User</strong>
+
     <div class="row3">
       <div>
         <label>User ID (Discord numeric)</label>
-        <input id="user_id" type="text" pattern="^[0-9]{16,22}$" placeholder="e.g. 792925959900061697" />
+        <input id="user_id" type="text" inputmode="numeric" pattern="[0-9]{16,22}" placeholder="e.g. 792929559900061697" />
       </div>
       <div>
         <label>Display</label>
-        <input id="display" type="text" placeholder="e.g. FALCONS jr.(awholelottablues) PT" />
+        <input id="display" type="text" placeholder="e.g. FALCONS jr. (username) AZ" />
       </div>
       <div>
-        <label>Start (optional)</label>
-        <input id="start" type="date" />
+        <label>AP Start Date</label>
+        <input id="start" type="date" min="2024-01-01" />
       </div>
     </div>
 
     <div class="row3">
       <div>
-        <label>Until (YYYY-MM-DD)</label>
-        <input id="until" type="date" min="2024-01-01" />
-      </div>
-    </div>
-    <div class="row">
-      <div>
         <label>Reason</label>
-        <input id="reason" type="text" placeholder="e.g. PS5 not working" />
+        <input id="reason" type="text" placeholder="e.g. Out of town" />
+      </div>
+      <div>
+        <label>Return / Until Date</label>
+        <input id="until" type="date" min="2024-01-01" />
       </div>
       <div>
         <label>Notes</label>
-        <input id="notes" type="text" placeholder="" />
+        <input id="notes" type="text" placeholder="Optional" />
       </div>
     </div>
+
+    <div class="muted small">
+      CPU/FS/FW eligibility is calculated automatically as the AP start date plus 6 days:
+      3 CPU/FS advances × 2 days per advance.
+    </div>
+
     <div class="flex">
-      <button class="primary" onclick="upsert()">Save / Upsert</button>
+      <button class="primary" onclick="upsertDraft()">Add / Update List</button>
       <button class="ghost" onclick="clearForm()">Clear</button>
-      <span id="status" class="muted"></span>
+      <span id="formStatus" class="muted"></span>
     </div>
   </div>
 
   <div class="card">
     <div class="flex">
       <strong>Current AP Users</strong>
-      <button class="ghost" onclick="loadList()">Refresh</button>
-      <span class="muted">Click a row to load it into the form.</span>
+      <button class="ghost" onclick="loadList()">Refresh from Server</button>
+      <span id="changeState" class="saved">No pending changes</span>
     </div>
-    <table id="table">
-      <thead>
-        <tr>
-          <th>User</th>
-          <th>Display</th>
-          <th>Reason</th>
-          <th>Start</th>
-          <th>Until</th>
-          <th>Notes</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="tbody">
-        <tr><td colspan="6" class="muted">No data yet…</td></tr>
-      </tbody>
-    </table>
+
+    <div class="table-wrap">
+      <table id="table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Display</th>
+            <th>Reason</th>
+            <th>AP Started</th>
+            <th>CPU/FS/FW Begins</th>
+            <th>Returns</th>
+            <th>Notes</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="8" class="muted">No data yet…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex" style="margin-top:14px">
+      <button id="saveAllButton" class="success" onclick="saveAll()" disabled>
+        Save All &amp; Post to Discord
+      </button>
+      <span id="saveStatus" class="muted"></span>
+    </div>
   </div>
 
   <script>
     const $ = sel => document.querySelector(sel);
 
+    let currentRows = [];
+    let editingUserId = null;
+    let dirty = false;
+
     function getToken() {
-      const t = $('#token').value || localStorage.getItem('ap_admin_token') || '';
-      if (!$('#token').value && t) $('#token').value = t;
-      return t;
+      const token = $('#token').value || localStorage.getItem('ap_admin_token') || '';
+      if (!$('#token').value && token) $('#token').value = token;
+      return token;
     }
+
     function saveToken() {
       localStorage.setItem('ap_admin_token', $('#token').value || '');
-      $('#status').textContent = 'Token saved locally.';
-      setTimeout(() => $('#status').textContent = '', 1500);
+      $('#formStatus').textContent = 'Token saved locally.';
+      setTimeout(() => $('#formStatus').textContent = '', 1500);
+    }
+
+    function todayYmd() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function addDaysYmd(ymd, days) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd || '')) return '';
+      const [y, m, d] = ymd.split('-').map(Number);
+      const date = new Date(Date.UTC(y, m - 1, d + days));
+      return [
+        date.getUTCFullYear(),
+        String(date.getUTCMonth() + 1).padStart(2, '0'),
+        String(date.getUTCDate()).padStart(2, '0')
+      ].join('-');
+    }
+
+    function prettyDate(ymd) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd || '')) return 'Not recorded';
+      const [y, m, d] = ymd.split('-').map(Number);
+      return new Intl.DateTimeFormat('en-US', {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC'
+      }).format(new Date(Date.UTC(y, m - 1, d)));
+    }
+
+    function normalizeRow(row) {
+      return {
+        user_id: String(row?.user_id ?? '').trim(),
+        display: String(row?.display ?? '').trim(),
+        reason: String(row?.reason ?? '').trim(),
+        start: String(row?.start ?? '').trim(),
+        until: String(row?.until ?? '').trim(),
+        notes: String(row?.notes ?? '').trim()
+      };
     }
 
     function clearForm() {
+      editingUserId = null;
       $('#user_id').value = '';
       $('#display').value = '';
       $('#reason').value = '';
-      $('#start').value = '';
+      $('#start').value = todayYmd();
       $('#until').value = '';
       $('#notes').value = '';
+      $('#formStatus').textContent = '';
     }
 
-    function esc(s){
-      return (s==null?'':String(s))
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;')
-        .replace(/'/g,'&#39;');
+    function esc(value) {
+      return (value == null ? '' : String(value))
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
-    function escAttr(s){ return esc(s).replace(/"/g,'&quot;'); }
+    function escAttr(value) {
+      return esc(value).replace(/"/g, '&quot;');
+    }
 
+    function dateCell(ymd) {
+      if (!ymd) return '<span class="muted">Not recorded</span>';
+      return `<div>${esc(prettyDate(ymd))}</div><div class="muted small">${esc(ymd)}</div>`;
+    }
 
-    function rowHtml(r){
-      const uid = String(r.user_id);
+    function rowHtml(row) {
+      const uid = String(row.user_id);
+      const fwEligible = addDaysYmd(row.start, 6);
+
       return `
         <tr data-userid="${escAttr(uid)}">
           <td><span class="badge">${esc(uid)}</span></td>
-          <td>${esc(r.display)}</td>
-          <td>${esc(r.reason)}</td>
-          <td>${esc(r.start || '')}</td>
-          <td>${esc(r.until)}</td>
-          <td>${esc(r.notes)}</td>
+          <td>${esc(row.display)}</td>
+          <td>${esc(row.reason)}</td>
+          <td>${dateCell(row.start)}</td>
+          <td>${dateCell(fwEligible)}</td>
+          <td>${dateCell(row.until)}</td>
+          <td>${esc(row.notes)}</td>
           <td>
             <button class="ghost" onclick="loadIntoForm('${escAttr(uid)}')">Edit</button>
             <button class="danger" onclick="removeUser('${escAttr(uid)}')">Delete</button>
@@ -155,107 +235,203 @@
         </tr>`;
     }
 
-
-    async function loadList(){
-      const token = getToken();
-      if (!token) return; // don't alert on first visit
-      try {
-        const res = await fetch('/admin/ap-users', { headers: {'X-Admin-Token': token} });
-        if (res.status === 401) throw new Error('Unauthorized – check your Admin Token.');
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        const tbody = $('#tbody');
-        if (!Array.isArray(data) || data.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="muted">Empty</td></tr>`;
-          return;
-        }
-        tbody.innerHTML = data.map(rowHtml).join('');
-      } catch(e){ alert('Load failed: ' + e.message); }
+    function renderList() {
+      const tbody = $('#tbody');
+      if (!currentRows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="muted">Empty</td></tr>';
+        return;
+      }
+      tbody.innerHTML = currentRows.map(rowHtml).join('');
     }
 
-    function loadIntoForm(user_id) {
-      const tr = document.querySelector(`tr[data-userid="${user_id}"]`);
-      if (!tr) return;
-      const tds = tr.querySelectorAll('td');
-      $('#user_id').value = user_id;
-      $('#display').value = tds[1].textContent;
-      $('#reason').value  = tds[2].textContent;
-      $('#start').value = ''; // default blank
-      $('#until').value   = tds[3].textContent;
-      $('#notes').value   = tds[4].textContent;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    function markDirty(message = 'Pending changes') {
+      dirty = true;
+      $('#changeState').className = 'pending';
+      $('#changeState').textContent = message;
+      $('#saveAllButton').disabled = false;
+      $('#saveStatus').textContent = 'Changes have not been sent to Discord.';
     }
 
-    async function upsert() {
+    function markClean(message = 'No pending changes') {
+      dirty = false;
+      $('#changeState').className = 'saved';
+      $('#changeState').textContent = message;
+      $('#saveAllButton').disabled = true;
+      $('#saveStatus').textContent = '';
+    }
+
+    async function loadList() {
       const token = getToken();
-      if (!token) { alert('Enter Admin Token first'); return; }
+      if (!token) return;
 
-      // Validate inputs
-      const uidStr = $('#user_id').value.trim();
-      if (!/^\d{6,20}$/.test(uidStr)) {
-        alert('User ID must be 6–20 digits.'); return;
-      }
-      const untilStr = $('#until').value;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(untilStr)) {
-        alert('Until must be YYYY-MM-DD'); return;
-      }
-
-      const payload = {
-        user_id: uidStr,                        
-        display: $('#display').value.trim(),
-        reason:  $('#reason').value.trim(),
-        until:   untilStr,                               // YYYY-MM-DD from input[type=date]
-        notes:   $('#notes').value.trim()
-      };
-
-      // ✅ ONLY include start if user set it
-      const startVal = $('#start').value;
-      if (startVal) {
-        payload.start = startVal;
-      }
-
-      if (!payload.display || !payload.reason || !payload.until) {
-        alert('user_id, display, reason, until are required.'); return;
+      if (dirty && !confirm('Discard the pending changes and reload from the server?')) {
+        return;
       }
 
       try {
         const res = await fetch('/admin/ap-users', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json', 'X-Admin-Token': token},
-          body: JSON.stringify(payload)
+          headers: { 'X-Admin-Token': token }
         });
-        const text = await res.text();
-        if (!res.ok) throw new Error(text);
-        $('#status').textContent = 'Saved.';
+
+        if (res.status === 401) throw new Error('Unauthorized – check your Admin Token.');
+        if (!res.ok) throw new Error(await res.text());
+
+        const data = await res.json();
+        currentRows = Array.isArray(data) ? data.map(normalizeRow) : [];
+        renderList();
         clearForm();
-        loadList();
-        setTimeout(() => $('#status').textContent = '', 1500);
-      } catch (e) {
-        alert('Save failed: ' + e.message);
+        markClean();
+      } catch (error) {
+        alert('Load failed: ' + error.message);
       }
     }
 
-    async function removeUser(user_id) {
+    function loadIntoForm(userId) {
+      const row = currentRows.find(r => r.user_id === String(userId));
+      if (!row) return;
+
+      editingUserId = row.user_id;
+      $('#user_id').value = row.user_id;
+      $('#display').value = row.display;
+      $('#reason').value = row.reason;
+      $('#start').value = row.start;
+      $('#until').value = row.until;
+      $('#notes').value = row.notes;
+      $('#formStatus').textContent = `Editing ${row.display || row.user_id}`;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function upsertDraft() {
+      const uid = $('#user_id').value.trim();
+      const start = $('#start').value;
+      const until = $('#until').value;
+
+      if (!/^\d{16,22}$/.test(uid)) {
+        alert('User ID must be a 16–22 digit Discord ID.');
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+        alert('AP Start Date is required.');
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) {
+        alert('Return / Until Date is required.');
+        return;
+      }
+      if (start > until) {
+        alert('AP Start Date cannot be after the Return / Until Date.');
+        return;
+      }
+
+      const row = normalizeRow({
+        user_id: uid,
+        display: $('#display').value,
+        reason: $('#reason').value,
+        start,
+        until,
+        notes: $('#notes').value
+      });
+
+      if (!row.display || !row.reason) {
+        alert('Display and Reason are required.');
+        return;
+      }
+
+      const duplicate = currentRows.find(
+        r => r.user_id === uid && r.user_id !== editingUserId
+      );
+      if (duplicate) {
+        alert('That Discord user is already in the AP list.');
+        return;
+      }
+
+      let index = -1;
+      if (editingUserId) {
+        index = currentRows.findIndex(r => r.user_id === editingUserId);
+      } else {
+        index = currentRows.findIndex(r => r.user_id === uid);
+      }
+
+      if (index >= 0) {
+        currentRows[index] = row;
+      } else {
+        currentRows.push(row);
+      }
+
+      renderList();
+      markDirty(index >= 0 ? 'AP user updated — not posted yet' : 'AP user added — not posted yet');
+      clearForm();
+    }
+
+    function removeUser(userId) {
+      const row = currentRows.find(r => r.user_id === String(userId));
+      if (!row) return;
+
+      if (!confirm(`Remove AP for ${row.display || row.user_id} from the pending list?`)) {
+        return;
+      }
+
+      currentRows = currentRows.filter(r => r.user_id !== String(userId));
+
+      if (editingUserId === String(userId)) clearForm();
+
+      renderList();
+      markDirty('AP user deleted — not posted yet');
+    }
+
+    async function saveAll() {
       const token = getToken();
-      if (!token) { alert('Enter Admin Token first'); return; }
-      if (!confirm(`Delete AP for ${user_id}?`)) return;
+      if (!token) {
+        alert('Enter the Admin Token first.');
+        return;
+      }
+
+      const button = $('#saveAllButton');
+      button.disabled = true;
+      $('#saveStatus').textContent = 'Saving the full AP list…';
+
       try {
-        const res = await fetch(`/admin/ap-users/${encodeURIComponent(user_id)}`, {
-          method: 'DELETE',
-          headers: {'X-Admin-Token': token}
+        const res = await fetch('/admin/ap-users/batch', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Admin-Token': token
+          },
+          body: JSON.stringify({ rows: currentRows.map(normalizeRow) })
         });
+
         const text = await res.text();
-        if (!res.ok) throw new Error(text);
-        loadList();
-      } catch (e) {
-        alert('Delete failed: ' + e.message);
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch (_) {}
+
+        if (!res.ok) {
+          throw new Error(data.error || text || 'Save failed');
+        }
+
+        currentRows = Array.isArray(data.rows)
+          ? data.rows.map(normalizeRow)
+          : currentRows.map(normalizeRow);
+
+        renderList();
+        markClean('Saved and posted to Discord');
+        $('#saveStatus').textContent = `Saved ${data.count ?? currentRows.length} AP user(s). Discord will update once.`;
+      } catch (error) {
+        button.disabled = false;
+        $('#saveStatus').textContent = '';
+        alert('Save All failed: ' + error.message);
       }
     }
 
-    // Auto-fill token from localStorage and load
+    window.addEventListener('beforeunload', event => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    });
+
     (function init() {
       const saved = localStorage.getItem('ap_admin_token');
       if (saved) $('#token').value = saved;
+      clearForm();
       loadList();
     })();
   </script>
