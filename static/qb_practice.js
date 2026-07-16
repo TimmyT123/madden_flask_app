@@ -10,31 +10,36 @@ const accuracyEl = document.getElementById("accuracy");
 const drillLengthSelect = document.getElementById("drillLengthSelect");
 const speedSelect = document.getElementById("speedSelect");
 
+// New display element. The tempoBtn fallback lets the current HTML keep working
+// until you replace the old button with a normal display element.
+const tempoDisplay =
+    document.getElementById("tempoDisplay") ||
+    document.getElementById("tempoBtn");
+
 const perfectSound = new Audio("/static/sounds/perfect.mp3");
 perfectSound.volume = 0.6;
 
 const wrongSound = new Audio("/static/sounds/wrong.mp3");
 wrongSound.volume = 0.5;
 
-const tempoBtn = document.getElementById("tempoBtn");
-
 const knockSound = new Audio("/static/sounds/knock.mp3");
 knockSound.volume = 0.40;
 
-let tempoEnabled = false;
-let tempoIntervalId = null;
+// Tempo is controlled manually now.
+// A larger millisecond value is slower; a smaller value is faster.
+const SLOWEST_TEMPO_MS = 1500;
+const FASTEST_TEMPO_MS = 950;
+const TEMPO_STEP_MS = 10;
+const STARTING_TEMPO_MS = 1200;
 
-let tempoMs = 1400;         // slower starting tempo
-let minTempoMs = 950;       // fastest allowed
-let maxTempoMs = 1500;      // slowest allowed
+const L2_BUTTON = 6;
+const R2_BUTTON = 7;
 
-let perfectsNeededForSpeedUp = 3;
-let tempoSpeedUpAmount = 30;
-let tempoSlowDownAmount = 10;
-let perfectsSinceSpeedUp = 0;
+let tempoMs = STARTING_TEMPO_MS;
+let tempoTimerId = null;
 let lastKnockTime = 0;
 let pressedOnBeat = false;
-let beatWindowMs = 400; // how close to the knock the release must be
+let beatWindowMs = 400;
 
 let currentTarget = null;
 let linePosition = 0;
@@ -51,11 +56,10 @@ let attempts = 0;
 
 let pressedCorrectButton = false;
 let lastControllerButtons = [];
-let noPickTimeoutId = null;
-let noPickPenaltyMs = 3000;
-
 let roundLocked = false;
+let startSequenceId = 0;
 
+// R1/RB remains a drill target. L2/R2 (LT/RT) are reserved for tempo control.
 const ps5Buttons = [
     { label: "△", key: "w", controllerButton: 3, className: "symbol-triangle" },
     { label: "□", key: "a", controllerButton: 2, className: "symbol-square" },
@@ -74,27 +78,37 @@ const xboxButtons = [
 
 startBtn.addEventListener("click", startGame);
 
+// Keyboard equivalents for tempo control:
+// Left Arrow = slower, Right Arrow = faster.
+// E remains available for the R1/RB drill target.
 document.addEventListener("keydown", function(event) {
     if (!gameRunning || drillComplete) return;
 
     const mode = modeSelect.value;
-
     if (!mode.startsWith("keyboard")) return;
+
+    if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        decreaseTempo();
+        return;
+    }
+
+    if (event.key === "ArrowRight") {
+        event.preventDefault();
+        increaseTempo();
+        return;
+    }
 
     const key = event.key.toLowerCase();
     const validKeys = getButtonSet().map(button => button.key);
-
-    // Ignore keys that are not part of the drill controls
     if (!validKeys.includes(key)) return;
 
     if (currentTarget && key === currentTarget.key && !pressedCorrectButton) {
-        clearNoPickTimeout();
-
         pressedCorrectButton = true;
         pressedOnBeat = isOnBeat();
         lineMoving = true;
 
-        if (tempoEnabled && !pressedOnBeat) {
+        if (!pressedOnBeat) {
             feedback.textContent = "Good button, but missed the knock!";
         } else {
             feedback.textContent = "On beat! Release near the target zone!";
@@ -108,7 +122,6 @@ document.addEventListener("keyup", function(event) {
     if (!gameRunning) return;
 
     const mode = modeSelect.value;
-
     if (!mode.startsWith("keyboard")) return;
 
     const key = event.key.toLowerCase();
@@ -119,9 +132,33 @@ document.addEventListener("keyup", function(event) {
 });
 
 function startGame() {
+    const thisStartSequence = ++startSequenceId;
+
+    stopTempo();
+
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+
+    gameRunning = false;
+    lineMoving = false;
+    drillComplete = false;
+    roundLocked = false;
+    pressedCorrectButton = false;
+    pressedOnBeat = false;
+    lastControllerButtons = [];
+
     lineSpeed = parseFloat(speedSelect.value);
     drillLength = drillLengthSelect.value;
-    drillComplete = false;
+
+    score = 0;
+    attempts = 0;
+    updateScoreboard();
+
+    // Every new drill starts at 1200 ms.
+    tempoMs = STARTING_TEMPO_MS;
+    updateTempoDisplay();
 
     fetch("/api/qb-practice-start", {
         method: "POST",
@@ -137,29 +174,32 @@ function startGame() {
         console.log("Practice tracking failed:", error);
     });
 
-    score = 0;
-    attempts = 0;
-    updateScoreboard();
-
-    tempoMs = 1400;
-    perfectsSinceSpeedUp = 0;
-
-    if (tempoEnabled) {
-        startTempo();
-    }
-
     gameArea.classList.remove("hidden");
-    gameRunning = true;
+    startBtn.disabled = true;
+    startBtn.textContent = "Starting...";
+    feedback.textContent = "Starting in 3...";
 
-    startBtn.textContent = "Restart Practice";
+    setTimeout(() => {
+        if (thisStartSequence !== startSequenceId) return;
+        feedback.textContent = "Starting in 2...";
+    }, 1000);
 
-    nextRound();
+    setTimeout(() => {
+        if (thisStartSequence !== startSequenceId) return;
+        feedback.textContent = "Starting in 1...";
+    }, 2000);
 
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-    }
+    setTimeout(() => {
+        if (thisStartSequence !== startSequenceId) return;
 
-    gameLoop();
+        gameRunning = true;
+        startBtn.disabled = false;
+        startBtn.textContent = "Restart Practice";
+
+        nextRound();
+        startTempo();
+        gameLoop();
+    }, 3000);
 }
 
 function getButtonSet() {
@@ -173,8 +213,6 @@ function getButtonSet() {
 }
 
 function nextRound() {
-    clearNoPickTimeout();
-
     const buttons = getButtonSet();
     currentTarget = buttons[Math.floor(Math.random() * buttons.length)];
 
@@ -189,37 +227,6 @@ function nextRound() {
     pressedOnBeat = false;
     lineMoving = false;
     roundLocked = false;
-
-    startNoPickTimeout();
-}
-
-function startNoPickTimeout() {
-    if (!gameRunning || drillComplete) return;
-
-    noPickTimeoutId = setTimeout(() => {
-        if (roundLocked || pressedCorrectButton || lineMoving || drillComplete) return;
-
-        roundLocked = true;
-        attempts++;
-        perfectsSinceSpeedUp = 0;
-
-        feedback.textContent = "No throw!";
-        slowDownTempo(30);
-        updateScoreboard();
-
-        if (isDrillFinished()) {
-            finishDrill();
-        } else {
-            setTimeout(nextRound, 500);
-        }
-    }, noPickPenaltyMs);
-}
-
-function clearNoPickTimeout() {
-    if (noPickTimeoutId) {
-        clearTimeout(noPickTimeoutId);
-        noPickTimeoutId = null;
-    }
 }
 
 function gameLoop() {
@@ -233,7 +240,6 @@ function gameLoop() {
             lineMoving = false;
             attempts++;
             feedback.textContent = "Too late!";
-            slowDownTempo(30);
             updateScoreboard();
 
             if (isDrillFinished()) {
@@ -249,7 +255,6 @@ function gameLoop() {
     }
 
     checkControllerInput();
-
     animationId = requestAnimationFrame(gameLoop);
 }
 
@@ -260,44 +265,26 @@ function checkRelease() {
     lineMoving = false;
     attempts++;
 
-    // Target zone is 68% to 80%
+    // Target zone is 68% to 80%.
+    // Results no longer change the tempo automatically.
     if (linePosition >= 68 && linePosition <= 80 && pressedOnBeat) {
         score++;
-        perfectsSinceSpeedUp++;
-
         feedback.textContent = "Perfect!";
 
         perfectSound.currentTime = 0;
         perfectSound.play().catch(error => {
             console.log("Perfect sound failed:", error);
         });
-
-        if (perfectsSinceSpeedUp >= perfectsNeededForSpeedUp) {
-            perfectsSinceSpeedUp = 0;
-            speedUpTempo();
-        } else if (tempoEnabled) {
-            tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms | Perfects: " + perfectsSinceSpeedUp + "/" + perfectsNeededForSpeedUp;
-        }
     } else if (linePosition >= 68 && linePosition <= 80 && !pressedOnBeat) {
-        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Good release, but missed the beat!";
-        slowDownTempo();
     } else if (linePosition >= 60 && linePosition < 68) {
-        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Early!";
-        slowDownTempo(10);
     } else if (linePosition > 80 && linePosition <= 88) {
-        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Late!";
-        slowDownTempo(10);
     } else if (linePosition > 88) {
-        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Overthrown!";
-        slowDownTempo(20);
     } else {
-        perfectsSinceSpeedUp = 0;
         feedback.textContent = "Way too early!";
-        slowDownTempo(20);
     }
 
     updateScoreboard();
@@ -319,9 +306,7 @@ function wrongButton() {
 
     feedback.textContent = "Wrong button!";
 
-    perfectsSinceSpeedUp = 0;
-    slowDownTempo(150);
-
+    // Wrong buttons no longer slow the tempo automatically.
     wrongSound.currentTime = 0;
     wrongSound.play().catch(error => {
         console.log("Wrong sound failed:", error);
@@ -341,20 +326,23 @@ function isDrillFinished() {
         return false;
     }
 
-    return attempts >= parseInt(drillLength);
+    return attempts >= parseInt(drillLength, 10);
 }
 
 function finishDrill() {
-    clearNoPickTimeout();
-
     drillComplete = true;
     gameRunning = false;
     lineMoving = false;
+    stopTempo();
+
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
 
     const accuracy = attempts === 0 ? 0 : Math.round((score / attempts) * 100);
 
     feedback.textContent = `Drill Complete! Score: ${score}/${attempts} - Accuracy: ${accuracy}%`;
-
     startBtn.textContent = "Start New Drill";
 }
 
@@ -368,13 +356,16 @@ function updateScoreboard() {
 
 function checkControllerInput() {
     const mode = modeSelect.value;
-
     if (!mode.startsWith("controller")) return;
 
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
     const gamepad = gamepads[0];
 
-    if (!gamepad || !currentTarget || drillComplete) return;
+    if (!gamepad || drillComplete) return;
+
+    handleTempoControllerButtons(gamepad);
+
+    if (!currentTarget) return;
 
     const validButtons = getButtonSet().map(button => button.controllerButton);
     const correctButtonIndex = currentTarget.controllerButton;
@@ -386,16 +377,13 @@ function checkControllerInput() {
         const wasPressed = lastControllerButtons[buttonIndex] || false;
         const isPressed = button.pressed;
 
-        // Button was just pressed
         if (isPressed && !wasPressed) {
             if (buttonIndex === correctButtonIndex && !pressedCorrectButton) {
-                clearNoPickTimeout();
-
                 pressedCorrectButton = true;
                 pressedOnBeat = isOnBeat();
                 lineMoving = true;
 
-                if (tempoEnabled && !pressedOnBeat) {
+                if (!pressedOnBeat) {
                     feedback.textContent = "Good button, but late on the beat!";
                 } else {
                     feedback.textContent = "Release near the target zone!";
@@ -405,8 +393,12 @@ function checkControllerInput() {
             }
         }
 
-        // Correct button was just released
-        if (!isPressed && wasPressed && buttonIndex === correctButtonIndex && pressedCorrectButton) {
+        if (
+            !isPressed &&
+            wasPressed &&
+            buttonIndex === correctButtonIndex &&
+            pressedCorrectButton
+        ) {
             checkRelease();
         }
 
@@ -414,77 +406,106 @@ function checkControllerInput() {
     }
 }
 
-tempoBtn.addEventListener("click", toggleTempo);
+function handleTempoControllerButtons(gamepad) {
+    const l2 = gamepad.buttons[L2_BUTTON];
+    const r2 = gamepad.buttons[R2_BUTTON];
 
-function toggleTempo() {
-    tempoEnabled = !tempoEnabled;
+    if (l2) {
+        const wasPressed = lastControllerButtons[L2_BUTTON] || false;
+        const isPressed = l2.pressed;
 
-    if (tempoEnabled) {
-        stopTempo();
+        if (isPressed && !wasPressed) {
+            decreaseTempo();
+        }
 
-        tempoBtn.disabled = true;
-        tempoBtn.textContent = "Tempo starting...";
-        feedback.textContent = "Tempo starting in 3...";
+        lastControllerButtons[L2_BUTTON] = isPressed;
+    }
 
-        setTimeout(() => {
-            if (!tempoEnabled) return;
-            feedback.textContent = "Tempo starting in 2...";
-        }, 1000);
+    if (r2) {
+        const wasPressed = lastControllerButtons[R2_BUTTON] || false;
+        const isPressed = r2.pressed;
 
-        setTimeout(() => {
-            if (!tempoEnabled) return;
-            feedback.textContent = "Tempo starting in 1...";
-        }, 2000);
+        if (isPressed && !wasPressed) {
+            increaseTempo();
+        }
 
-        setTimeout(() => {
-            if (!tempoEnabled) return;
-
-            tempoBtn.disabled = false;
-            tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
-            feedback.textContent = "Go! Press on the knock.";
-
-            startTempo();
-        }, 3000);
-
-    } else {
-        tempoBtn.textContent = "Tempo: Off";
-        tempoBtn.disabled = false;
-        stopTempo();
+        lastControllerButtons[R2_BUTTON] = isPressed;
     }
 }
 
-function restartTempoAfterChange() {
-    stopTempo();
+// L2/LT decreases the tempo by making the interval longer (slower).
+function decreaseTempo() {
+    const oldTempo = tempoMs;
+    tempoMs = Math.min(SLOWEST_TEMPO_MS, tempoMs + TEMPO_STEP_MS);
 
-    if (!tempoEnabled) return;
+    if (tempoMs !== oldTempo) {
+        restartTempoAfterChange();
+    }
 
-    tempoIntervalId = setInterval(() => {
-        playKnock();
-    }, tempoMs);
+    updateTempoDisplay();
+}
+
+// R2/RT increases the tempo by making the interval shorter (faster).
+function increaseTempo() {
+    const oldTempo = tempoMs;
+    tempoMs = Math.max(FASTEST_TEMPO_MS, tempoMs - TEMPO_STEP_MS);
+
+    if (tempoMs !== oldTempo) {
+        restartTempoAfterChange();
+    }
+
+    updateTempoDisplay();
+}
+
+function updateTempoDisplay() {
+    if (!tempoDisplay) return;
+
+    const mode = modeSelect.value;
+    const shoulderLabels = mode.includes("xbox")
+        ? "LT slower | RT faster"
+        : "L2 slower | R2 faster";
+
+    tempoDisplay.textContent = `Tempo: ${tempoMs}ms | ${shoulderLabels}`;
+
+    // The old tempo button is now display-only.
+    if (tempoDisplay.tagName === "BUTTON") {
+        tempoDisplay.disabled = true;
+    }
 }
 
 function startTempo() {
     stopTempo();
 
-    if (!tempoEnabled) return;
+    if (!gameRunning) return;
 
-    function tempoLoop() {
-        if (!tempoEnabled) return;
+    playKnock();
+    tempoTimerId = setTimeout(tempoLoop, tempoMs);
+}
 
-        playKnock();
-
-        tempoIntervalId = setTimeout(() => {
-            tempoLoop();
-        }, tempoMs);
+function tempoLoop() {
+    if (!gameRunning || drillComplete) {
+        tempoTimerId = null;
+        return;
     }
 
-    tempoLoop();
+    playKnock();
+    tempoTimerId = setTimeout(tempoLoop, tempoMs);
+}
+
+function restartTempoAfterChange() {
+    stopTempo();
+
+    if (!gameRunning || drillComplete) return;
+
+    // Do not make an extra instant knock when the tempo changes.
+    // Schedule the next knock using the new interval.
+    tempoTimerId = setTimeout(tempoLoop, tempoMs);
 }
 
 function stopTempo() {
-    if (tempoIntervalId) {
-        clearTimeout(tempoIntervalId);
-        tempoIntervalId = null;
+    if (tempoTimerId) {
+        clearTimeout(tempoTimerId);
+        tempoTimerId = null;
     }
 }
 
@@ -498,10 +519,6 @@ function playKnock() {
 }
 
 function isOnBeat() {
-    if (!tempoEnabled) {
-        return true;
-    }
-
     const now = performance.now();
     const timeSinceLastKnock = now - lastKnockTime;
     const timeUntilNextKnock = tempoMs - timeSinceLastKnock;
@@ -514,20 +531,14 @@ function isOnBeat() {
     return nearestBeatDistance <= beatWindowMs;
 }
 
-function speedUpTempo() {
-    tempoMs = Math.max(minTempoMs, tempoMs - tempoSpeedUpAmount);
-    tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
-}
-
-function slowDownTempo(amount = tempoSlowDownAmount) {
-    tempoMs = Math.min(maxTempoMs, tempoMs + amount);
-    tempoBtn.textContent = "Tempo: On - " + tempoMs + "ms";
-}
-
 window.addEventListener("gamepadconnected", function(event) {
     feedback.textContent = "Controller connected: " + event.gamepad.id;
+    updateTempoDisplay();
 });
 
 window.addEventListener("gamepaddisconnected", function() {
     feedback.textContent = "Controller disconnected.";
 });
+
+modeSelect.addEventListener("change", updateTempoDisplay);
+updateTempoDisplay();
