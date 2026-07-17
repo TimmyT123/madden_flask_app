@@ -1291,6 +1291,59 @@ def qb_practice_start():
 
     return jsonify({"ok": True})
 
+@app.route("/switch-stick-practice")
+def switch_stick_practice():
+    return render_template("switch_stick_practice.html")
+
+
+@app.route("/api/switch-stick-practice-start", methods=["POST"])
+def switch_stick_practice_start():
+    data = request.get_json(silent=True) or {}
+
+    log_entry = {
+        "event": "start",
+        "time": datetime.now().isoformat(timespec="seconds"),
+        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "user_agent": request.headers.get("User-Agent"),
+        "mode": data.get("mode"),
+        "reaction_window": data.get("reactionWindow"),
+        "drill_length": data.get("drillLength"),
+    }
+
+    os.makedirs("logs", exist_ok=True)
+
+    with open("logs/switch_stick_practice.log", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/switch-stick-practice-result", methods=["POST"])
+def switch_stick_practice_result():
+    data = request.get_json(silent=True) or {}
+
+    log_entry = {
+        "event": "result",
+        "time": datetime.now().isoformat(timespec="seconds"),
+        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "mode": data.get("mode"),
+        "reaction_window": data.get("reactionWindow"),
+        "drill_length": data.get("drillLength"),
+        "score": data.get("score"),
+        "attempts": data.get("attempts"),
+        "accuracy": data.get("accuracy"),
+        "average_reaction": data.get("averageReaction"),
+        "best_streak": data.get("bestStreak"),
+    }
+
+    os.makedirs("logs", exist_ok=True)
+
+    with open("logs/switch_stick_practice.log", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+    return jsonify({"ok": True})
+
+
 @app.route("/wurd_champions")
 def wurd_champions():
     m24_raw = _read_json_from_app_root("wurd_champions_m24.json", [])
