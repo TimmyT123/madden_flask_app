@@ -1,327 +1,877 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Madden Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WURD Madden League</title>
+
     <style>
+        :root {
+            --nav-height: 72px;
+            --page-max: 1120px;
+            --nav-bg: rgba(4, 18, 35, 0.94);
+            --panel-bg: rgba(5, 18, 32, 0.78);
+            --panel-border: rgba(255, 255, 255, 0.16);
+            --text-main: #f3f6fa;
+            --text-muted: #c2cad4;
+            --blue: #36a9e1;
+            --blue-dark: #1677a7;
+            --gold: #f5c542;
+            --gold-hover: #ffda67;
+            --danger: #ff5252;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            min-height: 100%;
+        }
+
         body {
+            min-height: 100vh;
+            margin: 0;
             background: url("{{ url_for('static', filename='images/background-night.jpg') }}") no-repeat center center fixed;
             background-size: cover;
-            font-family: Arial, sans-serif;
-            color: #ababab;
-            text-shadow: 1px 1px 3px black;
-            margin: 0;
-            padding: 0;
+            color: var(--text-main);
+            font-family: Arial, Helvetica, sans-serif;
+            overflow-x: hidden;
         }
 
-        .overlay {
-            background-color: rgba(0, 0, 0, 0.6);
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-        }
-
-        .content {
-          position: relative;
-          z-index: 1;
-          text-align: center;
-          padding: 16px 20px 24px; /* top, sides, bottom */
-        }
-
-        .content h1 {
-          margin: 8px 0 10px; /* was the default (larger) */
-        }
-
-        ul {
-            list-style-type: none;
-            padding: 0;
-        }
-
-        li {
-            margin: 10px 0;
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            background:
+                linear-gradient(to bottom, rgba(0, 10, 22, 0.36), rgba(0, 8, 18, 0.72)),
+                rgba(0, 0, 0, 0.18);
         }
 
         a {
+            color: inherit;
             text-decoration: none;
-            font-weight: bold;
-            color: #f2f2f2;
         }
 
-        a:hover {
-            color: #e74c3c;
+        button,
+        select {
+            font: inherit;
         }
 
-        .links {
-          display: flex;
-          flex-direction: column;  /* stack vertically */
-          align-items: center;     /* keep centered */
-          margin-top: 14px;        /* space from Season/Week above */
-          gap: 6px;                /* even space between Champions & Streamers */
+        /* ---------- Top navigation ---------- */
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            min-height: var(--nav-height);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+            background: var(--nav-bg);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
 
-        .links a {
-          font-weight: bold;
-          text-decoration: none;
-          color: #fff; /* or your accent color */
+        .navbar {
+            width: min(var(--page-max), calc(100% - 32px));
+            min-height: var(--nav-height);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 24px;
         }
 
-        .link-grid{
-          display:grid;
-          grid-template-columns: 1fr 1fr; /* two columns */
-          gap:24px;
-          margin-top: 18px;
-        }
-        .section h2{
-          margin: 0 0 8px 0;
-        }
-        .big-link{
-          display:block;
-          margin:10px 0;
-          padding:14px 16px;
-          border-radius:12px;
-          border:1px solid rgba(255,255,255,0.25);
-          background: rgba(0,0,0,0.35);
-          color:#fff;
-          text-decoration:none;
-          font-weight:700;
-          box-shadow: 0 2px 10px rgba(0,0,0,.25);
-        }
-        .big-link:hover{
-          background: rgba(0,0,0,0.5);
-          border-color: rgba(255,255,255,0.45);
-        }
-        /* Mobile: stack to one column */
-        @media (max-width: 860px){
-          .link-grid{ grid-template-columns: 1fr; }
+        .nav-brand {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 21px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            color: #ffffff;
+            text-shadow: none;
         }
 
-        .btn {
-          display: inline-block;   /* needed so margin-top takes effect on <a> */
-          margin-top: 14px;        /* adjust to taste: 12–24px */
-        }
-        /* Outer span: stroke/outline only */
-        .wurd-stroke{
-          -webkit-text-stroke: 1px #c0c0c0;   /* thin silver outline */
-          /* fallback solid text if inner fails completely */
-          color: #5a6470;
-          font-size: 3.2rem;
+        .nav-brand img {
+            width: 54px;
+            height: 54px;
+            object-fit: contain;
         }
 
-        /* Inner span: animated gradient fill */
-        .wurd-fill{
-          display:inline-block;
-          font-weight:900;
-
-          /* kill the global body text-shadow so it doesn't “fill” the letters black */
-          text-shadow:none;
-
-          /* animated gradient */
-          background-image: linear-gradient(90deg, #041E42, #869397, #FFFFFF, #041E42);
-          background-size: 200% 100%;
-          background-position: 0% 50%;
-          background-repeat: no-repeat;
-          animation: wurd-cowboys 6s linear infinite;
-
-          /* show gradient inside the text */
-          -webkit-background-clip: text;
-          background-clip: text;
-          -webkit-text-fill-color: transparent;
-          color: transparent; /* safety */
-
-          /* if you want a slightly slower, smoother look, try: animation-duration: 10s; */
+        .nav-brand-text {
+            display: inline-flex;
+            flex-direction: column;
+            line-height: 1;
         }
 
-        @keyframes wurd-cowboys{
-          0%   { background-position: 0% 50%; }
-          50%  { background-position:100% 50%; }
-          100% { background-position: 0% 50%; }
+        .nav-brand-text small {
+            margin-top: 5px;
+            color: #99a9bb;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.16em;
         }
 
-        /* Optional: respect reduced-motion settings */
-        @media (prefers-reduced-motion: reduce){
-          .wurd-fill{ animation: none; background-position: 50% 50%; }
+        .menu-toggle {
+            display: none;
+            width: 44px;
+            height: 42px;
+            margin-left: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 9px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #ffffff;
+            cursor: pointer;
         }
 
-        /* Weekly Stats - GREY */
-        .stats-title {
-            color: #8F8F8F;
-            text-shadow: 0 0 14px rgba(56,189,248,.7);
+        .menu-toggle:hover {
+            background: rgba(255, 255, 255, 0.12);
         }
 
-        /* League - GREY */
-        .league-title {
-            color: #A1A1A1;
-            text-shadow: 0 0 14px rgba(20,241,198,.7);
+        .menu-toggle-lines,
+        .menu-toggle-lines::before,
+        .menu-toggle-lines::after {
+            display: block;
+            width: 22px;
+            height: 2px;
+            margin: 0 auto;
+            border-radius: 4px;
+            background: currentColor;
         }
 
-        /* Champions - Bright Gold */
-        .champions-link {
-            color: #ffd700 !important;
-            text-shadow: 0 0 16px rgba(255,215,0,1);
+        .menu-toggle-lines {
+            position: relative;
+        }
+
+        .menu-toggle-lines::before,
+        .menu-toggle-lines::after {
+            content: "";
+            position: absolute;
+            left: 0;
+        }
+
+        .menu-toggle-lines::before {
+            top: -7px;
+        }
+
+        .menu-toggle-lines::after {
+            top: 7px;
+        }
+
+        .nav-menu {
+            flex: 1 1 auto;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 4px;
+        }
+
+        .nav-link,
+        .dropdown-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            min-height: 44px;
+            padding: 0 15px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: #eef4fa;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            text-shadow: none;
+            white-space: nowrap;
+        }
+
+        .nav-link:hover,
+        .nav-link:focus-visible,
+        .dropdown-toggle:hover,
+        .dropdown-toggle:focus-visible,
+        .nav-dropdown.open > .dropdown-toggle {
+            background: rgba(255, 255, 255, 0.09);
+            color: #ffffff;
+            outline: none;
+        }
+
+        .caret {
+            font-size: 11px;
+            opacity: 0.8;
+            transition: transform 0.18s ease;
+        }
+
+        .nav-dropdown {
+            position: relative;
+        }
+
+        .nav-dropdown.open .caret {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 9px);
+            left: 0;
+            z-index: 1100;
+            width: 245px;
+            padding: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 12px;
+            background: rgba(7, 22, 39, 0.98);
+            box-shadow: 0 18px 46px rgba(0, 0, 0, 0.46);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-6px);
+            transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+        }
+
+        .nav-dropdown.open .dropdown-menu,
+        .nav-dropdown:hover .dropdown-menu,
+        .nav-dropdown:focus-within .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-menu a {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-height: 43px;
+            padding: 9px 11px;
+            border-radius: 8px;
+            color: #eaf1f8;
+            font-size: 14px;
+            font-weight: 700;
+            text-shadow: none;
+        }
+
+        .dropdown-menu a:hover,
+        .dropdown-menu a:focus-visible {
+            background: rgba(54, 169, 225, 0.15);
+            color: #ffffff;
+            outline: none;
+        }
+
+        .dropdown-icon {
+            width: 24px;
+            text-align: center;
+            font-size: 17px;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            margin: 7px 4px;
+            background: rgba(255, 255, 255, 0.11);
+        }
+
+        .recruit-nav-btn {
+            margin-left: 8px;
+            padding: 0 18px;
+            background: var(--gold);
+            color: #121212;
+            box-shadow: 0 0 16px rgba(245, 197, 66, 0.28);
+        }
+
+        .recruit-nav-btn:hover,
+        .recruit-nav-btn:focus-visible {
+            background: var(--gold-hover);
+            color: #111111;
+        }
+
+        /* ---------- Main hero ---------- */
+        .content {
+            position: relative;
+            z-index: 1;
+            width: min(var(--page-max), calc(100% - 32px));
+            margin: 0 auto;
+            padding: 42px 0 56px;
+            text-align: center;
+        }
+
+        .hero-card {
+            width: min(820px, 100%);
+            margin: 0 auto;
+            padding: 30px 34px 34px;
+            border: 1px solid var(--panel-border);
+            border-radius: 22px;
+            background: var(--panel-bg);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .hero-logo {
+            display: block;
+            width: min(280px, 72vw);
+            margin: 0 auto 8px;
+            filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.35));
+        }
+
+        .eyebrow {
+            margin: 6px 0 10px;
+            color: #9db2c8;
+            font-size: 13px;
             font-weight: 800;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            text-shadow: none;
         }
 
-        /* Streamers - Electric Purple */
-        .streamers-link {
-            color: #5724B5 !important;
-            text-shadow: 0 0 14px rgba(202,151,252,.9);
+        .hero-title {
+            margin: 0;
+            color: #f4f4f4;
+            font-size: clamp(30px, 5vw, 50px);
+            line-height: 1.12;
+            text-shadow: 0 3px 9px rgba(0, 0, 0, 0.8);
+        }
+
+        .wurd-stroke {
+            -webkit-text-stroke: 1px #c0c0c0;
+            color: #5a6470;
+        }
+
+        .wurd-fill {
+            display: inline-block;
+            background-image: linear-gradient(90deg, #0b2c50, #8b969f, #ffffff, #0b2c50);
+            background-size: 200% 100%;
+            background-position: 0 50%;
+            background-repeat: no-repeat;
+            color: transparent;
+            font-weight: 900;
+            text-shadow: none;
+            animation: wurd-cowboys 7s linear infinite;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        @keyframes wurd-cowboys {
+            0% { background-position: 0 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0 50%; }
+        }
+
+        .status-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin: 26px 0 14px;
+        }
+
+        .status-card {
+            min-height: 86px;
+            padding: 15px 18px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 13px;
+            background: rgba(255, 255, 255, 0.055);
+            text-align: left;
+            text-shadow: none;
+        }
+
+        .status-label {
+            display: block;
+            margin-bottom: 7px;
+            color: #9fb0c1;
+            font-size: 12px;
             font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
         }
 
-        /* Weekly Stat Links */
-        .stats-link {
-            color: #1F49FF !important;
-        }
-
-        /* League Links */
-        .league-link {
-            color: #209BD4 !important;
+        .status-value {
+            color: #ffffff;
+            font-size: 21px;
+            font-weight: 800;
+            line-height: 1.22;
         }
 
         .advance-banner {
-            margin-top: 10px;
-            font-size: 22px;
-            font-weight: bold;
-            color: #C42727;
-            text-shadow: 2px 2px 6px black;
-            margin-bottom: 30px;
-        }
-
-        .practice-link {
-            color: #00ff99;
-            font-size: 24px;
-            font-weight: bold;
-            text-decoration: none;
-            text-shadow: 2px 2px 4px black;
-        }
-
-        .practice-link:hover {
-            color: #66ffcc;
-            text-decoration: underline;
-        }
-
-        .join-wurd-btn {
-            display: inline-block;
-            background: #f5c542;
-            color: #111 !important;
-            padding: 14px 24px;
-            border-radius: 8px;
-            font-weight: bold;
-            text-decoration: none;
+            color: #ff6161;
             font-size: 18px;
-            text-shadow: none;
-            box-shadow: 0 0 18px rgba(245, 197, 66, 0.45);
         }
 
-        .join-wurd-btn:hover {
-            background: #ffd95c;
-            color: #111 !important;
+        .selector-panel {
+            margin-top: 18px;
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            background: rgba(0, 0, 0, 0.22);
+            text-align: left;
+            text-shadow: none;
+        }
+
+        .selector-heading {
+            margin: 0 0 12px;
+            color: #dce6f0;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .selector-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        .field-group label {
+            display: block;
+            margin: 0 0 6px;
+            color: #b8c5d2;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .field-group select {
+            width: 100%;
+            min-height: 43px;
+            padding: 0 11px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(7, 18, 30, 0.94);
+            color: #ffffff;
+            outline: none;
+        }
+
+        .field-group select:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(54, 169, 225, 0.18);
+        }
+
+        .primary-actions {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+            padding: 0 21px;
+            border: 1px solid transparent;
+            border-radius: 9px;
+            font-size: 15px;
+            font-weight: 800;
+            text-shadow: none;
+            transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .action-primary {
+            background: var(--blue);
+            color: #06131e;
+        }
+
+        .action-primary:hover {
+            background: #5ac1ef;
+            color: #06131e;
+        }
+
+        .action-secondary {
+            border-color: rgba(255, 255, 255, 0.28);
+            background: rgba(255, 255, 255, 0.07);
+            color: #ffffff;
+        }
+
+        .action-secondary:hover {
+            border-color: rgba(255, 255, 255, 0.48);
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
         }
 
         .join-wurd-note {
-            margin-top: 8px;
-            font-size: 14px;
-            color: #ddd;
-            text-shadow: 1px 1px 3px black;
+            margin: 14px auto 0;
+            max-width: 650px;
+            color: var(--text-muted);
+            font-size: 13px;
+            line-height: 1.5;
+            text-shadow: none;
         }
 
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        @media (max-width: 860px) {
+            :root {
+                --nav-height: 64px;
+            }
+
+            .navbar {
+                width: min(100% - 24px, var(--page-max));
+                flex-wrap: wrap;
+                gap: 8px;
+                padding: 5px 0;
+            }
+
+            .nav-brand img {
+                width: 48px;
+                height: 48px;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .nav-menu {
+                display: none;
+                flex: 1 0 100%;
+                align-items: stretch;
+                flex-direction: column;
+                gap: 4px;
+                padding: 7px 0 12px;
+            }
+
+            .nav-menu.open {
+                display: flex;
+            }
+
+            .nav-link,
+            .dropdown-toggle {
+                width: 100%;
+                justify-content: space-between;
+                min-height: 46px;
+                padding: 0 13px;
+                text-align: left;
+            }
+
+            .recruit-nav-btn {
+                margin: 5px 0 0;
+                justify-content: center;
+            }
+
+            .nav-dropdown {
+                width: 100%;
+            }
+
+            .nav-dropdown:hover .dropdown-menu,
+            .nav-dropdown:focus-within .dropdown-menu {
+                opacity: 0;
+                visibility: hidden;
+                transform: none;
+            }
+
+            .nav-dropdown.open .dropdown-menu {
+                display: block;
+                position: static;
+                width: 100%;
+                margin-top: 4px;
+                border-radius: 9px;
+                box-shadow: none;
+                opacity: 1;
+                visibility: visible;
+                transform: none;
+            }
+
+            .dropdown-menu {
+                display: none;
+            }
+
+            .content {
+                width: min(100% - 22px, var(--page-max));
+                padding: 24px 0 38px;
+            }
+
+            .hero-card {
+                padding: 22px 18px 25px;
+                border-radius: 17px;
+            }
+
+            .status-row {
+                grid-template-columns: 1fr;
+            }
+
+            .status-card {
+                min-height: auto;
+                text-align: center;
+            }
+
+            .selector-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .nav-brand-text small {
+                display: none;
+            }
+
+            .hero-title {
+                font-size: 31px;
+            }
+
+            .primary-actions {
+                flex-direction: column;
+            }
+
+            .action-btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
+
 <body>
-    <div class="overlay"></div>
-    <div class="content">
+    <header class="site-header">
+        <nav class="navbar" aria-label="Main navigation">
+            <a class="nav-brand" href="/" aria-label="WURD home">
+                <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="">
+                <span class="nav-brand-text">
+                    WURD
+                    <small>MADDEN LEAGUE</small>
+                </span>
+            </a>
 
-    <img src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD Logo" style="max-width: 300px; display: block; margin: 0 auto;">
-    <div style="text-align:center; margin: 20px 0;">
-        <a href="{{ url_for('join_wurd') }}" class="join-wurd-btn">
-            Start Recruit Process
-        </a>
-        <div class="join-wurd-note">
-            New users enter a restricted recruit area first. Full league access requires commissioner approval.
-        </div>
-    </div>
-    <div style="font-size: 1.5rem; line-height: 1.5;">
-        <h1>🏈 Welcome to <span class="wurd-stroke"><span class="wurd-fill">WURD</span></span> Madden Franchise!</h1>
-        <p style="margin-bottom: 0.2rem;">
-          <strong>Current Week:</strong>
-          {% if current_week == 19 %}
-            Wildcard
-          {% elif current_week == 20 %}
-            Divisional
-          {% elif current_week == 21 %}
-            Conference
-          {% elif current_week == 22 %}
-            Pro Bowl
-          {% elif current_week == 23 %}
-            Super "WURD" Bowl
-          {% else %}
-            {{ latest_week_label }}
-          {% endif %}
-        </p>
+            <button
+                class="menu-toggle"
+                id="mobileNavToggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="mainNavMenu"
+                aria-label="Open navigation menu"
+            >
+                <span class="menu-toggle-lines" aria-hidden="true"></span>
+            </button>
 
-        {% if show_advance_info and advance_info %}
-            <div class="advance-banner">
-                ⏰ {{ advance_info.status_text }}
+            <div class="nav-menu" id="mainNavMenu">
+                <a class="nav-link" href="/">Home</a>
+
+                <div class="nav-dropdown">
+                    <button class="dropdown-toggle" type="button" aria-expanded="false">
+                        League <span class="caret" aria-hidden="true">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="#" onclick="goToSchedule(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">📅</span> Schedule
+                        </a>
+                        <a href="#" onclick="goToTeams(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">🏈</span> Teams
+                        </a>
+                        <a href="#" onclick="goToRosters(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">👥</span> Rosters
+                        </a>
+                        <a href="#" onclick="goToStandings(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">📊</span> Standings
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="{{ url_for('wurd_champions') }}">
+                            <span class="dropdown-icon">👑</span> Champions
+                        </a>
+                        <a href="#" onclick="goToStreamers(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">🎥</span> Streamers
+                        </a>
+                    </div>
+                </div>
+
+                <div class="nav-dropdown">
+                    <button class="dropdown-toggle" type="button" aria-expanded="false">
+                        Stats <span class="caret" aria-hidden="true">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="#" onclick="goToStats(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">🎯</span> Passing Stats
+                        </a>
+                        <a href="#" onclick="goToReceiving(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">🙌</span> Receiving Stats
+                        </a>
+                        <a href="#" onclick="goToRushing(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">💨</span> Rushing Stats
+                        </a>
+                        <a href="#" onclick="goToDefense(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">🛡️</span> Defensive Stats
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="#" onclick="goToRookies(); closeNavigation(); return false;">
+                            <span class="dropdown-icon">🌟</span> Rookie Preseason Stats
+                        </a>
+                    </div>
+                </div>
+
+                <div class="nav-dropdown">
+                    <button class="dropdown-toggle" type="button" aria-expanded="false">
+                        Practice <span class="caret" aria-hidden="true">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="/qb-practice">
+                            <span class="dropdown-icon">🎯</span> QB Passing Practice
+                        </a>
+                        <a href="/switch-stick-practice">
+                            <span class="dropdown-icon">🕹️</span> Switch-Stick Practice
+                        </a>
+                        <a href="/r2-practice">
+                            <span class="dropdown-icon">🏃</span> R2 Practice
+                        </a>
+                    </div>
+                </div>
+
+                <a class="nav-link recruit-nav-btn" href="{{ url_for('join_wurd') }}">
+                    Join WURD
+                </a>
             </div>
-        {% endif %}
+        </nav>
+    </header>
 
-        <form id="navForm" method="get" onsubmit="return false;">
-            <div style="margin-bottom: 8px;">
-                <label for="league">League:</label>
-                <select name="league" id="league">
-                    {% for league in leagues %}
-                        {% if league.id.isdigit() %}
-                            <option value="{{ league.id }}"
-                                {% if league.id == latest_league %}selected{% endif %}>
-                                {{ league.id }}
-                            </option>
+    <main class="content">
+        <section class="hero-card">
+            <img
+                class="hero-logo"
+                src="{{ url_for('static', filename='images/wurd_logo.png') }}"
+                alt="WURD Madden Football League"
+            >
+
+            <p class="eyebrow">Who's Ur Daddy Madden Football League</p>
+
+            <h1 class="hero-title">
+                Welcome to <span class="wurd-stroke"><span class="wurd-fill">WURD</span></span>
+            </h1>
+
+            <div class="status-row">
+                <div class="status-card">
+                    <span class="status-label">Current Week</span>
+                    <div class="status-value">
+                        {% if current_week == 19 %}
+                            Wildcard
+                        {% elif current_week == 20 %}
+                            Divisional
+                        {% elif current_week == 21 %}
+                            Conference
+                        {% elif current_week == 22 %}
+                            Pro Bowl
+                        {% elif current_week == 23 %}
+                            Super "WURD" Bowl
+                        {% else %}
+                            {{ latest_week_label }}
                         {% endif %}
-                    {% endfor %}
-                </select>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <span class="status-label">Next Advance</span>
+                    <div class="status-value advance-banner">
+                        {% if show_advance_info and advance_info %}
+                            ⏰ {{ advance_info.status_text }}
+                        {% else %}
+                            Check league announcements
+                        {% endif %}
+                    </div>
+                </div>
             </div>
 
-            <label for="season">Season:</label>
-            <select name="season" id="season"></select>
+            <form id="navForm" class="selector-panel" method="get" onsubmit="return false;">
+                <p class="selector-heading">Choose the league data you want to view</p>
 
-            <label for="week">Week:</label>
-            <select name="week" id="week"></select>
-        </form>
+                <div class="selector-grid">
+                    <div class="field-group">
+                        <label for="league">League</label>
+                        <select name="league" id="league">
+                            {% for league in leagues %}
+                                {% if league.id.isdigit() %}
+                                    <option
+                                        value="{{ league.id }}"
+                                        {% if league.id == latest_league %}selected{% endif %}
+                                    >
+                                        {{ league.id }}
+                                    </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
 
-        <div class="links">
-          <a href="{{ url_for('wurd_champions') }}" class="champions-link">👑 Champions</a>
-          <a href="#" onclick="goToStreamers()" class="streamers-link btn">🎥 Streamers</a>
-          <a href="{{ url_for('qb_practice') }}" class="practice-link">🎯 QB Passing Practice</a>
-        </div>
+                    <div class="field-group">
+                        <label for="season">Season</label>
+                        <select name="season" id="season"></select>
+                    </div>
 
-        <div class="link-grid">
-          <!-- Left column: Weekly Stats -->
-          <div class="section">
-            <h2 class="stats-title">Weekly Stats</h2>
-            <a class="big-link stats-link" href="#" onclick="goToStats()">View Passing Stats</a>
-            <a class="big-link stats-link" href="#" onclick="goToReceiving()">View Receiving Stats</a>
-            <a class="big-link stats-link" href="#" onclick="goToRushing()">View Rushing Stats</a>
-            <a class="big-link stats-link" href="#" onclick="goToDefense()">View Defensive Stats</a>
-            <a class="big-link stats-link" href="/rookies?league={{ latest_league }}&season={{ latest_season }}">🌟 Top Rookie Preseason Stats</a>
-          </div>
+                    <div class="field-group">
+                        <label for="week">Week</label>
+                        <select name="week" id="week"></select>
+                    </div>
+                </div>
+            </form>
 
-          <!-- Right column: League -->
-          <div class="section">
-              <h2 class="league-title">League</h2>
-              <a class="big-link league-link" href="#" onclick="goToSchedule()">View Schedule</a>
-              <a class="big-link league-link" href="#" onclick="goToTeams()">View Teams</a>
-              <a class="big-link league-link" href="#" onclick="goToRosters()">View Rosters</a>
-              <a class="big-link league-link" href="#" onclick="goToStandings()">View Standings</a>
-          </div>
-        </div>
-    </div>
+            <div class="primary-actions">
+                <a class="action-btn action-primary" href="#" onclick="goToSchedule(); return false;">
+                    📅 View Selected Week Schedule
+                </a>
+                <a class="action-btn action-secondary" href="{{ url_for('join_wurd') }}">
+                    Join the League
+                </a>
+            </div>
+
+            <p class="join-wurd-note">
+                New users begin in a restricted recruit area. Full league access requires commissioner approval.
+            </p>
+        </section>
+    </main>
 
     <script>
         const leagueData = {{ leagues|tojson }};
         const latestLeague = "{{ latest_league }}";
         const latestSeason = "{{ latest_season }}";
         const latestWeek = "{{ latest_week }}";
+
+        const mobileNavToggle = document.getElementById("mobileNavToggle");
+        const mainNavMenu = document.getElementById("mainNavMenu");
+        const dropdowns = Array.from(document.querySelectorAll(".nav-dropdown"));
+        const dropdownToggles = Array.from(document.querySelectorAll(".dropdown-toggle"));
+
+        function closeNavigation() {
+            mainNavMenu.classList.remove("open");
+            mobileNavToggle.setAttribute("aria-expanded", "false");
+
+            dropdowns.forEach(dropdown => dropdown.classList.remove("open"));
+            dropdownToggles.forEach(toggle => toggle.setAttribute("aria-expanded", "false"));
+        }
+
+        mobileNavToggle.addEventListener("click", function () {
+            const isOpen = mainNavMenu.classList.toggle("open");
+            mobileNavToggle.setAttribute("aria-expanded", String(isOpen));
+        });
+
+        dropdownToggles.forEach(toggle => {
+            toggle.addEventListener("click", function (event) {
+                event.stopPropagation();
+
+                const currentDropdown = toggle.closest(".nav-dropdown");
+                const willOpen = !currentDropdown.classList.contains("open");
+
+                dropdowns.forEach(dropdown => dropdown.classList.remove("open"));
+                dropdownToggles.forEach(item => item.setAttribute("aria-expanded", "false"));
+
+                if (willOpen) {
+                    currentDropdown.classList.add("open");
+                    toggle.setAttribute("aria-expanded", "true");
+                }
+            });
+        });
+
+        document.addEventListener("click", function (event) {
+            if (!event.target.closest(".navbar")) {
+                closeNavigation();
+            }
+        });
+
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 860) {
+                closeNavigation();
+            }
+        });
 
         function getSelectedLeagueId() {
             return document.getElementById("league").value;
@@ -332,12 +882,10 @@
 
             if (!seasonVal) return "";
 
-            // If already season_0, keep it.
             if (seasonVal.startsWith("season_")) {
                 return seasonVal;
             }
 
-            // If just 0, convert to season_0.
             return "season_" + seasonVal;
         }
 
@@ -350,75 +898,71 @@
         }
 
         function getLeagueObject(leagueId) {
-            return leagueData.find(l => String(l.id) === String(leagueId));
+            return leagueData.find(league => String(league.id) === String(leagueId));
         }
 
         function goToStreamers() {
             const { league } = getDropdownValues();
 
             if (!league) {
-                alert("Please select League.");
+                alert("Please select a league.");
                 return;
             }
 
-            window.location.href = `/streamers?league=${league}`;
+            window.location.href = `/streamers?league=${encodeURIComponent(league)}`;
         }
 
         function goToTeams() {
             const { league } = getDropdownValues();
 
             if (!league) {
-                alert("Please select League.");
+                alert("Please select a league.");
                 return;
             }
 
-            window.location.href = `/teams?league=${league}`;
+            window.location.href = `/teams?league=${encodeURIComponent(league)}`;
         }
 
         function goToRosters() {
             const { league } = getDropdownValues();
 
             if (!league) {
-                alert("Please select League.");
+                alert("Please select a league.");
                 return;
             }
 
-            window.location.href = `/rosters?league=${league}`;
+            window.location.href = `/rosters?league=${encodeURIComponent(league)}`;
         }
 
         function populateSeasons() {
             const leagueSelect = document.getElementById("league");
             const seasonSelect = document.getElementById("season");
             const weekSelect = document.getElementById("week");
-
             const selectedLeague = leagueSelect.value;
 
-            seasonSelect.innerHTML = '';
-            weekSelect.innerHTML = '';
+            seasonSelect.innerHTML = "";
+            weekSelect.innerHTML = "";
 
             const league = getLeagueObject(selectedLeague);
             if (!league) return;
 
-            league.seasons.forEach(s => {
-                if (!/^season_\d+$/.test(s.name)) return;
+            league.seasons.forEach(season => {
+                if (!/^season_\d+$/.test(season.name)) return;
 
-                const opt = document.createElement("option");
-
-                // Keep the full folder name to avoid confusion
-                opt.value = s.name;
-                opt.text = s.name;
+                const option = document.createElement("option");
+                option.value = season.name;
+                option.text = season.name;
 
                 if (
                     selectedLeague === latestLeague &&
-                    s.name === latestSeason
+                    season.name === latestSeason
                 ) {
-                    opt.selected = true;
+                    option.selected = true;
                 }
 
-                seasonSelect.appendChild(opt);
+                seasonSelect.appendChild(option);
             });
 
-            // If switching to an old league and nothing selected, select first season.
             if (!seasonSelect.value && seasonSelect.options.length > 0) {
                 seasonSelect.selectedIndex = 0;
             }
@@ -431,37 +975,36 @@
             const selectedSeason = getSelectedSeasonFolder();
             const weekSelect = document.getElementById("week");
 
-            weekSelect.innerHTML = '';
+            weekSelect.innerHTML = "";
 
             const league = getLeagueObject(selectedLeague);
-            const season = league?.seasons?.find(s => s.name === selectedSeason);
+            const season = league?.seasons?.find(item => item.name === selectedSeason);
 
             if (!season) return;
 
-            season.weeks.forEach(w => {
-                const opt = document.createElement("option");
-                opt.value = w;
+            season.weeks.forEach(week => {
+                const option = document.createElement("option");
+                option.value = week;
 
-                if (w.startsWith("pre_")) {
-                    opt.text = "Preseason Week " + w.replace("pre_", "");
-                } else if (w.startsWith("week_")) {
-                    opt.text = "Week " + w.replace("week_", "");
+                if (week.startsWith("pre_")) {
+                    option.text = "Preseason Week " + week.replace("pre_", "");
+                } else if (week.startsWith("week_")) {
+                    option.text = "Week " + week.replace("week_", "");
                 } else {
-                    opt.text = w;
+                    option.text = week;
                 }
 
                 if (
                     selectedLeague === latestLeague &&
                     selectedSeason === latestSeason &&
-                    w === latestWeek
+                    week === latestWeek
                 ) {
-                    opt.selected = true;
+                    option.selected = true;
                 }
 
-                weekSelect.appendChild(opt);
+                weekSelect.appendChild(option);
             });
 
-            // If switching to an old league/season and nothing selected, select latest available week in that list.
             if (!weekSelect.value && weekSelect.options.length > 0) {
                 weekSelect.selectedIndex = weekSelect.options.length - 1;
             }
@@ -472,86 +1015,79 @@
 
             if (!league) return;
 
-            let url = `/?league=${league}`;
+            const params = new URLSearchParams({ league });
 
-            if (season) {
-                url += `&season=${season}`;
+            if (season) params.set("season", season);
+            if (week) params.set("week", week);
+
+            window.location.href = `/?${params.toString()}`;
+        }
+
+        function requireLeagueSeasonWeek() {
+            const values = getDropdownValues();
+
+            if (!values.league || !values.season || !values.week) {
+                alert("Please select a league, season, and week.");
+                return null;
             }
 
-            if (week) {
-                url += `&week=${week}`;
-            }
-
-            window.location.href = url;
+            return values;
         }
 
         function goToStats() {
-            const { league, season, week } = getDropdownValues();
+            const values = requireLeagueSeasonWeek();
+            if (!values) return;
 
-            if (!league || !season || !week) {
-                alert("Please select League, Season and Week.");
-                return;
-            }
-
-            window.location.href = `/stats?league=${league}&season=${season}&week=${week}`;
+            window.location.href = `/stats?league=${encodeURIComponent(values.league)}&season=${encodeURIComponent(values.season)}&week=${encodeURIComponent(values.week)}`;
         }
 
         function goToReceiving() {
-            const { league, season, week } = getDropdownValues();
+            const values = requireLeagueSeasonWeek();
+            if (!values) return;
 
-            if (!league || !season || !week) {
-                alert("Please select League, Season and Week.");
-                return;
-            }
-
-            window.location.href = `/receiving?league=${league}&season=${season}&week=${week}`;
+            window.location.href = `/receiving?league=${encodeURIComponent(values.league)}&season=${encodeURIComponent(values.season)}&week=${encodeURIComponent(values.week)}`;
         }
 
         function goToRushing() {
-            const { league, season, week } = getDropdownValues();
+            const values = requireLeagueSeasonWeek();
+            if (!values) return;
 
-            if (!league || !season || !week) {
-                alert("Please select League, Season and Week.");
-                return;
-            }
-
-            window.location.href = `/rushing?league=${league}&season=${season}&week=${week}`;
+            window.location.href = `/rushing?league=${encodeURIComponent(values.league)}&season=${encodeURIComponent(values.season)}&week=${encodeURIComponent(values.week)}`;
         }
 
         function goToDefense() {
-            const { league, season, week } = getDropdownValues();
+            const values = requireLeagueSeasonWeek();
+            if (!values) return;
 
-            if (!league || !season || !week) {
-                alert("Please select League, Season and Week.");
-                return;
-            }
-
-            window.location.href = `/defense?league=${league}&season=${season}&week=${week}`;
+            window.location.href = `/defense?league=${encodeURIComponent(values.league)}&season=${encodeURIComponent(values.season)}&week=${encodeURIComponent(values.week)}`;
         }
 
         function goToSchedule() {
-            const { league, season, week } = getDropdownValues();
+            const values = requireLeagueSeasonWeek();
+            if (!values) return;
 
-            if (!league || !season || !week) {
-                alert("Please select League, Season and Week.");
-                return;
-            }
-
-            window.location.href = `/schedule?league=${league}&season=${season}&week=${week}`;
+            window.location.href = `/schedule?league=${encodeURIComponent(values.league)}&season=${encodeURIComponent(values.season)}&week=${encodeURIComponent(values.week)}`;
         }
 
         function goToStandings() {
-            const { league, season, week } = getDropdownValues();
+            const values = requireLeagueSeasonWeek();
+            if (!values) return;
 
-            if (!league || !season || !week) {
-                alert("Please select League, Season and Week.");
+            window.location.href = `/standings?league=${encodeURIComponent(values.league)}&season=${encodeURIComponent(values.season)}&week=${encodeURIComponent(values.week)}`;
+        }
+
+        function goToRookies() {
+            const { league, season } = getDropdownValues();
+
+            if (!league || !season) {
+                alert("Please select a league and season.");
                 return;
             }
 
-            window.location.href = `/standings?league=${league}&season=${season}&week=${week}`;
+            window.location.href = `/rookies?league=${encodeURIComponent(league)}&season=${encodeURIComponent(season)}`;
         }
 
-        window.onload = populateSeasons;
+        window.addEventListener("load", populateSeasons);
 
         document.getElementById("league").addEventListener("change", function () {
             populateSeasons();
@@ -567,6 +1103,5 @@
             refreshHomeWithSelectedLeague();
         });
     </script>
-   </div> <!-- close .content -->
 </body>
 </html>
