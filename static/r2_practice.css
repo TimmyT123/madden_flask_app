@@ -1,3 +1,4 @@
+/* WURD R2 Discipline Practice v7 — LOS moved above offensive line */
 * {
     box-sizing: border-box;
 }
@@ -628,4 +629,34 @@ select,
     .lesson-row {
         grid-template-columns: repeat(3, 1fr);
     }
+}
+
+
+/* v6 LOS overlay */
+.scrimmage-line {
+    position: absolute;
+    left: 6%;
+    width: 88%;
+    top: 44%;
+    height: 0;
+    border-top: 3px dashed rgba(56, 189, 248, 0.95);
+    box-shadow: 0 0 0 2px rgba(5, 5, 5, 0.18);
+    opacity: 0.96;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.scrimmage-line span {
+    position: absolute;
+    left: 50%;
+    top: -18px;
+    transform: translateX(-50%);
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(6, 18, 26, 0.86);
+    color: #bfe9ff;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
 }

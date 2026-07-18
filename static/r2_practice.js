@@ -1,5 +1,6 @@
-// WURD R2 Discipline Practice v4
-// The lane opens first. The player must steer without R2 until reaching the burst point.
+// WURD R2 Discipline Practice v7 — LOS reference moved above offensive line
+// Offense begins at the bottom and moves upward.
+// Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
 
 const DIFFICULTIES = {
@@ -87,6 +88,8 @@ const els = {
         middle: document.getElementById("laneMiddle"),
         right: document.getElementById("laneRight")
     },
+    lineOfScrimmage: document.getElementById("lineOfScrimmage"),
+    lineOfScrimmageLabel: document.getElementById("lineOfScrimmageLabel"),
     burstLine: document.getElementById("burstLine"),
     burstLineLabel: document.getElementById("burstLineLabel"),
     directionArrow: document.getElementById("directionArrow"),
@@ -127,6 +130,7 @@ const state = {
     approachProgress: 0,
     approachDuration: 850,
     burstLineTop: 52,
+    lineOfScrimmageTop: 44,
     approachLastAt: 0,
     cueTimer: null,
     lateTimer: null,
@@ -276,10 +280,28 @@ function directionX(direction) {
     return 50;
 }
 
+
+function losRelationshipText() {
+    if (state.playType === "defense") {
+        return "Stay above the LOS until you close downhill.";
+    }
+    if (state.runConcept === "outside" && state.outsideTiming === "open") {
+        return "Use the LOS as a reference only; a clean edge can justify bursting before or near it.";
+    }
+    return "If you are still behind the LOS, R2 is usually still too early.";
+}
+
 function requiredStickLabel(direction) {
-    if (direction === "left") return "up-left ↖";
-    if (direction === "right") return "up-right ↗";
-    return "straight up ↑";
+    const verticalWord = state.playType === "defense" ? "down" : "up";
+    const verticalArrow = state.playType === "defense" ? "↓" : "↑";
+
+    if (direction === "left") {
+        return state.playType === "defense" ? "down-left ↙" : "up-left ↖";
+    }
+    if (direction === "right") {
+        return state.playType === "defense" ? "down-right ↘" : "up-right ↗";
+    }
+    return `straight ${verticalWord} ${verticalArrow}`;
 }
 
 function describeStickDirection(x = state.leftX, y = state.leftY) {
@@ -296,9 +318,13 @@ function describeStickDirection(x = state.leftX, y = state.leftY) {
 }
 
 function stickMatchesTarget(direction, x = state.leftX, y = state.leftY) {
-    const movingForward = y <= -STICK_FORWARD_MIN;
-    if (!movingForward) return false;
+    // Madden's standard camera keeps offense at the bottom and defense at the top.
+    // Offense therefore attacks upward; a user-controlled defender closes downward.
+    const movingForward = state.playType === "defense"
+        ? y >= STICK_FORWARD_MIN
+        : y <= -STICK_FORWARD_MIN;
 
+    if (!movingForward) return false;
     if (direction === "left") return x <= -STICK_SIDE_MIN;
     if (direction === "right") return x >= STICK_SIDE_MIN;
     return Math.abs(x) <= STICK_MIDDLE_MAX_X;
@@ -308,7 +334,12 @@ function resetFieldVisuals() {
     Object.values(els.lanes).forEach((lane) => lane.classList.remove("open"));
     els.directionArrow.classList.remove("visible");
     els.directionArrow.style.left = "50%";
+    els.directionArrow.style.top = "23%";
+    els.directionArrow.textContent = "▲";
     els.directionArrow.style.transform = "translate(-50%, -50%) rotate(0deg)";
+
+    els.lineOfScrimmage.style.top = `${state.lineOfScrimmageTop}%`;
+    els.lineOfScrimmageLabel.textContent = "LINE OF SCRIMMAGE";
 
     els.burstLine.classList.remove("visible", "ready");
     els.burstLine.style.top = "52%";
@@ -317,11 +348,12 @@ function resetFieldVisuals() {
     els.runner.style.left = "50%";
     els.runner.style.top = "72%";
     els.runner.style.opacity = "1";
+    // Madden camera orientation: defense at the top, offense at the bottom.
     els.defender.style.left = "50%";
-    els.defender.style.top = "68%";
+    els.defender.style.top = "30%";
     els.defender.style.opacity = "1";
     els.ballCarrier.style.left = "50%";
-    els.ballCarrier.style.top = "34%";
+    els.ballCarrier.style.top = "68%";
     els.ballCarrier.style.opacity = "1";
 
     els.blockers.forEach((blocker, index) => {
@@ -342,8 +374,8 @@ function configureFieldForPlay() {
         els.blockers.forEach((blocker) => blocker.classList.add("hidden"));
         els.defender.classList.remove("hidden");
         els.ballCarrier.classList.remove("hidden");
-        els.phaseTitle.textContent = "Stay square and read";
-        els.phaseInstruction.textContent = "Keep R2 released while the runner hesitates. Aim only after he commits.";
+        els.phaseTitle.textContent = "Stay square at the top and read";
+        els.phaseInstruction.textContent = "The runner is below you. Stay above the LOS, keep R2 released, then close downward only after he commits.";
         return;
     }
 
@@ -372,7 +404,7 @@ function showWaitState() {
     setCue("wait", "WAIT");
     els.reactionMeterFill.className = "reaction-meter-fill";
     els.reactionMeterFill.style.animationDuration = "";
-    setFeedback("Read first. Keep R2 completely released.", "neutral");
+    setFeedback(`Read first. Keep R2 completely released. ${losRelationshipText()}`, "neutral");
 }
 
 function animateReadPhase() {
@@ -400,6 +432,21 @@ function setDirectionArrow() {
     els.directionArrow.style.left = `${x}%`;
     els.directionArrow.classList.add("visible");
 
+    if (state.playType === "defense") {
+        els.directionArrow.style.top = "43%";
+        els.directionArrow.textContent = "▼";
+        if (state.direction === "left") {
+            els.directionArrow.style.transform = "translate(-50%, -50%) rotate(45deg)";
+        } else if (state.direction === "right") {
+            els.directionArrow.style.transform = "translate(-50%, -50%) rotate(-45deg)";
+        } else {
+            els.directionArrow.style.transform = "translate(-50%, -50%) rotate(0deg)";
+        }
+        return;
+    }
+
+    els.directionArrow.style.top = "23%";
+    els.directionArrow.textContent = "▲";
     if (state.direction === "left") {
         els.directionArrow.style.transform = "translate(-50%, -50%) rotate(-45deg)";
     } else if (state.direction === "right") {
@@ -411,10 +458,11 @@ function setDirectionArrow() {
 
 function configureApproachTiming() {
     const difficulty = currentDifficulty();
+    state.lineOfScrimmageTop = 44;
 
     if (state.playType === "defense") {
         state.approachDuration = difficulty.defenseApproach;
-        state.burstLineTop = 56;
+        state.burstLineTop = 49;
         els.burstLineLabel.textContent = "R2 CLOSE POINT";
         return;
     }
@@ -465,6 +513,7 @@ function revealDecision() {
     configureApproachTiming();
     setDirectionArrow();
 
+    els.lineOfScrimmage.style.top = `${state.lineOfScrimmageTop}%`;
     els.burstLine.style.top = `${state.burstLineTop}%`;
     els.burstLine.classList.add("visible");
     els.burstLine.classList.remove("ready");
@@ -473,10 +522,10 @@ function revealDecision() {
     const x = directionX(state.direction);
     if (state.playType === "defense") {
         els.ballCarrier.style.left = `${x}%`;
-        els.ballCarrier.style.top = "46%";
-        els.phaseTitle.textContent = "Runner committed—close under control";
-        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)} without R2. Sprint only when you reach the close point.`;
-        setFeedback("Aim at the runner. R2 is still too early.", "neutral");
+        els.ballCarrier.style.top = "58%";
+        els.phaseTitle.textContent = "Runner committed below you—close under control";
+        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)} without R2. Stay above the blue dashed LOS until you close downhill, and sprint only when you reach the close point.`;
+        setFeedback("Pursue downward toward the runner. The LOS is a reference in defense too, but wait for the close point before R2.", "neutral");
         return;
     }
 
@@ -485,16 +534,16 @@ function revealDecision() {
 
     if (state.runConcept === "outside" && state.outsideTiming === "open") {
         els.phaseTitle.textContent = "The edge is already sealed";
-        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)}. The burst point is early, so be ready to accelerate soon.`;
-        setFeedback("The edge is clean, but steer first. Do not mash R2 from the handoff.", "neutral");
+        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)}. The blue dashed LOS is your reference; this clean edge gives you an earlier burst point.`;
+        setFeedback("The edge is clean. You may burst before or near the LOS here—but still steer first and do not mash R2 from the handoff.", "neutral");
     } else if (state.runConcept === "outside") {
         els.phaseTitle.textContent = "The outside block is developing";
-        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)} and follow the block. Keep R2 released until the later burst point.`;
-        setFeedback("Stay patient and follow the blocker before accelerating.", "neutral");
+        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)} and follow the block. The blue dashed LOS helps show when you are still behind it. Keep R2 released until the later burst point.`;
+        setFeedback("Stay patient and follow the blocker before accelerating. Use the LOS as a guide, not an automatic sprint signal.", "neutral");
     } else {
         els.phaseTitle.textContent = "The inside lane opened";
-        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)} and enter the gap without R2. Accelerate at the burst point.`;
-        setFeedback("Enter the opening under control. R2 is still too early.", "neutral");
+        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)} and enter the gap without R2. The blue dashed LOS helps show when you are approaching the hole. Accelerate at the burst point.`;
+        setFeedback("Enter the opening under control. If you are still behind the LOS, R2 is usually still too early.", "neutral");
     }
 }
 
@@ -504,7 +553,7 @@ function updateApproachVisual() {
 
     if (state.playType === "defense") {
         els.defender.style.left = `${lerp(50, targetX, progress)}%`;
-        els.defender.style.top = `${lerp(68, state.burstLineTop, progress)}%`;
+        els.defender.style.top = `${lerp(30, state.burstLineTop, progress)}%`;
     } else {
         els.runner.style.left = `${lerp(50, targetX, progress)}%`;
         els.runner.style.top = `${lerp(72, state.burstLineTop, progress)}%`;
@@ -670,7 +719,7 @@ function finishPlay(result, reactionMs = null) {
             els.runner.style.top = "27%";
         } else {
             els.defender.style.left = `${x}%`;
-            els.defender.style.top = "43%";
+            els.defender.style.top = "58%";
         }
     } else if (result === "early") {
         state.early += 1;
@@ -817,7 +866,7 @@ function applyLeftStick(x, y) {
         els.runner.style.top = `${72 + yOffset}%`;
     } else {
         els.defender.style.left = `${50 + xOffset}%`;
-        els.defender.style.top = `${68 + yOffset}%`;
+        els.defender.style.top = `${30 + yOffset}%`;
     }
 }
 

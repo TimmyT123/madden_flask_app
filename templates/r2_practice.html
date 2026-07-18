@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>WURD R2 Discipline Practice</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=4-burst-point">
+    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=8-los-defense">
 </head>
 <body>
 <div class="container">
@@ -12,7 +12,7 @@
         <a href="https://wurd-madden.com/" class="home-btn">Back to WURD</a>
         <div>
             <h1>WURD R2 Discipline Practice</h1>
-            <p class="intro">Read the play, steer toward the opening without R2, and accelerate only when your player reaches the burst point.</p>
+            <p class="intro">Read the play, steer without R2, and accelerate at the burst point. A blue dashed LOS line now shows the line of scrimmage so you can see whether you are still behind it, at it, or through it. Offense attacks upward from the bottom; defense closes downward from the top, matching Madden.</p>
         </div>
     </header>
 
@@ -82,8 +82,8 @@
 
         <section class="drill-layout">
             <div id="footballField" class="football-field">
-                <div class="end-zone end-zone-top">PATIENCE</div>
-                <div class="end-zone end-zone-bottom">READ</div>
+                <div class="end-zone end-zone-top">DEFENSE</div>
+                <div class="end-zone end-zone-bottom">OFFENSE</div>
                 <div class="yard-line line-20"></div>
                 <div class="yard-line line-40"></div>
                 <div class="yard-line line-60"></div>
@@ -94,6 +94,8 @@
                 <div id="laneLeft" class="lane lane-left"><span>LEFT</span></div>
                 <div id="laneMiddle" class="lane lane-middle"><span>MIDDLE</span></div>
                 <div id="laneRight" class="lane lane-right"><span>RIGHT</span></div>
+
+                <div id="lineOfScrimmage" class="scrimmage-line visible"><span id="lineOfScrimmageLabel">LINE OF SCRIMMAGE</span></div>
 
                 <div id="burstLine" class="burst-line"><span id="burstLineLabel">R2 BURST POINT</span></div>
 
@@ -124,14 +126,14 @@
                 <p id="reactionWindowText" class="small-text">Normal window: 850 ms</p>
 
                 <button id="r2TestButton" class="r2-button" type="button" aria-label="Simulate R2 press">R2</button>
-                <p class="small-text">Yellow STEER means choose the lane without sprinting. Green R2 NOW appears only after you reach the burst point.</p>
+                <p class="small-text">Blue dashed LOS = line of scrimmage. Yellow STEER means choose the lane without sprinting. Green R2 NOW appears only after you reach the burst point.</p>
             </aside>
         </section>
 
         <section class="lesson-row">
             <div>
                 <strong>Inside:</strong>
-                <span>Read the blocks → enter the opening → R2 as you burst through.</span>
+                <span>Read the blocks behind the LOS → enter the opening → R2 as you burst through.</span>
             </div>
             <div>
                 <strong>Outside:</strong>
@@ -139,7 +141,7 @@
             </div>
             <div>
                 <strong>Defense:</strong>
-                <span>Stay square → aim after the runner commits → R2 to close.</span>
+                <span>Start at the top, stay above the LOS, then pursue down-left/down/down-right after the runner commits → R2 to close.</span>
             </div>
         </section>
 
@@ -147,6 +149,6 @@
     </main>
 </div>
 
-<script src="{{ url_for('static', filename='r2_practice.js') }}?v=4-burst-point"></script>
+<script src="{{ url_for('static', filename='r2_practice.js') }}?v=8-los-defense"></script>
 </body>
 </html>
