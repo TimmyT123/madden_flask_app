@@ -1291,6 +1291,62 @@ def qb_practice_start():
 
     return jsonify({"ok": True})
 
+@app.route("/r2-practice")
+@app.route("/r2_practice")
+def r2_practice():
+    return render_template("r2_practice.html")
+
+
+@app.route("/api/r2-practice-start", methods=["POST"])
+def r2_practice_start():
+    data = request.get_json(silent=True) or {}
+
+    log_entry = {
+        "event": "start",
+        "time": datetime.now().isoformat(timespec="seconds"),
+        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "user_agent": request.headers.get("User-Agent"),
+        "mode": data.get("mode"),
+        "drill_type": data.get("drillType"),
+        "difficulty": data.get("difficulty"),
+        "drill_length": data.get("drillLength"),
+    }
+
+    os.makedirs("logs", exist_ok=True)
+    with open("logs/r2_practice.log", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/r2-practice-result", methods=["POST"])
+def r2_practice_result():
+    data = request.get_json(silent=True) or {}
+
+    log_entry = {
+        "event": "result",
+        "time": datetime.now().isoformat(timespec="seconds"),
+        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "mode": data.get("mode"),
+        "drill_type": data.get("drillType"),
+        "difficulty": data.get("difficulty"),
+        "drill_length": data.get("drillLength"),
+        "plays": data.get("plays"),
+        "perfect": data.get("perfect"),
+        "early": data.get("early"),
+        "late": data.get("late"),
+        "wrong_direction": data.get("wrongDirection"),
+        "discipline": data.get("discipline"),
+        "average_reaction": data.get("averageReaction"),
+        "best_streak": data.get("bestStreak"),
+    }
+
+    os.makedirs("logs", exist_ok=True)
+    with open("logs/r2_practice.log", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+    return jsonify({"ok": True})
+
 @app.route("/switch-stick-practice")
 def switch_stick_practice():
     return render_template("switch_stick_practice.html")

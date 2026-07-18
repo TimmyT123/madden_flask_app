@@ -14,9 +14,8 @@
         <span>WURD Switch Stick Practice</span>
     </h1>
 
-    <p class="intro">
-        Find the pulsing coverage defender and flick the right stick toward him.
-        The defender selected by your flick becomes your new controlled defender for the next repetition.
+    <p id="practiceInstructions" class="intro">
+        Read the route break, flick the right stick to the responsible defender, then use the left stick to move him into the catch area before the pass arrives.
     </p>
 
     <div class="settings">
@@ -25,6 +24,21 @@
             <option value="controller_ps5" selected>PS5 Controller</option>
             <option value="controller_xbox">Xbox Controller</option>
             <option value="keyboard">PC Keyboard Test</option>
+        </select>
+
+        <label for="drillTypeSelect">Drill Type:</label>
+        <select id="drillTypeSelect">
+            <option value="switch_and_cover" selected>Switch and Cover</option>
+            <option value="route_reaction">Route Reaction</option>
+            <option value="target_recognition">Highlighted Target</option>
+        </select>
+
+        <label for="routeSpeedSelect">Route Speed:</label>
+        <select id="routeSpeedSelect">
+            <option value="1400">Slow</option>
+            <option value="1050" selected>Normal</option>
+            <option value="800">Fast</option>
+            <option value="650">Very Fast</option>
         </select>
 
         <label for="reactionWindowSelect">Reaction Window:</label>
@@ -39,10 +53,10 @@
         <label for="drillLengthSelect">Drill Length:</label>
         <select id="drillLengthSelect">
             <option value="free" selected>Free Practice</option>
-            <option value="10">10 Switches</option>
-            <option value="20">20 Switches</option>
-            <option value="30">30 Switches</option>
-            <option value="50">50 Switches</option>
+            <option value="10">10 Plays</option>
+            <option value="20">20 Plays</option>
+            <option value="30">30 Plays</option>
+            <option value="50">50 Plays</option>
         </select>
 
         <button id="startBtn" type="button">Start Practice</button>
@@ -51,20 +65,21 @@
     <div class="status-row">
         <div id="controllerStatus" class="controller-status">Waiting for controller...</div>
         <div id="stickStatus" class="stick-status">Right stick: centered</div>
+        <div id="leftStickStatus" class="stick-status">Left stick: centered</div>
     </div>
 
     <div class="keyboard-help">
         <h3>Keyboard Test Controls</h3>
-        <p>Arrows = up, down, left, right</p>
-        <p>Q / E = up-left / up-right</p>
-        <p>Z / C = down-left / down-right</p>
+        <p>Right-stick flick: Arrows, Q/E, and Z/C</p>
+        <p>Left-stick movement after switching: W/A/S/D</p>
     </div>
 
     <div id="gameArea" class="game-area hidden">
         <div class="scoreboard">
-            <span>Correct: <strong id="score">0</strong></span>
+            <span><span id="scoreLabel">Stops</span>: <strong id="score">0</strong></span>
+            <span id="switchScoreItem">Correct Switches: <strong id="switchCorrect">0</strong></span>
             <span>Attempts: <strong id="attempts">0</strong></span>
-            <span>Accuracy: <strong id="accuracy">0%</strong></span>
+            <span><span id="accuracyLabel">Stop Rate</span>: <strong id="accuracy">0%</strong></span>
             <span>Avg Reaction: <strong id="averageReaction">--</strong></span>
             <span>Streak: <strong id="streak">0</strong></span>
             <span>Best: <strong id="bestStreak">0</strong></span>
@@ -78,6 +93,10 @@
                 <div class="hash hash-left"></div>
                 <div class="hash hash-right"></div>
 
+                <svg id="routeTrailSvg" class="route-trail-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline id="routeTrail" points=""></polyline>
+                </svg>
+
                 <svg id="flickArrowSvg" class="flick-arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                     <defs>
                         <marker id="arrowHead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
@@ -88,23 +107,46 @@
                 </svg>
 
                 <div id="defenderLayer" class="defender-layer"></div>
+                <div id="receiverLayer" class="receiver-layer"></div>
             </div>
 
-            <div class="stick-panel">
-                <h3>Right Stick</h3>
-                <div class="stick-box">
-                    <div class="stick-cross stick-cross-horizontal"></div>
-                    <div class="stick-cross stick-cross-vertical"></div>
-                    <div id="stickDot" class="stick-dot"></div>
+            <div class="stick-panels">
+                <div class="stick-panel">
+                    <h3>Right Stick</h3>
+                    <div class="stick-box">
+                        <div class="stick-cross stick-cross-horizontal"></div>
+                        <div class="stick-cross stick-cross-vertical"></div>
+                        <div id="stickDot" class="stick-dot"></div>
+                    </div>
+                    <p id="flickDetails">Center the stick before each flick.</p>
                 </div>
-                <p id="flickDetails">Center the stick before each flick.</p>
+
+                <div id="leftStickPanel" class="stick-panel">
+                    <h3>Left Stick</h3>
+                    <div class="stick-box">
+                        <div class="stick-cross stick-cross-horizontal"></div>
+                        <div class="stick-cross stick-cross-vertical"></div>
+                        <div id="leftStickDot" class="stick-dot left-stick-dot"></div>
+                    </div>
+                    <p id="movementDetails">After the switch, move your defender into the orange catch area.</p>
+                </div>
             </div>
+        </div>
+
+        <div id="coverHud" class="cover-hud hidden">
+            <div class="cover-hud-row">
+                <span id="coverPhaseLabel">Switch first, then move into the catch area.</span>
+                <strong id="passTime">--</strong>
+            </div>
+            <div class="pass-meter"><div id="passMeterFill" class="pass-meter-fill"></div></div>
         </div>
 
         <div class="legend">
             <span><i class="legend-dot controlled-dot"></i> You control</span>
-            <span><i class="legend-dot target-dot"></i> Flick target</span>
+            <span><i class="legend-dot target-dot"></i> Highlighted target</span>
             <span><i class="legend-dot coverage-dot"></i> Coverage defender</span>
+            <span><i class="legend-dot receiver-dot"></i> Route threat</span>
+            <span><i class="legend-dot catch-dot"></i> Catch area</span>
         </div>
 
         <div id="feedback" class="feedback">Press Start Practice.</div>

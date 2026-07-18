@@ -517,3 +517,245 @@ button:disabled {
         font-size: 22px;
     }
 }
+
+/* ---------------------------------------------------------
+   Version 2: moving receiver / route-reaction drill
+   --------------------------------------------------------- */
+
+.route-trail-svg,
+.receiver-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.route-trail-svg {
+    z-index: 2;
+}
+
+#routeTrail {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.72);
+    stroke-width: 0.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 2.2 1.4;
+    filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85));
+}
+
+.receiver-layer {
+    z-index: 5;
+}
+
+.receiver {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 4px solid #fff;
+    border-radius: 50%;
+    background: #b91c1c;
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 4px 9px rgba(0, 0, 0, 0.55);
+    user-select: none;
+}
+
+.receiver::after {
+    content: attr(data-label);
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.78);
+    color: #fff;
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.receiver.breaking {
+    border-color: #fdba74;
+    background: #c2410c;
+    box-shadow:
+        0 0 0 7px rgba(251, 146, 60, 0.20),
+        0 4px 9px rgba(0, 0, 0, 0.55);
+}
+
+.catch-point {
+    position: absolute;
+    width: 58px;
+    height: 58px;
+    transform: translate(-50%, -50%);
+    border: 4px dashed #fb923c;
+    border-radius: 50%;
+    background: rgba(251, 146, 60, 0.10);
+    opacity: 0;
+}
+
+.catch-point.visible {
+    opacity: 1;
+    animation: catchPointPulse 0.55s infinite alternate;
+}
+
+@keyframes catchPointPulse {
+    from {
+        transform: translate(-50%, -50%) scale(0.90);
+        box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.25);
+    }
+    to {
+        transform: translate(-50%, -50%) scale(1.10);
+        box-shadow: 0 0 0 10px rgba(251, 146, 60, 0.05);
+    }
+}
+
+.defender.target-reveal {
+    z-index: 8;
+    border-color: #86efac;
+    box-shadow:
+        0 0 0 8px rgba(134, 239, 172, 0.25),
+        0 4px 9px rgba(0, 0, 0, 0.55);
+}
+
+.receiver-dot {
+    background: #b91c1c;
+    border-color: #fff;
+}
+
+select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+    .receiver {
+        width: 40px;
+        height: 40px;
+        border-width: 3px;
+        font-size: 10px;
+    }
+
+    .receiver::after {
+        font-size: 8px;
+    }
+
+    .catch-point {
+        width: 48px;
+        height: 48px;
+        border-width: 3px;
+    }
+}
+
+/* ---------------------------------------------------------
+   Version 3: switch-and-cover movement phase
+   --------------------------------------------------------- */
+
+.stick-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.left-stick-dot {
+    background: #38bdf8;
+    box-shadow: 0 0 9px rgba(56, 189, 248, 0.8);
+}
+
+#movementDetails {
+    min-height: 48px;
+    margin: 0;
+    color: #ccc;
+    line-height: 1.35;
+}
+
+.cover-hud {
+    width: min(660px, 100%);
+    margin: 18px auto 0;
+    padding: 12px 14px;
+    border: 1px solid #444;
+    border-radius: 9px;
+    background: #151515;
+    text-align: left;
+}
+
+.cover-hud-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+    color: #ddd;
+}
+
+.pass-meter {
+    width: 100%;
+    height: 16px;
+    overflow: hidden;
+    border: 1px solid #555;
+    border-radius: 999px;
+    background: #2a2a2a;
+}
+
+.pass-meter-fill {
+    width: 100%;
+    height: 100%;
+    background: #22c55e;
+    transition: width 0.05s linear;
+}
+
+.cover-hud.urgent .pass-meter-fill {
+    background: #ef4444;
+}
+
+.catch-point.cover-zone {
+    width: 92px;
+    height: 92px;
+    border-width: 4px;
+}
+
+.catch-point.defended {
+    border-color: #86efac;
+    background: rgba(34, 197, 94, 0.18);
+    box-shadow: 0 0 0 10px rgba(34, 197, 94, 0.10);
+    animation: none;
+}
+
+.catch-point.open {
+    border-color: #fca5a5;
+    background: rgba(239, 68, 68, 0.16);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0.08);
+    animation: none;
+}
+
+.catch-dot {
+    background: rgba(251, 146, 60, 0.22);
+    border-color: #fb923c;
+}
+
+.defender.moving-controlled {
+    box-shadow:
+        0 0 0 5px rgba(56, 189, 248, 0.24),
+        0 4px 9px rgba(0, 0, 0, 0.55);
+}
+
+@media (max-width: 760px) {
+    .stick-panels {
+        width: 100%;
+        max-width: 260px;
+    }
+
+    .catch-point.cover-zone {
+        width: 72px;
+        height: 72px;
+    }
+
+    .cover-hud-row {
+        font-size: 14px;
+    }
+}

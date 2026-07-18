@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WURD R2 Discipline Practice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=4-burst-point">
+</head>
+<body>
+<div class="container">
+    <header class="page-header">
+        <a href="https://wurd-madden.com/" class="home-btn">Back to WURD</a>
+        <div>
+            <h1>WURD R2 Discipline Practice</h1>
+            <p class="intro">Read the play, steer toward the opening without R2, and accelerate only when your player reaches the burst point.</p>
+        </div>
+    </header>
+
+    <section class="settings" aria-label="Practice settings">
+        <label for="inputModeSelect">Controls</label>
+        <select id="inputModeSelect">
+            <option value="controller_ps5" selected>PS5 Controller</option>
+            <option value="controller_xbox">Xbox Controller</option>
+            <option value="keyboard">Keyboard Test</option>
+        </select>
+
+        <label for="drillTypeSelect">Drill</label>
+        <select id="drillTypeSelect">
+            <option value="mixed" selected>Mixed Offense + Defense</option>
+            <option value="offense">Offense Only</option>
+            <option value="defense">Defense Only</option>
+        </select>
+
+        <label for="runReadSelect">Offense Reads</label>
+        <select id="runReadSelect">
+            <option value="mixed" selected>Mixed Inside + Outside</option>
+            <option value="inside">Inside Runs</option>
+            <option value="outside">Outside Runs</option>
+        </select>
+
+        <label for="difficultySelect">Difficulty</label>
+        <select id="difficultySelect">
+            <option value="beginner">Beginner</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fast">Fast</option>
+            <option value="game">Game Speed</option>
+        </select>
+
+        <label for="drillLengthSelect">Length</label>
+        <select id="drillLengthSelect">
+            <option value="free" selected>Free Practice</option>
+            <option value="10">10 Plays</option>
+            <option value="20">20 Plays</option>
+            <option value="30">30 Plays</option>
+            <option value="50">50 Plays</option>
+        </select>
+
+        <button id="startBtn" type="button">Start Practice</button>
+    </section>
+
+    <div class="status-row">
+        <div id="controllerStatus" class="status-pill">Waiting for controller...</div>
+        <div id="r2Status" class="status-pill">R2: released</div>
+        <div id="leftStickStatus" class="status-pill">Left stick: centered</div>
+    </div>
+
+    <div id="keyboardHelp" class="keyboard-help hidden">
+        <strong>Keyboard:</strong> WASD or arrows move. Space, Shift, or the on-screen R2 button presses R2.
+    </div>
+
+    <main id="gameArea" class="game-area hidden">
+        <section class="scoreboard" aria-label="Practice score">
+            <span>Perfect: <strong id="perfectCount">0</strong></span>
+            <span>Early: <strong id="earlyCount">0</strong></span>
+            <span>Late: <strong id="lateCount">0</strong></span>
+            <span>Wrong Lane: <strong id="wrongDirectionCount">0</strong></span>
+            <span>Accuracy: <strong id="disciplinePercent">100%</strong></span>
+            <span>Avg Reaction: <strong id="averageReaction">--</strong></span>
+            <span>Streak: <strong id="streak">0</strong></span>
+            <span>Best: <strong id="bestStreak">0</strong></span>
+        </section>
+
+        <section class="drill-layout">
+            <div id="footballField" class="football-field">
+                <div class="end-zone end-zone-top">PATIENCE</div>
+                <div class="end-zone end-zone-bottom">READ</div>
+                <div class="yard-line line-20"></div>
+                <div class="yard-line line-40"></div>
+                <div class="yard-line line-60"></div>
+                <div class="yard-line line-80"></div>
+                <div class="hash hash-left"></div>
+                <div class="hash hash-right"></div>
+
+                <div id="laneLeft" class="lane lane-left"><span>LEFT</span></div>
+                <div id="laneMiddle" class="lane lane-middle"><span>MIDDLE</span></div>
+                <div id="laneRight" class="lane lane-right"><span>RIGHT</span></div>
+
+                <div id="burstLine" class="burst-line"><span id="burstLineLabel">R2 BURST POINT</span></div>
+
+                <div id="blockerLeft" class="player blocker blocker-left">OL</div>
+                <div id="blockerMiddle" class="player blocker blocker-middle">OL</div>
+                <div id="blockerRight" class="player blocker blocker-right">OL</div>
+
+                <div id="runner" class="player runner">RB</div>
+                <div id="defender" class="player defender">YOU</div>
+                <div id="ballCarrier" class="player ball-carrier">HB</div>
+
+                <div id="directionArrow" class="direction-arrow">▲</div>
+                <div id="countdown" class="countdown hidden">3</div>
+            </div>
+
+            <aside class="control-panel">
+                <div id="playBadge" class="play-badge">OFFENSE</div>
+                <h2 id="phaseTitle">Press Start Practice</h2>
+                <p id="phaseInstruction">Wait for the opening, steer toward it, cross the burst point, and then press R2.</p>
+
+                <div id="cueLight" class="cue-light wait">
+                    <span id="cueText">WAIT</span>
+                </div>
+
+                <div class="reaction-meter" aria-label="Reaction time window">
+                    <div id="reactionMeterFill" class="reaction-meter-fill"></div>
+                </div>
+                <p id="reactionWindowText" class="small-text">Normal window: 850 ms</p>
+
+                <button id="r2TestButton" class="r2-button" type="button" aria-label="Simulate R2 press">R2</button>
+                <p class="small-text">Yellow STEER means choose the lane without sprinting. Green R2 NOW appears only after you reach the burst point.</p>
+            </aside>
+        </section>
+
+        <section class="lesson-row">
+            <div>
+                <strong>Inside:</strong>
+                <span>Read the blocks → enter the opening → R2 as you burst through.</span>
+            </div>
+            <div>
+                <strong>Outside:</strong>
+                <span>A sealed edge creates an earlier burst point; a developing block requires more patience.</span>
+            </div>
+            <div>
+                <strong>Defense:</strong>
+                <span>Stay square → aim after the runner commits → R2 to close.</span>
+            </div>
+        </section>
+
+        <div id="feedback" class="feedback neutral">Press Start Practice.</div>
+    </main>
+</div>
+
+<script src="{{ url_for('static', filename='r2_practice.js') }}?v=4-burst-point"></script>
+</body>
+</html>
