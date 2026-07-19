@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Private Knife Practice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='knife_practice.css') }}">
+</head>
+<body class="login-page">
+    <main class="login-card">
+        <div class="lock-symbol" aria-hidden="true">PIN</div>
+
+        <h1>Private Knife Practice</h1>
+        <p>Enter your PIN to open the hidden Call of Duty knife-throwing practice.</p>
+
+        {% if error %}
+            <div class="login-error" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="{{ url_for('knife_practice') }}">
+            <label for="pin">Practice PIN</label>
+            <input
+                id="pin"
+                name="pin"
+                type="password"
+                inputmode="numeric"
+                autocomplete="current-password"
+                required
+                autofocus
+            >
+            <button type="submit">Open Practice</button>
+        </form>
+
+        <a class="login-back" href="https://wurd-madden.com/">Back to WURD</a>
+    </main>
+</body>
+</html>
