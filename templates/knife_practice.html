@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WURD Knife Throw Practice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='knife_practice.css') }}">
+</head>
+<body>
+<div class="container">
+    <header class="page-header">
+        <a href="https://wurd-madden.com/" class="home-btn">Back to WURD</a>
+        <div>
+            <h1>Knife Throw Practice</h1>
+            <p class="private-label">Private WURD practice page</p>
+        </div>
+        <a href="{{ url_for('knife_practice', logout=1) }}" class="logout-btn">Lock Page</a>
+    </header>
+
+    <p id="practiceInstructions" class="intro">
+        Aim with the right stick and press <strong>R1</strong> to throw. Build the habit of aiming first and pressing R1 only when the target is exposed.
+    </p>
+
+    <div class="settings">
+        <label for="modeSelect">Input:</label>
+        <select id="modeSelect">
+            <option value="controller_ps5" selected>PS5 Controller</option>
+            <option value="keyboard">Keyboard Test</option>
+        </select>
+
+        <label for="drillTypeSelect">Drill:</label>
+        <select id="drillTypeSelect">
+            <option value="mixed" selected>Mixed Targets</option>
+            <option value="moving">Moving Targets</option>
+            <option value="peek">Quick Peek</option>
+            <option value="stationary">Random Stationary</option>
+        </select>
+
+        <label for="targetSpeedSelect">Target Speed:</label>
+        <select id="targetSpeedSelect">
+            <option value="slow">Slow</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fast">Fast</option>
+            <option value="elite">Very Fast</option>
+        </select>
+
+        <label for="targetSizeSelect">Target Size:</label>
+        <select id="targetSizeSelect">
+            <option value="large">Large</option>
+            <option value="normal" selected>Normal</option>
+            <option value="small">Small</option>
+        </select>
+
+        <label for="sensitivitySelect">Aim Speed:</label>
+        <select id="sensitivitySelect">
+            <option value="low">Low</option>
+            <option value="normal" selected>Normal</option>
+            <option value="high">High</option>
+        </select>
+
+        <label for="drillLengthSelect">Drill Length:</label>
+        <select id="drillLengthSelect">
+            <option value="free" selected>Free Practice</option>
+            <option value="10">10 Targets</option>
+            <option value="20">20 Targets</option>
+            <option value="30">30 Targets</option>
+            <option value="50">50 Targets</option>
+        </select>
+
+        <button id="startBtn" type="button">Start Practice</button>
+        <button id="fullscreenBtn" type="button" class="secondary-btn">Full Screen</button>
+    </div>
+
+    <div class="status-row">
+        <div id="controllerStatus" class="status-box">Waiting for controller...</div>
+        <div id="aimStatus" class="status-box">Right stick: centered</div>
+        <div id="r1Status" class="status-box">R1: ready</div>
+    </div>
+
+    <div id="keyboardHelp" class="keyboard-help hidden">
+        <strong>Keyboard test:</strong> Aim with W/A/S/D or the arrow keys. Throw with Space or R.
+    </div>
+
+    <main id="gameArea" class="game-area hidden">
+        <div class="scoreboard">
+            <span>Hits: <strong id="hits">0</strong></span>
+            <span>Throws: <strong id="throws">0</strong></span>
+            <span>Accuracy: <strong id="accuracy">0%</strong></span>
+            <span>Escaped: <strong id="escaped">0</strong></span>
+            <span>Avg Reaction: <strong id="averageReaction">--</strong></span>
+            <span>Center Hits: <strong id="centerHits">0</strong></span>
+            <span>Streak: <strong id="streak">0</strong></span>
+            <span>Best: <strong id="bestStreak">0</strong></span>
+        </div>
+
+        <div id="arena" class="arena" tabindex="0" aria-label="Knife throw practice arena">
+            <div class="range-light range-light-left"></div>
+            <div class="range-light range-light-right"></div>
+            <div class="back-wall-lines"></div>
+            <div class="floor-grid"></div>
+
+            <div class="arena-cover cover-left"><span>01</span></div>
+            <div class="arena-cover cover-center"><span>02</span></div>
+            <div class="arena-cover cover-right"><span>03</span></div>
+
+            <div id="targetLayer" class="target-layer"></div>
+            <div id="knifeLayer" class="knife-layer"></div>
+
+            <div id="crosshair" class="crosshair" aria-hidden="true">
+                <i class="crosshair-line crosshair-top"></i>
+                <i class="crosshair-line crosshair-right"></i>
+                <i class="crosshair-line crosshair-bottom"></i>
+                <i class="crosshair-line crosshair-left"></i>
+                <i class="crosshair-dot"></i>
+            </div>
+
+            <div id="countdown" class="countdown hidden"></div>
+            <div id="hitMarker" class="hit-marker hidden">×</div>
+        </div>
+
+        <div class="lower-hud">
+            <div id="knifeReady" class="knife-ready ready">
+                <span class="knife-icon">◆</span>
+                <span id="knifeReadyText">Knife ready — press R1</span>
+            </div>
+            <div class="round-counter">Targets: <strong id="roundsCompleted">0</strong><span id="roundGoal"></span></div>
+        </div>
+
+        <div id="feedback" class="feedback info">Press Start Practice.</div>
+    </main>
+</div>
+
+<script src="{{ url_for('static', filename='knife_practice.js') }}"></script>
+</body>
+</html>

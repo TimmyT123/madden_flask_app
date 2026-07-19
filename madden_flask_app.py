@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify, url_for
+from flask import Flask, request, jsonify, url_for, redirect, make_response
 from flask import send_from_directory
 
 from datetime import datetime
 import os
 import json
+import hmac
 import requests
 from threading import Timer
 from hashlib import sha256
@@ -56,6 +57,10 @@ DISCORD_HIGHLIGHT_WEBHOOK_URL = os.getenv("DISCORD_HIGHLIGHT_WEBHOOK_URL")
 DISCORD_RECAP_WEBHOOK_URL = os.getenv("DISCORD_RECAP_WEBHOOK_URL")
 
 WURD_RECRUIT_DISCORD_INVITE = os.getenv("WURD_RECRUIT_DISCORD_INVITE", "")
+
+# Private Call of Duty knife-throw practice page. Set this in .env.
+KNIFE_PRACTICE_PIN = os.getenv("KNIFE_PRACTICE_PIN", "").strip()
+KNIFE_PRACTICE_COOKIE = "wurd_knife_practice_access"
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -1350,6 +1355,118 @@ def r2_practice_result():
 @app.route("/switch-stick-practice")
 def switch_stick_practice():
     return render_template("switch_stick_practice.html")
+
+
+def _knife_practice_cookie_value() -> str:
+    """Return a cookie value that automatically changes when the PIN changes."""
+    raw = f"{KNIFE_PRACTICE_PIN}|wurd-knife-practice"
+    return sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _knife_practice_has_access() -> bool:
+    supplied = request.cookies.get(KNIFE_PRACTICE_COOKIE, "")
+    expected = _knife_practice_cookie_value()
+    return bool(supplied) and hmac.compare_digest(supplied, expected)
+
+
+@app.route("/knife-practice", methods=["GET", "POST"])
+def knife_practice():
+    """Hidden, PIN-protected knife practice page. It is not linked in the menus."""
+    if not KNIFE_PRACTICE_PIN:
+        return (
+            "KNIFE_PRACTICE_PIN is not configured. Add it to .env and restart Flask.",
+            503,
+        )
+
+    if request.args.get("logout") == "1":
+        response = make_response(redirect(url_for("knife_practice")))
+        response.delete_cookie(KNIFE_PRACTICE_COOKIE)
+        return response
+
+    if _knife_practice_has_access():
+        return render_template("knife_practice.html")
+
+    error = ""
+
+    if request.method == "POST":
+        submitted_pin = (request.form.get("pin") or "").strip()
+
+        if hmac.compare_digest(submitted_pin, KNIFE_PRACTICE_PIN):
+            response = make_response(redirect(url_for("knife_practice")))
+            forwarded_https = request.headers.get("X-Forwarded-Proto", "").lower() == "https"
+            response.set_cookie(
+                KNIFE_PRACTICE_COOKIE,
+                _knife_practice_cookie_value(),
+                max_age=60 * 60 * 24 * 30,
+                httponly=True,
+                samesite="Lax",
+                secure=request.is_secure or forwarded_https,
+            )
+            return response
+
+        error = "Incorrect PIN."
+
+    status = 401 if error else 200
+    return render_template("knife_practice_login.html", error=error), status
+
+
+@app.route("/api/knife-practice-start", methods=["POST"])
+def knife_practice_start():
+    if not _knife_practice_has_access():
+        abort(401)
+
+    data = request.get_json(silent=True) or {}
+    log_entry = {
+        "event": "start",
+        "time": datetime.now().isoformat(timespec="seconds"),
+        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "user_agent": request.headers.get("User-Agent"),
+        "mode": data.get("mode"),
+        "drill_type": data.get("drillType"),
+        "target_speed": data.get("targetSpeed"),
+        "target_size": data.get("targetSize"),
+        "sensitivity": data.get("sensitivity"),
+        "drill_length": data.get("drillLength"),
+    }
+
+    os.makedirs("logs", exist_ok=True)
+    with open("logs/knife_practice.log", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/knife-practice-result", methods=["POST"])
+def knife_practice_result():
+    if not _knife_practice_has_access():
+        abort(401)
+
+    data = request.get_json(silent=True) or {}
+    log_entry = {
+        "event": "result",
+        "time": datetime.now().isoformat(timespec="seconds"),
+        "ip": request.headers.get("X-Forwarded-For", request.remote_addr),
+        "mode": data.get("mode"),
+        "drill_type": data.get("drillType"),
+        "target_speed": data.get("targetSpeed"),
+        "target_size": data.get("targetSize"),
+        "sensitivity": data.get("sensitivity"),
+        "drill_length": data.get("drillLength"),
+        "hits": data.get("hits"),
+        "throws": data.get("throws"),
+        "escaped": data.get("escaped"),
+        "center_hits": data.get("centerHits"),
+        "rounds_completed": data.get("roundsCompleted"),
+        "accuracy": data.get("accuracy"),
+        "average_reaction": data.get("averageReaction"),
+        "best_streak": data.get("bestStreak"),
+    }
+
+    os.makedirs("logs", exist_ok=True)
+    with open("logs/knife_practice.log", "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+    return jsonify({"ok": True})
 
 
 @app.route("/api/switch-stick-practice-start", methods=["POST"])
