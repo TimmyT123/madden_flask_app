@@ -1102,6 +1102,12 @@
         document.getElementById("week").addEventListener("change", function () {
             refreshHomeWithSelectedLeague();
         });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.ctrlKey && event.altKey && event.key.toLowerCase() === "a") {
+                window.location.href = "/admin/ap-users/ui";
+            }
+        });
     </script>
 </body>
 </html>
