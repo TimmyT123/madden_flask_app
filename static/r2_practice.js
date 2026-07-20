@@ -47,6 +47,8 @@ const DIFFICULTIES = {
 };
 
 const R2_BUTTON_INDEX = 7;
+const PS_HOME_BUTTON_INDEX = 16;
+const WURD_HOME_URL = "/";
 const R2_THRESHOLD = 0.35;
 const LEFT_STICK_DEADZONE = 0.18;
 const STICK_FORWARD_MIN = 0.28;
@@ -137,7 +139,8 @@ const state = {
     nextTimer: null,
     countdownTimer: null,
     lastControllerIndex: null,
-    animationFrame: null
+    animationFrame: null,
+    psHomeDown: false
 };
 
 const perfectSound = new Audio("/static/sounds/perfect.mp3");
@@ -897,6 +900,17 @@ function pollController(now) {
             els.controllerStatus.textContent = `Connected: ${pad.id.split("(")[0].trim()} · ${mappingText}`;
             els.controllerStatus.classList.add("connected");
 
+            // Return to the WURD homepage when the browser exposes the
+            // DualSense PS/Home button as standard Gamepad button 16.
+            const psHomePressed = Boolean(pad.buttons[PS_HOME_BUTTON_INDEX]?.pressed);
+
+            if (psHomePressed && !state.psHomeDown) {
+                window.location.assign(WURD_HOME_URL);
+                return;
+            }
+
+            state.psHomeDown = psHomePressed;
+
             const x = Number.isFinite(pad.axes[0]) ? pad.axes[0] : 0;
             const y = Number.isFinite(pad.axes[1]) ? pad.axes[1] : 0;
             applyLeftStick(x, y);
@@ -906,6 +920,7 @@ function pollController(now) {
             const triggerValue = button ? Math.max(button.value || 0, button.pressed ? 1 : 0) : 0;
             updateR2State(triggerValue >= R2_THRESHOLD || state.pointerR2Down);
         } else {
+            state.psHomeDown = false;
             els.controllerStatus.textContent = "Waiting for controller—press a controller button.";
             els.controllerStatus.classList.remove("connected");
             applyLeftStick(0, 0);
@@ -913,6 +928,7 @@ function pollController(now) {
             updateR2State(state.pointerR2Down);
         }
     } else {
+        state.psHomeDown = false;
         els.controllerStatus.textContent = "Keyboard test mode";
         els.controllerStatus.classList.add("connected");
         applyLeftStick(keyboardAxisX(), keyboardAxisY());

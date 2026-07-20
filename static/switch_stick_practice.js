@@ -59,6 +59,9 @@ const ROUND_FEEDBACK_MS = 1100;
 const NEXT_TARGET_DELAY_MS = 260;
 const ROUTE_BREAK_FRACTION = 0.52;
 
+const PS_HOME_BUTTON_INDEX = 16;
+const WURD_HOME_URL = "/";
+
 const defenders = [
     { id: "FS", role: "FS", x: 50, y: 16 },
     { id: "SS", role: "SS", x: 72, y: 27 },
@@ -81,6 +84,7 @@ let roundTimeoutId = null;
 let nextRoundTimerId = null;
 let countdownTimerIds = [];
 let startSequenceId = 0;
+let lastPsHomePressed = false;
 
 let activeGamepadIndex = null;
 let currentControlledId = "MLB";
@@ -186,6 +190,7 @@ function startGame() {
     pendingCoverAttempt = null;
     leftStickVector = { x: 0, y: 0 };
     lastAnimationTimestamp = null;
+    lastPsHomePressed = false;
     pressedMovementKeys.clear();
 
     drillType = drillTypeSelect.value;
@@ -420,16 +425,31 @@ function triggerRouteBreak(timestamp) {
 }
 
 function checkControllerInput() {
-    if (!modeSelect.value.startsWith("controller")) return;
+    if (!modeSelect.value.startsWith("controller")) {
+        lastPsHomePressed = false;
+        return;
+    }
 
     const gamepad = getActiveGamepad();
     if (!gamepad) {
+        lastPsHomePressed = false;
         controllerStatus.textContent = "No controller detected.";
         controllerStatus.classList.remove("connected");
         return;
     }
 
     showControllerConnected(gamepad);
+
+    // Return to the WURD homepage when the browser exposes the
+    // DualSense PS/Home button as standard Gamepad button 16.
+    const psHomePressed = Boolean(gamepad.buttons[PS_HOME_BUTTON_INDEX]?.pressed);
+
+    if (psHomePressed && !lastPsHomePressed) {
+        window.location.assign(WURD_HOME_URL);
+        return;
+    }
+
+    lastPsHomePressed = psHomePressed;
 
     const rawLeftX = gamepad.axes[LEFT_STICK_X_AXIS] || 0;
     const rawLeftY = gamepad.axes[LEFT_STICK_Y_AXIS] || 0;

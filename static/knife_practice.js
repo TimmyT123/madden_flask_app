@@ -44,6 +44,8 @@ wrongSound.volume = 0.42;
 const RIGHT_STICK_X_AXIS = 2;
 const RIGHT_STICK_Y_AXIS = 3;
 const R1_BUTTON_INDEX = 5;
+const PS_HOME_BUTTON_INDEX = 16;
+const WURD_HOME_URL = "/";
 const STICK_DEADZONE = 0.12;
 const KNIFE_RECOVERY_MS = 570;
 const NEXT_TARGET_DELAY_MS = 560;
@@ -56,9 +58,9 @@ const SPEED_SETTINGS = {
 };
 
 const AIM_SPEED = {
-    low: 95,
-    normal: 105,
-    high: 115,
+    low: 125,
+    normal: 165,
+    high: 185,
 };
 
 const TARGET_SCALE = {
@@ -82,6 +84,7 @@ let knifeRecoveryTimer = null;
 let hitMarkerTimer = null;
 let lastFrameTime = null;
 let lastR1Pressed = false;
+let lastPsHomePressed = false;
 let activeTarget = null;
 let gameRunning = false;
 let drillComplete = false;
@@ -164,6 +167,7 @@ function startPractice() {
     roundLocked = true;
     knifeIsReady = true;
     lastR1Pressed = false;
+    lastPsHomePressed = false;
     lastFrameTime = null;
     pressedKeys.clear();
     drillLength = drillLengthSelect.value;
@@ -332,6 +336,17 @@ function updateInput(deltaMs) {
     }
 
     showControllerConnected(gamepad);
+
+    // Return to the WURD homepage when the browser exposes the
+    // DualSense PS/Home button as standard Gamepad button 16.
+    const psHomePressed = Boolean(gamepad.buttons[PS_HOME_BUTTON_INDEX]?.pressed);
+
+    if (psHomePressed && !lastPsHomePressed) {
+        window.location.assign(WURD_HOME_URL);
+        return;
+    }
+
+    lastPsHomePressed = psHomePressed;
 
     const rawX = gamepad.axes[RIGHT_STICK_X_AXIS] || 0;
     const rawY = gamepad.axes[RIGHT_STICK_Y_AXIS] || 0;

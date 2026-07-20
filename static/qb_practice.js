@@ -32,6 +32,9 @@ const FASTEST_TEMPO_MS = 950;
 const TEMPO_STEP_MS = 10;
 const STARTING_TEMPO_MS = 1200;
 
+const PS_HOME_BUTTON_INDEX = 16;
+const WURD_HOME_URL = "/";
+
 const L2_BUTTON = 6;
 const R2_BUTTON = 7;
 
@@ -58,6 +61,8 @@ let pressedCorrectButton = false;
 let lastControllerButtons = [];
 let roundLocked = false;
 let startSequenceId = 0;
+
+let lastPsHomePressed = false;
 
 // R1/RB remains a drill target. L2/R2 (LT/RT) are reserved for tempo control.
 const ps5Buttons = [
@@ -148,6 +153,7 @@ function startGame() {
     pressedCorrectButton = false;
     pressedOnBeat = false;
     lastControllerButtons = [];
+    lastPsHomePressed = false;
 
     lineSpeed = parseFloat(speedSelect.value);
     drillLength = drillLengthSelect.value;
@@ -366,6 +372,17 @@ function checkControllerInput() {
     handleTempoControllerButtons(gamepad);
 
     if (!currentTarget) return;
+
+    // Return to the WURD homepage when the browser exposes the
+    // DualSense PS/Home button as standard Gamepad button 16.
+    const psHomePressed = Boolean(gamepad.buttons[PS_HOME_BUTTON_INDEX]?.pressed);
+
+    if (psHomePressed && !lastPsHomePressed) {
+        window.location.assign(WURD_HOME_URL);
+        return;
+    }
+
+    lastPsHomePressed = psHomePressed;
 
     const validButtons = getButtonSet().map(button => button.controllerButton);
     const correctButtonIndex = currentTarget.controllerButton;
