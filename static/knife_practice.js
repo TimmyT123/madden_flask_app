@@ -58,9 +58,9 @@ const SPEED_SETTINGS = {
 };
 
 const AIM_SPEED = {
-    low: 185,
-    normal: 225,
-    high: 265,
+    low: 175,
+    normal: 215,
+    high: 255,
 };
 
 const TARGET_SCALE = {
