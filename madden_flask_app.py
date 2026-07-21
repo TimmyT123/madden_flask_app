@@ -1516,6 +1516,10 @@ def switch_stick_practice_result():
 
     return jsonify({"ok": True})
 
+@app.route("/user-catch-pick-practice")
+def user_catch_pick_practice():
+    return render_template("user_catch_pick_practice.html")
+
 
 @app.route("/wurd_champions")
 def wurd_champions():
