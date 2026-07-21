@@ -1,0 +1,326 @@
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    color-scheme: dark;
+    --bg: #0b0f16;
+    --panel: #151b26;
+    --panel-2: #1c2432;
+    --border: #2b3649;
+    --text: #f3f6fb;
+    --muted: #aeb8c8;
+    --green: #26d07c;
+    --yellow: #ffd166;
+    --red: #ff6b6b;
+    --blue: #64b5f6;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at top, rgba(37, 99, 235, 0.14), transparent 34rem),
+        var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+select {
+    font: inherit;
+}
+
+.page-shell {
+    width: min(1180px, calc(100% - 28px));
+    margin: 0 auto;
+    padding: 24px 0 40px;
+}
+
+.page-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 18px;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.page-header h1 {
+    margin: 0 0 6px;
+    font-size: clamp(1.7rem, 4vw, 2.7rem);
+}
+
+.page-header p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.45;
+}
+
+.home-btn,
+.primary-btn,
+.secondary-btn {
+    border: 0;
+    border-radius: 9px;
+    padding: 11px 16px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.home-btn,
+.primary-btn {
+    background: var(--green);
+    color: #07130d;
+}
+
+.secondary-btn {
+    background: #303b50;
+    color: var(--text);
+}
+
+.home-btn:hover,
+.primary-btn:hover,
+.secondary-btn:hover {
+    filter: brightness(1.08);
+}
+
+.controller-status {
+    min-width: 178px;
+    padding: 10px 13px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.controller-status.connected {
+    color: var(--green);
+    border-color: rgba(38, 208, 124, 0.55);
+    background: rgba(38, 208, 124, 0.09);
+}
+
+.controller-status.disconnected {
+    color: var(--yellow);
+    border-color: rgba(255, 209, 102, 0.4);
+    background: rgba(255, 209, 102, 0.08);
+}
+
+.controls-panel,
+.score-strip,
+.game-card,
+.help-card {
+    border: 1px solid var(--border);
+    background: rgba(21, 27, 38, 0.94);
+    border-radius: 14px;
+    box-shadow: 0 14px 45px rgba(0, 0, 0, 0.24);
+}
+
+.controls-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: end;
+    padding: 14px;
+    margin-bottom: 14px;
+}
+
+.controls-panel label {
+    display: grid;
+    gap: 6px;
+    min-width: 185px;
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.controls-panel select {
+    min-height: 43px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 12px;
+    background: var(--panel-2);
+    color: var(--text);
+}
+
+.score-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+
+.score-strip > div {
+    padding: 13px 16px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+}
+
+.score-strip > div:last-child {
+    border-right: 0;
+}
+
+.score-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.score-strip strong {
+    font-size: 1.35rem;
+}
+
+.game-card {
+    overflow: hidden;
+}
+
+.instruction-bar {
+    min-height: 78px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 18px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+}
+
+.instruction-label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+}
+
+#instructionText {
+    font-size: clamp(1rem, 2.6vw, 1.35rem);
+}
+
+.timing-message {
+    min-width: 180px;
+    text-align: right;
+    font-weight: 800;
+}
+
+.timing-message.good {
+    color: var(--green);
+}
+
+.timing-message.warn {
+    color: var(--yellow);
+}
+
+.timing-message.bad {
+    color: var(--red);
+}
+
+.canvas-wrap {
+    position: relative;
+    width: 100%;
+    background: #07120d;
+}
+
+#practiceCanvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 5 / 3;
+    touch-action: none;
+}
+
+.feedback-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--border);
+}
+
+.feedback-grid > div {
+    min-height: 74px;
+    padding: 13px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+}
+
+.feedback-grid > div:last-child {
+    border-right: 0;
+}
+
+.feedback-grid span {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.feedback-grid strong {
+    font-size: 1rem;
+}
+
+.help-card {
+    margin-top: 14px;
+    padding: 14px 18px;
+}
+
+.help-card summary {
+    cursor: pointer;
+    font-weight: 800;
+}
+
+.help-content {
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+.help-content h2 {
+    margin-bottom: 5px;
+    color: var(--text);
+    font-size: 1rem;
+}
+
+.help-content p {
+    margin-top: 0;
+}
+
+@media (max-width: 760px) {
+    .page-header {
+        grid-template-columns: 1fr;
+    }
+
+    .controller-status {
+        justify-self: start;
+    }
+
+    .score-strip,
+    .feedback-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .score-strip > div:nth-child(2),
+    .feedback-grid > div:nth-child(2) {
+        border-right: 0;
+    }
+
+    .score-strip > div:nth-child(-n+2),
+    .feedback-grid > div:nth-child(-n+2) {
+        border-bottom: 1px solid var(--border);
+    }
+
+    .instruction-bar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .timing-message {
+        min-width: 0;
+        text-align: left;
+    }
+
+    .controls-panel > * {
+        flex: 1 1 100%;
+    }
+}

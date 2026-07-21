@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Catch & Pick Practice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='user_catch_pick_practice.css') }}">
+</head>
+<body>
+    <main class="page-shell">
+        <header class="page-header">
+            <a class="home-btn" href="/">← Home</a>
+            <div>
+                <h1>User Catch & Pick Practice</h1>
+                <p>Practice throwing away from coverage, clicking on, steering, catching, and user interceptions.</p>
+            </div>
+            <div id="controllerStatus" class="controller-status disconnected">Controller not detected</div>
+        </header>
+
+        <section class="controls-panel">
+            <label>
+                Mode
+                <select id="modeSelect">
+                    <option value="offense">Offense: Placement + Catch</option>
+                    <option value="defense">Defense: Click-On Interception</option>
+                </select>
+            </label>
+
+            <label>
+                Difficulty
+                <select id="difficultySelect">
+                    <option value="rookie">Rookie</option>
+                    <option value="pro" selected>Pro</option>
+                    <option value="allPro">All-Pro</option>
+                    <option value="allMadden">All-Madden</option>
+                </select>
+            </label>
+
+            <label>
+                Repetitions
+                <select id="repsSelect">
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                    <option value="30">30</option>
+                </select>
+            </label>
+
+            <button id="startBtn" class="primary-btn">Start Drill</button>
+            <button id="resetBtn" class="secondary-btn">Reset</button>
+        </section>
+
+        <section class="score-strip">
+            <div><span class="score-label">Rep</span><strong id="repValue">0 / 10</strong></div>
+            <div><span class="score-label">Score</span><strong id="scoreValue">0</strong></div>
+            <div><span class="score-label">Success</span><strong id="successValue">0%</strong></div>
+            <div><span class="score-label">Streak</span><strong id="streakValue">0</strong></div>
+        </section>
+
+        <section class="game-card">
+            <div class="instruction-bar">
+                <div>
+                    <span class="instruction-label">Current instruction</span>
+                    <strong id="instructionText">Connect a controller and press Start Drill.</strong>
+                </div>
+                <div id="timingMessage" class="timing-message"></div>
+            </div>
+
+            <div class="canvas-wrap">
+                <canvas id="practiceCanvas" width="1000" height="600" aria-label="Madden user catch and interception practice field"></canvas>
+            </div>
+
+            <div class="feedback-grid">
+                <div>
+                    <span>Placement</span>
+                    <strong id="placementFeedback">—</strong>
+                </div>
+                <div>
+                    <span>Click-On</span>
+                    <strong id="switchFeedback">—</strong>
+                </div>
+                <div>
+                    <span>Movement</span>
+                    <strong id="movementFeedback">—</strong>
+                </div>
+                <div>
+                    <span>Catch / Pick</span>
+                    <strong id="catchFeedback">—</strong>
+                </div>
+            </div>
+        </section>
+
+        <details class="help-card">
+            <summary>Controls and drill explanation</summary>
+            <div class="help-content">
+                <h2>Offense</h2>
+                <p>Use the left stick to place the aiming reticle away from the defender. Press the displayed receiver button, then press Circle to click on. Steer with the left stick and use the displayed catch button as the ball arrives.</p>
+
+                <h2>Defense</h2>
+                <p>Press Circle during the pass to switch to the defender. Steer into the passing lane with the left stick and press Triangle as the ball reaches you.</p>
+
+                <h2>Keyboard test controls</h2>
+                <p>WASD = left stick, 1 = X, 2 = Circle, 3 = Square, 4 = Triangle, 5 = L1, 6 = R1.</p>
+            </div>
+        </details>
+    </main>
+
+    <script src="{{ url_for('static', filename='user_catch_pick_practice.js') }}"></script>
+</body>
+</html>
