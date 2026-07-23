@@ -79,12 +79,19 @@ let gameRunning = false;
 let drillComplete = false;
 let roundLocked = true;
 let waitingForNeutral = true;
+let practicePaused = false;
+let pauseStartedAt = 0;
 let animationId = null;
 let roundTimeoutId = null;
 let nextRoundTimerId = null;
 let countdownTimerIds = [];
 let startSequenceId = 0;
 let lastPsHomePressed = false;
+
+const pauseAwareTimers = {
+    round: null,
+    next: null,
+};
 
 let activeGamepadIndex = null;
 let currentControlledId = "MLB";
@@ -118,6 +125,72 @@ startBtn.addEventListener("click", startGame);
 modeSelect.addEventListener("change", updateModeHelp);
 drillTypeSelect.addEventListener("change", updateDrillTypeHelp);
 
+// Universal WURD practice controls:
+// D-pad Up starts or restarts this practice.
+window.addEventListener("wurd:practice-start", () => {
+    if (startBtn.disabled) return;
+    startGame();
+});
+
+// D-pad Down pauses or resumes this practice.
+window.addEventListener("wurd:practice-pause", event => {
+    if (!gameRunning || drillComplete) {
+        practicePaused = false;
+        pauseStartedAt = 0;
+
+        // Do not leave the universal overlay open during the countdown
+        // or after the drill has finished.
+        if (window.WurdPracticeControls?.isPaused()) {
+            window.WurdPracticeControls.setPaused(false);
+        }
+        return;
+    }
+
+    const shouldPause = Boolean(event.detail?.paused);
+
+    if (shouldPause === practicePaused) {
+        return;
+    }
+
+    if (shouldPause) {
+        practicePaused = true;
+        pauseStartedAt = performance.now();
+        pauseActiveTimers();
+
+        // Prevent movement or a held right stick from being processed
+        // immediately when the practice resumes.
+        pressedMovementKeys.clear();
+        leftStickVector = { x: 0, y: 0 };
+        updateLeftStickMonitor(0, 0);
+        waitingForNeutral = true;
+        return;
+    }
+
+    const pausedFor = Number(event.detail?.pausedFor) ||
+        Math.max(0, performance.now() - pauseStartedAt);
+
+    practicePaused = false;
+    pauseStartedAt = 0;
+
+    // Route animation, pass arrival, and reaction measurements all use
+    // absolute timestamps. Move them forward by the paused duration.
+    if (activeRoute && pausedFor > 0) {
+        activeRoute.startedAt += pausedFor;
+
+        if (Number.isFinite(activeRoute.passArrivalAt)) {
+            activeRoute.passArrivalAt += pausedFor;
+        }
+    }
+
+    if (roundStartedAt && pausedFor > 0) {
+        roundStartedAt += pausedFor;
+    }
+
+    lastAnimationTimestamp = null;
+    waitingForNeutral = true;
+    resumeActiveTimers();
+});
+
 window.addEventListener("gamepadconnected", function(event) {
     activeGamepadIndex = event.gamepad.index;
     showControllerConnected(event.gamepad);
@@ -133,7 +206,14 @@ window.addEventListener("gamepaddisconnected", function(event) {
 });
 
 document.addEventListener("keydown", function(event) {
-    if (!gameRunning || drillComplete || modeSelect.value !== "keyboard") return;
+    if (
+        !gameRunning ||
+        drillComplete ||
+        practicePaused ||
+        modeSelect.value !== "keyboard"
+    ) {
+        return;
+    }
 
     if (isMovementKey(event.key)) {
         event.preventDefault();
@@ -158,7 +238,7 @@ document.addEventListener("keydown", function(event) {
 });
 
 document.addEventListener("keyup", function(event) {
-    if (modeSelect.value !== "keyboard") return;
+    if (practicePaused || modeSelect.value !== "keyboard") return;
 
     if (isMovementKey(event.key)) {
         pressedMovementKeys.delete(event.key.toLowerCase());
@@ -174,8 +254,102 @@ document.addEventListener("keyup", function(event) {
     waitingForNeutral = false;
 });
 
+function clearPauseAwareTimer(name) {
+    const timer = pauseAwareTimers[name];
+
+    if (timer?.id !== null && timer?.id !== undefined) {
+        clearTimeout(timer.id);
+    }
+
+    pauseAwareTimers[name] = null;
+
+    if (name === "round") {
+        roundTimeoutId = null;
+    } else if (name === "next") {
+        nextRoundTimerId = null;
+    }
+}
+
+function armPauseAwareTimer(name) {
+    const timer = pauseAwareTimers[name];
+
+    if (!timer || practicePaused || !gameRunning || drillComplete) {
+        return;
+    }
+
+    timer.startedAt = performance.now();
+
+    timer.id = setTimeout(() => {
+        pauseAwareTimers[name] = null;
+
+        if (name === "round") {
+            roundTimeoutId = null;
+        } else if (name === "next") {
+            nextRoundTimerId = null;
+        }
+
+        if (!gameRunning || drillComplete || practicePaused) {
+            return;
+        }
+
+        timer.callback();
+    }, Math.max(0, timer.remaining));
+
+    if (name === "round") {
+        roundTimeoutId = timer.id;
+    } else if (name === "next") {
+        nextRoundTimerId = timer.id;
+    }
+}
+
+function setPauseAwareTimer(name, callback, delayMs) {
+    clearPauseAwareTimer(name);
+
+    pauseAwareTimers[name] = {
+        id: null,
+        callback,
+        remaining: Math.max(0, Number(delayMs) || 0),
+        startedAt: performance.now(),
+    };
+
+    armPauseAwareTimer(name);
+}
+
+function pauseActiveTimers() {
+    const now = performance.now();
+
+    for (const [name, timer] of Object.entries(pauseAwareTimers)) {
+        if (!timer || timer.id === null) continue;
+
+        clearTimeout(timer.id);
+        timer.id = null;
+        timer.remaining = Math.max(
+            0,
+            timer.remaining - (now - timer.startedAt)
+        );
+
+        if (name === "round") {
+            roundTimeoutId = null;
+        } else if (name === "next") {
+            nextRoundTimerId = null;
+        }
+    }
+}
+
+function resumeActiveTimers() {
+    armPauseAwareTimer("round");
+    armPauseAwareTimer("next");
+}
+
 function startGame() {
     const thisStartSequence = ++startSequenceId;
+
+    practicePaused = false;
+    pauseStartedAt = 0;
+
+    if (window.WurdPracticeControls?.isPaused()) {
+        window.WurdPracticeControls.setPaused(false);
+    }
 
     clearAllTimers();
     stopAnimationLoop();
@@ -249,7 +423,7 @@ function startGame() {
 }
 
 function beginNextRound() {
-    if (!gameRunning || drillComplete) return;
+    if (!gameRunning || drillComplete || practicePaused) return;
 
     clearRoundTimer();
     clearRouteVisuals();
@@ -300,7 +474,7 @@ function beginNextRound() {
     flickDetails.textContent = "Center the right stick, then make one quick flick.";
 
     if (reactionWindowMs > 0) {
-        roundTimeoutId = setTimeout(handleReactionTimeout, reactionWindowMs);
+        setPauseAwareTimer("round", handleReactionTimeout, reactionWindowMs);
     }
 }
 
@@ -343,6 +517,14 @@ function startAnimationLoop() {
 
     const loop = timestamp => {
         if (!gameRunning) return;
+
+        // Keep requestAnimationFrame alive, but freeze controller input,
+        // defender movement, receiver routes, and the pass clock.
+        if (practicePaused) {
+            lastAnimationTimestamp = timestamp;
+            animationId = requestAnimationFrame(loop);
+            return;
+        }
 
         const deltaMs = lastAnimationTimestamp === null
             ? 0
@@ -420,7 +602,7 @@ function triggerRouteBreak(timestamp) {
     }
 
     if (reactionWindowMs > 0) {
-        roundTimeoutId = setTimeout(handleReactionTimeout, reactionWindowMs);
+        setPauseAwareTimer("round", handleReactionTimeout, reactionWindowMs);
     }
 }
 
@@ -509,7 +691,15 @@ function getActiveGamepad() {
 }
 
 function processFlick(rawX, rawY) {
-    if (!gameRunning || drillComplete || roundLocked || !targetDefenderId) return;
+    if (
+        practicePaused ||
+        !gameRunning ||
+        drillComplete ||
+        roundLocked ||
+        !targetDefenderId
+    ) {
+        return;
+    }
 
     const magnitude = Math.hypot(rawX, rawY);
     if (magnitude < MIN_DIRECTION_MAGNITUDE) return;
@@ -618,7 +808,7 @@ function processFlick(rawX, rawY) {
     renderDefenders(isCorrect, true);
 
     if (isDrillFinished()) {
-        nextRoundTimerId = setTimeout(finishDrill, ROUND_FEEDBACK_MS);
+        setPauseAwareTimer("next", finishDrill, ROUND_FEEDBACK_MS);
         return;
     }
 
@@ -630,7 +820,7 @@ function processFlick(rawX, rawY) {
 }
 
 function handleReactionTimeout() {
-    if (!gameRunning || roundLocked || drillComplete) return;
+    if (practicePaused || !gameRunning || roundLocked || drillComplete) return;
 
     roundTimeoutId = null;
     roundLocked = true;
@@ -660,7 +850,7 @@ function handleReactionTimeout() {
     hideCoverHud();
 
     if (isDrillFinished()) {
-        nextRoundTimerId = setTimeout(finishDrill, ROUND_FEEDBACK_MS);
+        setPauseAwareTimer("next", finishDrill, ROUND_FEEDBACK_MS);
         return;
     }
 
@@ -1093,7 +1283,7 @@ function markCatchPointResult(defended) {
 }
 
 function resolveCoverPlay() {
-    if (drillType !== "switch_and_cover" || coverResolved) return;
+    if (practicePaused || drillType !== "switch_and_cover" || coverResolved) return;
 
     coverResolved = true;
     coverPhaseActive = false;
@@ -1167,7 +1357,7 @@ function resolveCoverPlay() {
     updateScoreboard();
 
     if (isDrillFinished()) {
-        nextRoundTimerId = setTimeout(finishDrill, ROUND_FEEDBACK_MS);
+        setPauseAwareTimer("next", finishDrill, ROUND_FEEDBACK_MS);
         return;
     }
 
@@ -1175,13 +1365,13 @@ function resolveCoverPlay() {
 }
 
 function scheduleNextRound() {
-    nextRoundTimerId = setTimeout(() => {
+    setPauseAwareTimer("next", () => {
         targetDefenderId = null;
         selectedDefenderId = null;
         clearRouteVisuals();
         renderDefenders();
 
-        nextRoundTimerId = setTimeout(beginNextRound, NEXT_TARGET_DELAY_MS);
+        setPauseAwareTimer("next", beginNextRound, NEXT_TARGET_DELAY_MS);
     }, ROUND_FEEDBACK_MS);
 }
 
@@ -1234,7 +1424,13 @@ function finishDrill() {
     drillComplete = true;
     gameRunning = false;
     roundLocked = true;
+    practicePaused = false;
+    pauseStartedAt = 0;
     clearAllTimers();
+
+    if (window.WurdPracticeControls?.isPaused()) {
+        window.WurdPracticeControls.setPaused(false);
+    }
     stopAnimationLoop();
 
     targetDefenderId = null;
@@ -1266,23 +1462,17 @@ function finishDrill() {
 
 function clearAllTimers() {
     clearRoundTimer();
-
-    if (nextRoundTimerId !== null) {
-        clearTimeout(nextRoundTimerId);
-        nextRoundTimerId = null;
-    }
+    clearPauseAwareTimer("next");
 
     for (const timerId of countdownTimerIds) {
         clearTimeout(timerId);
     }
+
     countdownTimerIds = [];
 }
 
 function clearRoundTimer() {
-    if (roundTimeoutId !== null) {
-        clearTimeout(roundTimeoutId);
-        roundTimeoutId = null;
-    }
+    clearPauseAwareTimer("round");
 }
 
 function getDefender(id) {

@@ -117,7 +117,9 @@
         keyboardPressed: new Set(),
         keysDown: new Set(),
         gamepadIndex: null,
-        flash: null
+        flash: null,
+        paused: false,
+        pauseStartedAt: 0
     };
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -163,6 +165,12 @@
 
     function resetDrill() {
         state.running = false;
+        state.paused = false;
+        state.pauseStartedAt = 0;
+
+        if (window.WurdPracticeControls?.isPaused()) {
+            window.WurdPracticeControls.setPaused(false);
+        }
         state.completedReps = 0;
         state.successCount = 0;
         state.streak = 0;
@@ -177,6 +185,13 @@
     }
 
     function startDrill() {
+        state.paused = false;
+        state.pauseStartedAt = 0;
+
+        if (window.WurdPracticeControls?.isPaused()) {
+            window.WurdPracticeControls.setPaused(false);
+        }
+
         state.mode = ui.mode.value;
         state.difficultyKey = ui.difficulty.value;
         state.totalReps = Number(ui.reps.value);
@@ -215,7 +230,13 @@
 
     function finishDrill() {
         state.running = false;
+        state.paused = false;
+        state.pauseStartedAt = 0;
         state.phase = "complete";
+
+        if (window.WurdPracticeControls?.isPaused()) {
+            window.WurdPracticeControls.setPaused(false);
+        }
         const rate = state.completedReps
             ? Math.round((state.successCount / state.completedReps) * 100)
             : 0;
@@ -398,6 +419,22 @@
         };
     }
 
+    function syncCurrentControllerButtons() {
+        const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+        let pad = null;
+
+        if (state.gamepadIndex !== null && pads[state.gamepadIndex]) {
+            pad = pads[state.gamepadIndex];
+        } else {
+            pad = Array.from(pads).find(Boolean) || null;
+            state.gamepadIndex = pad ? pad.index : null;
+        }
+
+        state.previousButtons = pad
+            ? pad.buttons.map(button => Boolean(button?.pressed))
+            : [];
+    }
+
     function keyboardButtonForCode(code) {
         if (code === "Digit1") return BUTTONS.X;
         if (code === "Digit2") return BUTTONS.CIRCLE;
@@ -413,6 +450,11 @@
     }
 
     function update(dt, now) {
+        if (state.paused) {
+            draw();
+            return;
+        }
+
         const input = getInput();
 
         if (!state.running || !state.rep) {
@@ -1096,19 +1138,82 @@
     });
 
     window.addEventListener("keydown", event => {
+        if (
+            ["KeyW", "KeyA", "KeyS", "KeyD", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6"]
+                .includes(event.code)
+        ) {
+            event.preventDefault();
+        }
+
+        if (state.paused) return;
+
         state.keysDown.add(event.code);
         const mapped = keyboardButtonForCode(event.code);
         if (mapped !== null && !event.repeat) {
             state.keyboardPressed.add(mapped);
         }
 
-        if (["KeyW", "KeyA", "KeyS", "KeyD", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6"].includes(event.code)) {
-            event.preventDefault();
-        }
     });
 
     window.addEventListener("keyup", event => {
         state.keysDown.delete(event.code);
+    });
+
+    // Universal WURD practice controls:
+    // D-pad Up starts or restarts this practice.
+    window.addEventListener("wurd:practice-start", () => {
+        startDrill();
+    });
+
+    // D-pad Down pauses or resumes this practice.
+    window.addEventListener("wurd:practice-pause", event => {
+        if (!state.running || state.phase === "complete") {
+            state.paused = false;
+            state.pauseStartedAt = 0;
+
+            if (window.WurdPracticeControls?.isPaused()) {
+                window.WurdPracticeControls.setPaused(false);
+            }
+            return;
+        }
+
+        const shouldPause = Boolean(event.detail?.paused);
+
+        if (shouldPause === state.paused) {
+            return;
+        }
+
+        if (shouldPause) {
+            state.paused = true;
+            state.pauseStartedAt = performance.now();
+
+            // Clear keyboard input and record currently held controller
+            // buttons so nothing fires beneath the pause overlay.
+            state.keysDown.clear();
+            state.keyboardPressed.clear();
+            syncCurrentControllerButtons();
+            return;
+        }
+
+        const pausedFor = Number(event.detail?.pausedFor) ||
+            Math.max(0, performance.now() - state.pauseStartedAt);
+
+        state.paused = false;
+        state.pauseStartedAt = 0;
+
+        // The result screen uses an absolute deadline. Move it forward
+        // so the next repetition waits for the same remaining time.
+        if (state.phase === "result" && state.nextRepAt > 0) {
+            state.nextRepAt += pausedFor;
+        }
+
+        // Preserve any timestamps stored on the active repetition.
+        if (state.rep?.startedAt) {
+            state.rep.startedAt += pausedFor;
+        }
+
+        state.lastTime = performance.now();
+        syncCurrentControllerButtons();
     });
 
     ui.start.addEventListener("click", startDrill);

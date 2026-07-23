@@ -50,6 +50,8 @@ let lineSpeed = 4.4;
 let gameRunning = false;
 let animationId = null;
 let lineMoving = false;
+let practicePaused = false;
+let nextRoundTimerId = null;
 
 let drillLength = "free";
 let drillComplete = false;
@@ -83,11 +85,55 @@ const xboxButtons = [
 
 startBtn.addEventListener("click", startGame);
 
+// Universal WURD practice controls:
+// D-pad Up starts or restarts this practice.
+window.addEventListener("wurd:practice-start", () => {
+    if (startBtn.disabled) return;
+    startGame();
+});
+
+// D-pad Down pauses or resumes this practice.
+window.addEventListener("wurd:practice-pause", event => {
+    if (!gameRunning || drillComplete) {
+        practicePaused = false;
+
+        // Do not leave the universal pause overlay visible during
+        // the countdown or after the drill has ended.
+        if (window.WurdPracticeControls?.isPaused()) {
+            window.WurdPracticeControls.setPaused(false);
+        }
+        return;
+    }
+
+    practicePaused = Boolean(event.detail?.paused);
+
+    if (practicePaused) {
+        // Freeze the beat and prevent held buttons from being treated
+        // as new presses when the drill resumes.
+        stopTempo();
+
+        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+        const gamepad = gamepads[0];
+
+        if (gamepad) {
+            gamepad.buttons.forEach((button, index) => {
+                lastControllerButtons[index] = Boolean(button?.pressed);
+            });
+        }
+
+        return;
+    }
+
+    // Restart the beat cleanly after resuming. The next knock begins
+    // a new timing window, so paused time cannot count against the user.
+    startTempo();
+});
+
 // Keyboard equivalents for tempo control:
 // Left Arrow = slower, Right Arrow = faster.
 // E remains available for the R1/RB drill target.
 document.addEventListener("keydown", function(event) {
-    if (!gameRunning || drillComplete) return;
+    if (!gameRunning || drillComplete || practicePaused) return;
 
     const mode = modeSelect.value;
     if (!mode.startsWith("keyboard")) return;
@@ -124,7 +170,7 @@ document.addEventListener("keydown", function(event) {
 });
 
 document.addEventListener("keyup", function(event) {
-    if (!gameRunning) return;
+    if (!gameRunning || practicePaused) return;
 
     const mode = modeSelect.value;
     if (!mode.startsWith("keyboard")) return;
@@ -139,7 +185,15 @@ document.addEventListener("keyup", function(event) {
 function startGame() {
     const thisStartSequence = ++startSequenceId;
 
+    practicePaused = false;
+
+    if (window.WurdPracticeControls?.isPaused()) {
+        window.WurdPracticeControls.setPaused(false);
+    }
+
     stopTempo();
+    clearTimeout(nextRoundTimerId);
+    nextRoundTimerId = null;
 
     if (animationId) {
         cancelAnimationFrame(animationId);
@@ -219,6 +273,18 @@ function getButtonSet() {
 }
 
 function nextRound() {
+    if (!gameRunning || drillComplete) return;
+
+    // A delayed next round may become due while paused. Keep waiting
+    // rather than changing the target underneath the pause screen.
+    if (practicePaused) {
+        clearTimeout(nextRoundTimerId);
+        nextRoundTimerId = setTimeout(nextRound, 100);
+        return;
+    }
+
+    nextRoundTimerId = null;
+
     const buttons = getButtonSet();
     currentTarget = buttons[Math.floor(Math.random() * buttons.length)];
 
@@ -238,6 +304,13 @@ function nextRound() {
 function gameLoop() {
     if (!gameRunning) return;
 
+    // Keep the animation loop alive, but freeze the moving line,
+    // controller input, releases, scoring, and target changes.
+    if (practicePaused) {
+        animationId = requestAnimationFrame(gameLoop);
+        return;
+    }
+
     if (lineMoving) {
         linePosition += lineSpeed;
 
@@ -251,7 +324,7 @@ function gameLoop() {
             if (isDrillFinished()) {
                 finishDrill();
             } else {
-                setTimeout(nextRound, 700);
+                scheduleNextRound(700);
             }
 
             linePosition = 0;
@@ -265,7 +338,7 @@ function gameLoop() {
 }
 
 function checkRelease() {
-    if (drillComplete || roundLocked) return;
+    if (practicePaused || drillComplete || roundLocked) return;
 
     roundLocked = true;
     lineMoving = false;
@@ -298,12 +371,12 @@ function checkRelease() {
     if (isDrillFinished()) {
         finishDrill();
     } else {
-        setTimeout(nextRound, 250);
+        scheduleNextRound(250);
     }
 }
 
 function wrongButton() {
-    if (drillComplete || roundLocked) return;
+    if (practicePaused || drillComplete || roundLocked) return;
 
     roundLocked = true;
     lineMoving = false;
@@ -323,8 +396,29 @@ function wrongButton() {
     if (isDrillFinished()) {
         finishDrill();
     } else {
-        setTimeout(nextRound, 350);
+        scheduleNextRound(350);
     }
+}
+
+function scheduleNextRound(delayMs) {
+    clearTimeout(nextRoundTimerId);
+
+    const waitForNextRound = () => {
+        if (!gameRunning || drillComplete) {
+            nextRoundTimerId = null;
+            return;
+        }
+
+        if (practicePaused) {
+            nextRoundTimerId = setTimeout(waitForNextRound, 100);
+            return;
+        }
+
+        nextRoundTimerId = null;
+        nextRound();
+    };
+
+    nextRoundTimerId = setTimeout(waitForNextRound, delayMs);
 }
 
 function isDrillFinished() {
@@ -339,7 +433,15 @@ function finishDrill() {
     drillComplete = true;
     gameRunning = false;
     lineMoving = false;
+    practicePaused = false;
+
     stopTempo();
+    clearTimeout(nextRoundTimerId);
+    nextRoundTimerId = null;
+
+    if (window.WurdPracticeControls?.isPaused()) {
+        window.WurdPracticeControls.setPaused(false);
+    }
 
     if (animationId) {
         cancelAnimationFrame(animationId);
@@ -361,6 +463,8 @@ function updateScoreboard() {
 }
 
 function checkControllerInput() {
+    if (practicePaused) return;
+
     const mode = modeSelect.value;
     if (!mode.startsWith("controller")) return;
 
@@ -452,6 +556,8 @@ function handleTempoControllerButtons(gamepad) {
 
 // L2/LT decreases the tempo by making the interval longer (slower).
 function decreaseTempo() {
+    if (practicePaused) return;
+
     const oldTempo = tempoMs;
     tempoMs = Math.min(SLOWEST_TEMPO_MS, tempoMs + TEMPO_STEP_MS);
 
@@ -464,6 +570,8 @@ function decreaseTempo() {
 
 // R2/RT increases the tempo by making the interval shorter (faster).
 function increaseTempo() {
+    if (practicePaused) return;
+
     const oldTempo = tempoMs;
     tempoMs = Math.max(FASTEST_TEMPO_MS, tempoMs - TEMPO_STEP_MS);
 
@@ -493,14 +601,14 @@ function updateTempoDisplay() {
 function startTempo() {
     stopTempo();
 
-    if (!gameRunning) return;
+    if (!gameRunning || drillComplete || practicePaused) return;
 
     playKnock();
     tempoTimerId = setTimeout(tempoLoop, tempoMs);
 }
 
 function tempoLoop() {
-    if (!gameRunning || drillComplete) {
+    if (!gameRunning || drillComplete || practicePaused) {
         tempoTimerId = null;
         return;
     }
@@ -512,7 +620,7 @@ function tempoLoop() {
 function restartTempoAfterChange() {
     stopTempo();
 
-    if (!gameRunning || drillComplete) return;
+    if (!gameRunning || drillComplete || practicePaused) return;
 
     // Do not make an extra instant knock when the tempo changes.
     // Schedule the next knock using the new interval.

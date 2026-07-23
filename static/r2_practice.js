@@ -140,8 +140,13 @@ const state = {
     countdownTimer: null,
     lastControllerIndex: null,
     animationFrame: null,
-    psHomeDown: false
+    psHomeDown: false,
+    paused: false,
+    pauseStartedAt: 0,
+    readAnimationTimer: null
 };
+
+const managedTimerMeta = {};
 
 const perfectSound = new Audio("/static/sounds/perfect.mp3");
 const wrongSound = new Audio("/static/sounds/wrong.mp3");
@@ -173,15 +178,64 @@ function currentDifficulty() {
     return DIFFICULTIES[els.difficulty.value] || DIFFICULTIES.normal;
 }
 
+function clearManagedTimer(key) {
+    if (state[key] !== null) {
+        clearTimeout(state[key]);
+        state[key] = null;
+    }
+
+    delete managedTimerMeta[key];
+}
+
+function armManagedTimer(key) {
+    const meta = managedTimerMeta[key];
+    if (!meta || state.paused || !state.running) return;
+
+    meta.startedAt = performance.now();
+
+    state[key] = setTimeout(() => {
+        state[key] = null;
+        delete managedTimerMeta[key];
+
+        if (!state.running || state.paused) return;
+        meta.callback();
+    }, Math.max(0, meta.remaining));
+}
+
+function setManagedTimer(key, callback, delayMs) {
+    clearManagedTimer(key);
+
+    managedTimerMeta[key] = {
+        callback,
+        remaining: Math.max(0, Number(delayMs) || 0),
+        startedAt: performance.now()
+    };
+
+    armManagedTimer(key);
+}
+
+function pauseManagedTimers() {
+    const now = performance.now();
+
+    Object.entries(managedTimerMeta).forEach(([key, meta]) => {
+        if (state[key] !== null) {
+            clearTimeout(state[key]);
+            state[key] = null;
+            meta.remaining = Math.max(0, meta.remaining - (now - meta.startedAt));
+        }
+    });
+}
+
+function resumeManagedTimers() {
+    Object.keys(managedTimerMeta).forEach(armManagedTimer);
+}
+
 function clearTimers() {
-    clearTimeout(state.cueTimer);
-    clearTimeout(state.lateTimer);
-    clearTimeout(state.nextTimer);
-    clearTimeout(state.countdownTimer);
-    state.cueTimer = null;
-    state.lateTimer = null;
-    state.nextTimer = null;
-    state.countdownTimer = null;
+    clearManagedTimer("cueTimer");
+    clearManagedTimer("lateTimer");
+    clearManagedTimer("nextTimer");
+    clearManagedTimer("countdownTimer");
+    clearManagedTimer("readAnimationTimer");
 }
 
 function playSound(sound) {
@@ -414,7 +468,7 @@ function animateReadPhase() {
     if (state.playType === "defense") {
         const fakeDirection = Math.random() < 0.5 ? -1 : 1;
         els.ballCarrier.style.left = `${50 + fakeDirection * 6}%`;
-        setTimeout(() => {
+        setManagedTimer("readAnimationTimer", () => {
             if (state.running && state.phase === "read") {
                 els.ballCarrier.style.left = "50%";
             }
@@ -508,7 +562,7 @@ function moveBlockersForDecision() {
 }
 
 function revealDecision() {
-    if (!state.running || state.phase !== "read") return;
+    if (!state.running || state.paused || state.phase !== "read") return;
 
     state.phase = "approach";
     state.approachProgress = 0;
@@ -564,7 +618,7 @@ function updateApproachVisual() {
 }
 
 function advanceApproach(now) {
-    if (!state.running || state.phase !== "approach") return;
+    if (!state.running || state.paused || state.phase !== "approach") return;
 
     const elapsed = clamp(now - state.approachLastAt, 0, 50);
     state.approachLastAt = now;
@@ -585,6 +639,7 @@ function advanceApproach(now) {
 
 function startReactionMeter() {
     const windowMs = currentDifficulty().reactionWindow;
+    els.reactionMeterFill.style.animationPlayState = "running";
     els.reactionMeterFill.className = "reaction-meter-fill";
     void els.reactionMeterFill.offsetWidth;
     els.reactionMeterFill.style.animationDuration = `${windowMs}ms`;
@@ -592,7 +647,7 @@ function startReactionMeter() {
 }
 
 function showBurstCue() {
-    if (!state.running || state.phase !== "approach") return;
+    if (!state.running || state.paused || state.phase !== "approach") return;
 
     state.phase = "burst";
     state.cueAt = performance.now();
@@ -614,11 +669,11 @@ function showBurstCue() {
         setFeedback("Now accelerate through the opening.", "neutral");
     }
 
-    state.lateTimer = setTimeout(() => finishPlay("late"), currentDifficulty().reactionWindow);
+    setManagedTimer("lateTimer", () => finishPlay("late"), currentDifficulty().reactionWindow);
 }
 
 function beginReadPhase() {
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
 
     configurePlaySelection();
     state.phase = "read";
@@ -629,11 +684,11 @@ function beginReadPhase() {
 
     const difficulty = currentDifficulty();
     const cueDelay = randomBetween(difficulty.readMin, difficulty.readMax);
-    state.cueTimer = setTimeout(revealDecision, cueDelay);
+    setManagedTimer("cueTimer", revealDecision, cueDelay);
 }
 
 function waitForR2ReleaseThenBegin() {
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
 
     state.phase = "waiting_release";
     configurePlaySelection();
@@ -644,12 +699,12 @@ function waitForR2ReleaseThenBegin() {
     setFeedback("Release R2, then prepare to read the play.", "neutral");
 
     const checkRelease = () => {
-        if (!state.running || state.phase !== "waiting_release") return;
+        if (!state.running || state.paused || state.phase !== "waiting_release") return;
         if (!state.r2Down) {
-            state.nextTimer = setTimeout(beginReadPhase, 350);
+            setManagedTimer("nextTimer", beginReadPhase, 350);
             return;
         }
-        state.nextTimer = setTimeout(checkRelease, 80);
+        setManagedTimer("nextTimer", checkRelease, 80);
     };
     checkRelease();
 }
@@ -663,22 +718,22 @@ function runCountdown() {
     setFeedback("Get ready. Keep R2 released.", "neutral");
 
     const tick = () => {
-        if (!state.running) return;
+        if (!state.running || state.paused) return;
         value -= 1;
         if (value > 0) {
             els.countdown.textContent = String(value);
-            state.countdownTimer = setTimeout(tick, 650);
+            setManagedTimer("countdownTimer", tick, 650);
             return;
         }
 
         els.countdown.textContent = "GO";
-        state.countdownTimer = setTimeout(() => {
+        setManagedTimer("countdownTimer", () => {
             els.countdown.classList.add("hidden");
             waitForR2ReleaseThenBegin();
         }, 500);
     };
 
-    state.countdownTimer = setTimeout(tick, 650);
+    setManagedTimer("countdownTimer", tick, 650);
 }
 
 function wrongDirectionMessage() {
@@ -695,13 +750,11 @@ function earlyMessage(phaseAtResult) {
 }
 
 function finishPlay(result, reactionMs = null) {
-    if (!state.running || !["read", "approach", "burst"].includes(state.phase)) return;
+    if (!state.running || state.paused || !["read", "approach", "burst"].includes(state.phase)) return;
 
     const phaseAtResult = state.phase;
-    clearTimeout(state.cueTimer);
-    clearTimeout(state.lateTimer);
-    state.cueTimer = null;
-    state.lateTimer = null;
+    clearManagedTimer("cueTimer");
+    clearManagedTimer("lateTimer");
     state.phase = "feedback";
     state.playsCompleted += 1;
     els.reactionMeterFill.className = "reaction-meter-fill";
@@ -747,15 +800,22 @@ function finishPlay(result, reactionMs = null) {
     updateScoreboard();
 
     if (state.targetPlays !== null && state.playsCompleted >= state.targetPlays) {
-        state.nextTimer = setTimeout(finishSession, 1150);
+        setManagedTimer("nextTimer", finishSession, 1150);
     } else {
-        state.nextTimer = setTimeout(waitForR2ReleaseThenBegin, 1200);
+        setManagedTimer("nextTimer", waitForR2ReleaseThenBegin, 1200);
     }
 }
 
 function finishSession() {
     clearTimers();
     state.running = false;
+    state.paused = false;
+    state.pauseStartedAt = 0;
+    els.reactionMeterFill.style.animationPlayState = "running";
+
+    if (window.WurdPracticeControls?.isPaused()) {
+        window.WurdPracticeControls.setPaused(false);
+    }
     state.phase = "finished";
     els.startBtn.textContent = "Start Again";
     setCue("go", "FINISHED");
@@ -791,7 +851,15 @@ function finishSession() {
 }
 
 function startPractice() {
+    state.paused = false;
+    state.pauseStartedAt = 0;
+
+    if (window.WurdPracticeControls?.isPaused()) {
+        window.WurdPracticeControls.setPaused(false);
+    }
+
     clearTimers();
+    els.reactionMeterFill.style.animationPlayState = "running";
     state.running = true;
     state.phase = "starting";
     state.targetPlays = els.drillLength.value === "free" ? null : Number(els.drillLength.value);
@@ -828,7 +896,7 @@ function postResult(payload) {
 }
 
 function onR2Pressed() {
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
 
     if (state.phase === "read" || state.phase === "approach") {
         finishPlay("early");
@@ -842,15 +910,29 @@ function onR2Pressed() {
     }
 }
 
-function updateR2State(isDown) {
-    const wasDown = state.r2Down;
-    state.r2Down = Boolean(isDown);
-
+function renderR2State() {
     els.r2Status.textContent = state.r2Down ? "R2: pressed" : "R2: released";
     els.r2Status.classList.toggle("active", state.r2Down);
     els.r2TestButton.classList.toggle("pressed", state.r2Down);
+}
 
-    if (state.r2Down && !wasDown) {
+function syncHeldR2WithoutAction() {
+    const pad = findActiveGamepad();
+    const button = pad?.buttons[R2_BUTTON_INDEX];
+    const triggerValue = button
+        ? Math.max(button.value || 0, button.pressed ? 1 : 0)
+        : 0;
+
+    state.r2Down = triggerValue >= R2_THRESHOLD;
+    renderR2State();
+}
+
+function updateR2State(isDown) {
+    const wasDown = state.r2Down;
+    state.r2Down = Boolean(isDown);
+    renderR2State();
+
+    if (!state.paused && state.r2Down && !wasDown) {
         onR2Pressed();
     }
 }
@@ -891,6 +973,11 @@ function findActiveGamepad() {
 }
 
 function pollController(now) {
+    if (state.paused) {
+        state.animationFrame = requestAnimationFrame(pollController);
+        return;
+    }
+
     const controllerMode = els.inputMode.value !== "keyboard";
 
     if (controllerMode) {
@@ -961,6 +1048,9 @@ window.addEventListener("keydown", (event) => {
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) {
         event.preventDefault();
     }
+
+    if (state.paused) return;
+
     keysDown.add(event.code);
     if (isR2KeyboardCode(event.code)) {
         state.keyboardR2Down = true;
@@ -968,6 +1058,8 @@ window.addEventListener("keydown", (event) => {
 });
 
 window.addEventListener("keyup", (event) => {
+    if (state.paused) return;
+
     keysDown.delete(event.code);
     if (isR2KeyboardCode(event.code)) {
         state.keyboardR2Down = false;
@@ -996,6 +1088,8 @@ window.addEventListener("gamepaddisconnected", (event) => {
 
 els.r2TestButton.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    if (state.paused) return;
+
     state.pointerR2Down = true;
     els.r2TestButton.setPointerCapture?.(event.pointerId);
 });
@@ -1007,6 +1101,58 @@ function releasePointerR2() {
 els.r2TestButton.addEventListener("pointerup", releasePointerR2);
 els.r2TestButton.addEventListener("pointercancel", releasePointerR2);
 els.r2TestButton.addEventListener("lostpointercapture", releasePointerR2);
+
+// Universal WURD practice controls:
+// D-pad Up starts or restarts this practice.
+window.addEventListener("wurd:practice-start", () => {
+    startPractice();
+});
+
+// D-pad Down pauses or resumes this practice.
+window.addEventListener("wurd:practice-pause", (event) => {
+    if (!state.running || state.phase === "finished") {
+        state.paused = false;
+
+        if (window.WurdPracticeControls?.isPaused()) {
+            window.WurdPracticeControls.setPaused(false);
+        }
+        return;
+    }
+
+    const shouldPause = Boolean(event.detail?.paused);
+
+    if (shouldPause === state.paused) return;
+
+    if (shouldPause) {
+        state.paused = true;
+        state.pauseStartedAt = performance.now();
+        pauseManagedTimers();
+
+        els.reactionMeterFill.style.animationPlayState = "paused";
+        keysDown.clear();
+        state.keyboardR2Down = false;
+        state.pointerR2Down = false;
+        syncHeldR2WithoutAction();
+        return;
+    }
+
+    const pausedFor = Number(event.detail?.pausedFor) ||
+        Math.max(0, performance.now() - state.pauseStartedAt);
+
+    state.paused = false;
+    state.pauseStartedAt = 0;
+
+    // Keep approach and reaction timing exactly where they were.
+    state.approachLastAt = performance.now();
+
+    if (state.phase === "burst" && state.cueAt) {
+        state.cueAt += pausedFor;
+    }
+
+    syncHeldR2WithoutAction();
+    els.reactionMeterFill.style.animationPlayState = "running";
+    resumeManagedTimers();
+});
 
 els.startBtn.addEventListener("click", startPractice);
 els.difficulty.addEventListener("change", updateReactionWindowLabel);

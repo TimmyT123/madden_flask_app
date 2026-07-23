@@ -104,11 +104,60 @@ let bestStreak = 0;
 let totalReactionMs = 0;
 let reactionCount = 0;
 
+let practicePaused = false;
+
 const pressedKeys = new Set();
 
 startBtn.addEventListener("click", startPractice);
 fullscreenBtn.addEventListener("click", toggleFullscreen);
 modeSelect.addEventListener("change", updateInputHelp);
+
+// Universal WURD practice controls:
+// D-pad Up starts/restarts this practice.
+window.addEventListener("wurd:practice-start", () => {
+    if (startBtn.disabled) return;
+    startPractice();
+});
+
+// D-pad Down pauses/resumes this practice.
+window.addEventListener("wurd:practice-pause", event => {
+    if (!gameRunning || drillComplete) {
+        practicePaused = false;
+
+        // Do not leave the universal pause overlay open before the
+        // countdown starts or after the practice has finished.
+        if (window.WurdPracticeControls?.isPaused()) {
+            window.WurdPracticeControls.setPaused(false);
+        }
+        return;
+    }
+
+    practicePaused = Boolean(event.detail?.paused);
+
+    if (practicePaused) {
+        // Prevent a held R1 or keyboard key from firing immediately
+        // when the practice resumes.
+        const gamepad = getActiveGamepad();
+        lastR1Pressed = Boolean(gamepad?.buttons[R1_BUTTON_INDEX]?.pressed);
+        pressedKeys.clear();
+        return;
+    }
+
+    const pausedFor = Number(event.detail?.pausedFor) || 0;
+
+    // The peek and stationary drills use absolute timestamps. Move
+    // those timestamps forward so paused time does not count.
+    if (activeTarget && pausedFor > 0) {
+        activeTarget.spawnedAt += pausedFor;
+
+        if (Number.isFinite(activeTarget.deadlineAt)) {
+            activeTarget.deadlineAt += pausedFor;
+        }
+    }
+
+    // Prevent one large movement frame immediately after resuming.
+    lastFrameTime = null;
+});
 
 window.addEventListener("gamepadconnected", event => {
     activeGamepadIndex = event.gamepad.index;
@@ -156,6 +205,11 @@ arena.addEventListener("pointerdown", event => {
 
 function startPractice() {
     const thisSequence = ++startSequenceId;
+
+    practicePaused = false;
+    if (window.WurdPracticeControls?.isPaused()) {
+        window.WurdPracticeControls.setPaused(false);
+    }
 
     clearAllTimers();
     stopAnimationLoop();
@@ -229,6 +283,14 @@ function runCountdown(sequenceId) {
 function spawnNextTarget() {
     if (!gameRunning || drillComplete) return;
 
+    // A next-target timeout may expire while paused. Keep waiting
+    // instead of creating a new target underneath the pause screen.
+    if (practicePaused) {
+        clearTimeout(nextTargetTimer);
+        nextTargetTimer = setTimeout(spawnNextTarget, 100);
+        return;
+    }
+
     clearTarget();
     roundLocked = false;
 
@@ -297,6 +359,14 @@ function startAnimationLoop() {
 
     const loop = timestamp => {
         if (!gameRunning) return;
+
+        // Keep the animation loop alive, but freeze aiming, target
+        // movement, target deadlines, and controller throws.
+        if (practicePaused) {
+            lastFrameTime = timestamp;
+            animationId = requestAnimationFrame(loop);
+            return;
+        }
 
         const deltaMs = lastFrameTime === null
             ? 0
@@ -422,7 +492,7 @@ function updateTarget(timestamp, deltaMs) {
 }
 
 function throwKnife() {
-    if (!gameRunning || drillComplete || roundLocked || !activeTarget || activeTarget.resolved) return;
+    if (practicePaused || !gameRunning || drillComplete || roundLocked || !activeTarget || activeTarget.resolved) return;
 
     if (!knifeIsReady) {
         setFeedback("Knife is still recovering. Do not spam R1.", "bad");
@@ -525,8 +595,17 @@ function handleTargetEscape(message) {
 }
 
 function finishPractice() {
+    // A finish timeout may expire while paused. Finish only after
+    // the player resumes.
+    if (practicePaused) {
+        clearTimeout(nextTargetTimer);
+        nextTargetTimer = setTimeout(finishPractice, 100);
+        return;
+    }
+
     gameRunning = false;
     drillComplete = true;
+    practicePaused = false;
     roundLocked = true;
     stopAnimationLoop();
     clearTarget();
@@ -586,12 +665,20 @@ function updateKnifeReady(isReady) {
     knifeReady.classList.add("recovering");
     knifeReadyText.textContent = "Recovering knife...";
 
-    knifeRecoveryTimer = setTimeout(() => {
+    const finishKnifeRecovery = () => {
+        // Do not change the knife state underneath the pause screen.
+        if (practicePaused) {
+            knifeRecoveryTimer = setTimeout(finishKnifeRecovery, 100);
+            return;
+        }
+
         knifeIsReady = true;
         knifeReady.classList.add("ready");
         knifeReady.classList.remove("recovering");
         knifeReadyText.textContent = "Knife ready — press R1";
-    }, KNIFE_RECOVERY_MS);
+    };
+
+    knifeRecoveryTimer = setTimeout(finishKnifeRecovery, KNIFE_RECOVERY_MS);
 }
 
 function showHitMarker(wasCenter) {
