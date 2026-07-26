@@ -1,3 +1,6 @@
+// VERIFIED FOUR-WAY LEVERAGE VERSION: left, right, above, below
+// VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
+// VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
     "use strict";
 
@@ -115,6 +118,7 @@
         previousButtons: [],
         keyboardButtons: new Set(),
         keyboardPressed: new Set(),
+        keyboardReleased: new Set(),
         keysDown: new Set(),
         gamepadIndex: null,
         flash: null,
@@ -154,7 +158,8 @@
     }
 
     function updateScoreboard() {
-        ui.rep.textContent = `${state.completedReps} / ${state.totalReps}`;
+        const repLimit = state.totalReps === Infinity ? "∞" : state.totalReps;
+        ui.rep.textContent = `${state.completedReps} / ${repLimit}`;
         ui.score.textContent = Math.round(state.totalScore);
         const successRate = state.completedReps
             ? Math.round((state.successCount / state.completedReps) * 100)
@@ -178,6 +183,9 @@
         state.phase = "idle";
         state.rep = null;
         state.nextRepAt = 0;
+        state.keyboardButtons.clear();
+        state.keyboardPressed.clear();
+        state.keyboardReleased.clear();
         setInstruction("Connect a controller and press Start Drill.");
         setTiming("");
         setFeedback();
@@ -194,13 +202,20 @@
 
         state.mode = ui.mode.value;
         state.difficultyKey = ui.difficulty.value;
-        state.totalReps = Number(ui.reps.value);
+        state.totalReps =
+            ui.reps.value === "infinite"
+                ? Infinity
+                : Number(ui.reps.value);
         state.completedReps = 0;
         state.successCount = 0;
         state.streak = 0;
         state.totalScore = 0;
         state.running = true;
         state.nextRepAt = 0;
+        state.keyboardButtons.clear();
+        state.keyboardPressed.clear();
+        state.keyboardReleased.clear();
+        syncCurrentControllerButtons();
         updateScoreboard();
         beginRep();
     }
@@ -220,7 +235,7 @@
         if (state.mode === "offense") {
             state.rep = createOffenseRep();
             setInstruction(
-                `Lead away from the defender and throw to ${BUTTON_LABELS[state.rep.throwButton]}.`
+                `Defender is on the ${state.rep.leverage}. Hold ${BUTTON_LABELS[state.rep.throwButton]} and lead to the open side.`
             );
         } else {
             state.rep = createDefenseRep();
@@ -259,19 +274,19 @@
         if (routeType === "outLeft") receiver.vx = -53;
         if (routeType === "outRight") receiver.vx = 53;
 
-        const leverage = randomChoice(["left", "right", "trail", "top"]);
+        // The defender can align left, right, above, or below the receiver.
+        // Both players run the same route speed, and the safe lead appears on
+        // the side directly opposite the defender.
+        const leverage = randomChoice(["left", "right", "above", "below"]);
+        const coverageOffset = 46;
+        const coverage = coverageOffsetFor(leverage, coverageOffset);
         const defender = {
-            x: receiver.x,
-            y: receiver.y,
-            vx: receiver.vx * 0.92,
-            vy: receiver.vy * 0.96,
+            x: receiver.x + coverage.x,
+            y: receiver.y + coverage.y,
+            vx: receiver.vx,
+            vy: receiver.vy,
             radius: 18
         };
-
-        if (leverage === "left") defender.x -= 38;
-        if (leverage === "right") defender.x += 38;
-        if (leverage === "trail") defender.y += 42;
-        if (leverage === "top") defender.y -= 42;
 
         const catchType = randomChoice([
             { button: "X", name: "Possession" },
@@ -291,6 +306,10 @@
             safePoint: { x: receiver.x, y: receiver.y - 125 },
             throwButton: randomChoice(THROW_BUTTONS),
             catchType,
+            throwHolding: false,
+            throwHeldAt: null,
+            throwHoldMs: 0,
+            passType: "lob",
             thrown: false,
             switched: false,
             catchAttempted: false,
@@ -352,7 +371,8 @@
                 y: ballStart.y,
                 progress: 0,
                 duration,
-                elapsed: 0
+                elapsed: 0,
+                arcHeight: 72
             },
             switched: false,
             pickAttempted: false,
@@ -370,6 +390,8 @@
         let axisX = 0;
         let axisY = 0;
         const pressed = new Set();
+        const released = new Set();
+        const down = new Set();
 
         const pads = navigator.getGamepads ? navigator.getGamepads() : [];
         let pad = null;
@@ -390,8 +412,15 @@
 
             pad.buttons.forEach((button, index) => {
                 const wasPressed = Boolean(state.previousButtons[index]);
+
+                if (button.pressed) {
+                    down.add(index);
+                }
                 if (button.pressed && !wasPressed) {
                     pressed.add(index);
+                }
+                if (!button.pressed && wasPressed) {
+                    released.add(index);
                 }
             });
 
@@ -410,12 +439,21 @@
         for (const button of state.keyboardPressed) {
             pressed.add(button);
         }
+        for (const button of state.keyboardReleased) {
+            released.add(button);
+        }
+        for (const button of state.keyboardButtons) {
+            down.add(button);
+        }
         state.keyboardPressed.clear();
+        state.keyboardReleased.clear();
 
         return {
             axisX: clamp(axisX, -1, 1),
             axisY: clamp(axisY, -1, 1),
-            pressed
+            pressed,
+            released,
+            down
         };
     }
 
@@ -449,6 +487,10 @@
         return input.pressed.has(BUTTONS[name]);
     }
 
+    function released(input, name) {
+        return input.released.has(BUTTONS[name]);
+    }
+
     function update(dt, now) {
         if (state.paused) {
             draw();
@@ -471,7 +513,7 @@
         }
 
         if (state.rep.kind === "offense") {
-            updateOffense(dt, input);
+            updateOffense(dt, input, now);
         } else {
             updateDefense(dt, input);
         }
@@ -479,38 +521,65 @@
         draw();
     }
 
-    function updateOffense(dt, input) {
+    function updateOffense(dt, input, now) {
         const rep = state.rep;
         const difficulty = currentDifficulty();
 
         if (!rep.thrown) {
             moveAutoRoute(rep.receiver, dt);
-            moveDefender(rep.defender, rep.receiver, dt, 0.74);
+            moveCoverageDefender(rep);
 
             const projectedReceiver = {
                 x: rep.receiver.x + rep.receiver.vx * 1.35,
                 y: rep.receiver.y + rep.receiver.vy * 1.35
             };
 
-            const away = normalize(
-                projectedReceiver.x - rep.defender.x,
-                projectedReceiver.y - rep.defender.y
+            // Put the safe lead directly opposite the defender. Examples:
+            // left defender -> right lead; above defender -> below lead.
+            const openLead = safeLeadOffsetFor(rep.leverage);
+            rep.safePoint.x = clamp(projectedReceiver.x + openLead.x, 95, 905);
+            rep.safePoint.y = clamp(projectedReceiver.y + openLead.y, 80, 520);
+
+            rep.reticle.x = clamp(projectedReceiver.x + input.axisX * 150, 65, 935);
+
+            // Give the stick more range downward than upward. This lets the
+            // quarterback place the ball behind/below the receiver when the
+            // defender is playing over the top.
+            const verticalAimRange = input.axisY >= 0 ? 225 : 125;
+            rep.reticle.y = clamp(
+                projectedReceiver.y + input.axisY * verticalAimRange,
+                65,
+                540
             );
 
-            rep.safePoint.x = clamp(projectedReceiver.x + away.x * 95, 95, 905);
-            rep.safePoint.y = clamp(projectedReceiver.y + away.y * 78, 80, 445);
-
-            rep.reticle.x = clamp(projectedReceiver.x + input.axisX * 120, 65, 935);
-            rep.reticle.y = clamp(projectedReceiver.y + input.axisY * 105, 65, 465);
-
             if (pressed(input, rep.throwButton)) {
+                rep.throwHolding = true;
+                rep.throwHeldAt = now;
+                rep.throwHoldMs = 0;
+                setTiming(
+                    `Keep aiming—release ${BUTTON_LABELS[rep.throwButton]} to throw.`,
+                    "good"
+                );
+            }
+
+            if (rep.throwHolding && rep.throwHeldAt !== null) {
+                rep.throwHoldMs = Math.max(0, now - rep.throwHeldAt);
+            }
+
+            if (rep.throwHolding && released(input, rep.throwButton)) {
+                rep.throwHoldMs = Math.max(
+                    0,
+                    now - (rep.throwHeldAt || now)
+                );
+                rep.throwHolding = false;
                 throwOffensePass(rep);
-            } else {
-                for (const name of THROW_BUTTONS) {
-                    if (name !== rep.throwButton && pressed(input, name)) {
-                        setTiming(`Wrong receiver button. Use ${BUTTON_LABELS[rep.throwButton]}.`, "bad");
-                        vibrate(80, 0.35);
-                    }
+                return;
+            }
+
+            for (const name of THROW_BUTTONS) {
+                if (name !== rep.throwButton && pressed(input, name)) {
+                    setTiming(`Wrong receiver button. Use ${BUTTON_LABELS[rep.throwButton]}.`, "bad");
+                    vibrate(80, 0.35);
                 }
             }
             return;
@@ -518,21 +587,23 @@
 
         updateBall(rep.ball, dt);
 
-        moveDefender(rep.defender, rep.receiver, dt, 0.68);
-
         if (!rep.switched) {
             moveAutoRoute(rep.receiver, dt);
+            moveCoverageDefender(rep);
             if (pressed(input, "CIRCLE")) {
                 rep.switched = true;
                 rep.switchedAt = rep.ball.progress;
                 rep.switchPoints = scoreSwitchTiming(rep.ball.progress, difficulty);
                 setTiming(switchTimingLabel(rep.switchPoints), rep.switchPoints >= 18 ? "good" : "warn");
                 setInstruction(
-                    `Steer to the ball and press ${BUTTON_LABELS[rep.catchType.button]} for a ${rep.catchType.name} catch.`
+                    `Steer to the ball spot and press ${BUTTON_LABELS[rep.catchType.button]} for a ${rep.catchType.name} catch.`
                 );
                 vibrate(45, 0.22);
             }
         } else {
+            // After the user clicks on, the defender keeps running the same
+            // route speed while the receiver can be steered toward the ball.
+            moveAutoRoute(rep.defender, dt);
             rep.receiver.x = clamp(
                 rep.receiver.x + input.axisX * difficulty.steerSpeed * dt,
                 35,
@@ -559,28 +630,61 @@
         }
     }
 
+    function getPassProfile(holdMs, difficulty) {
+        const baseSpeed = difficulty.ballSpeed;
+
+        if (holdMs < 180) {
+            return {
+                type: "lob",
+                durationFactor: 1.22,
+                arcHeight: 108,
+                timingText: "Lob pass — click on and run under it."
+            };
+        }
+
+        if (holdMs < 550) {
+            return {
+                type: "touch",
+                durationFactor: 1.0,
+                arcHeight: 78,
+                timingText: "Touch pass — click on now."
+            };
+        }
+
+        return {
+            type: "bullet",
+            durationFactor: 0.78,
+            arcHeight: 40,
+            timingText: "Bullet pass — react quickly."
+        };
+    }
+
     function throwOffensePass(rep) {
         rep.thrown = true;
         const distToSafe = distance(rep.reticle, rep.safePoint);
         rep.placementPoints = Math.round(clamp(1 - distToSafe / 190, 0, 1) * 40);
 
         const dist = distance(rep.qb, rep.reticle);
+        const profile = getPassProfile(rep.throwHoldMs, currentDifficulty());
+        rep.passType = profile.type;
+
         rep.ball = {
             start: { ...rep.qb },
             target: { ...rep.reticle },
             x: rep.qb.x,
             y: rep.qb.y,
             progress: 0,
-            duration: dist / currentDifficulty().ballSpeed,
-            elapsed: 0
+            duration: (dist / currentDifficulty().ballSpeed) * profile.durationFactor,
+            elapsed: 0,
+            arcHeight: profile.arcHeight
         };
 
         if (rep.placementPoints >= 32) {
-            setTiming("Good placement—click on now.", "good");
+            setTiming(`${profile.timingText} Good placement.`, "good");
         } else if (rep.placementPoints >= 20) {
-            setTiming("Catchable, but lead farther from coverage.", "warn");
+            setTiming(`${profile.timingText} Catchable, but lead farther from coverage.`, "warn");
         } else {
-            setTiming("Throw is too close to the defender.", "bad");
+            setTiming(`${profile.timingText} Throw is too close to the defender.`, "bad");
         }
         setInstruction("Press Circle to click on to the receiver.");
         beep(520, 0.05);
@@ -824,13 +928,32 @@
         player.y = clamp(player.y + player.vy * dt, 55, 525);
     }
 
-    function moveDefender(defender, receiver, dt, followStrength) {
-        const dx = receiver.x - defender.x;
-        const dy = receiver.y - defender.y;
-        defender.x += (defender.vx + dx * followStrength) * dt;
-        defender.y += (defender.vy + dy * followStrength) * dt;
-        defender.x = clamp(defender.x, 38, 962);
-        defender.y = clamp(defender.y, 55, 525);
+    function coverageOffsetFor(leverage, amount = 46) {
+        if (leverage === "left") return { x: -amount, y: 0 };
+        if (leverage === "right") return { x: amount, y: 0 };
+        if (leverage === "above") return { x: 0, y: -amount };
+        return { x: 0, y: amount }; // below
+    }
+
+    function safeLeadOffsetFor(leverage) {
+        // The safe area is intentionally farther from the receiver than the
+        // defender's alignment so the user has a clear open-side target.
+        if (leverage === "left") return { x: 110, y: 0 };
+        if (leverage === "right") return { x: -110, y: 0 };
+        if (leverage === "above") return { x: 0, y: 120 };
+        return { x: 0, y: -120 }; // below
+    }
+
+    function moveCoverageDefender(rep) {
+        const coverage = coverageOffsetFor(rep.leverage, 46);
+
+        // Lock the defender to the chosen position while matching the
+        // receiver's route velocity exactly. The coverage picture therefore
+        // stays left, right, above, or below for the entire pre-throw route.
+        rep.defender.vx = rep.receiver.vx;
+        rep.defender.vy = rep.receiver.vy;
+        rep.defender.x = clamp(rep.receiver.x + coverage.x, 38, 962);
+        rep.defender.y = clamp(rep.receiver.y + coverage.y, 55, 525);
     }
 
     function updateBall(ball, dt) {
@@ -838,7 +961,7 @@
         ball.progress = ball.elapsed / ball.duration;
         const t = clamp(ball.progress, 0, 1);
         ball.x = lerp(ball.start.x, ball.target.x, t);
-        ball.y = lerp(ball.start.y, ball.target.y, t) - Math.sin(Math.PI * t) * 72;
+        ball.y = lerp(ball.start.y, ball.target.y, t) - Math.sin(Math.PI * t) * (ball.arcHeight || 72);
     }
 
     function draw() {
@@ -902,6 +1025,10 @@
             drawReticle(rep.reticle, "#ffd166");
         }
 
+        if (rep.ball) {
+            drawBallSpot(rep.ball.target);
+        }
+
         drawPlayer(rep.defender, "#f55c69", "D", false);
         drawPlayer(
             rep.receiver,
@@ -909,7 +1036,7 @@
             BUTTON_SYMBOLS[rep.throwButton],
             rep.switched
         );
-
+        drawThrowMeter(rep);
         drawPlayer(rep.qb, "#d7dde8", "QB", false);
 
         if (rep.ball) {
@@ -1039,6 +1166,89 @@
         ctx.restore();
     }
 
+    function drawBallSpot(point) {
+        ctx.save();
+        ctx.strokeStyle = "#ffd166";
+        ctx.fillStyle = "rgba(255, 209, 102, 0.18)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(point.x - 28, point.y);
+        ctx.lineTo(point.x + 28, point.y);
+        ctx.moveTo(point.x, point.y - 28);
+        ctx.lineTo(point.x, point.y + 28);
+        ctx.stroke();
+
+        ctx.fillStyle = "#fff6cc";
+        ctx.font = "bold 13px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("BALL SPOT", point.x, point.y - 32);
+        ctx.restore();
+    }
+
+    function drawThrowMeter(rep) {
+        const isVisible = !rep.thrown || rep.throwHoldMs > 0;
+        if (!isVisible) return;
+
+        const heldMs = rep.throwHolding && rep.throwHeldAt !== null
+            ? Math.max(0, performance.now() - rep.throwHeldAt)
+            : rep.throwHoldMs;
+
+        const progress = clamp(heldMs / 900, 0, 1);
+        const width = 150;
+        const height = 12;
+        const x = clamp(rep.receiver.x - width / 2, 20, canvas.width - width - 20);
+        const y = clamp(rep.receiver.y - 54, 38, canvas.height - 38);
+
+        ctx.save();
+        ctx.fillStyle = "rgba(4, 9, 13, 0.92)";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 7);
+        ctx.fill();
+        ctx.stroke();
+
+        const lobWidth = width * 0.25;
+        const touchWidth = width * 0.36;
+        const bulletWidth = width - lobWidth - touchWidth;
+
+        ctx.fillStyle = "rgba(125, 211, 252, 0.45)";
+        ctx.fillRect(x, y, lobWidth, height);
+        ctx.fillStyle = "rgba(250, 204, 21, 0.45)";
+        ctx.fillRect(x + lobWidth, y, touchWidth, height);
+        ctx.fillStyle = "rgba(248, 113, 113, 0.45)";
+        ctx.fillRect(x + lobWidth + touchWidth, y, bulletWidth, height);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x, y, width * progress, height);
+
+        const markerX = x + width * progress;
+        ctx.strokeStyle = "#071015";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(markerX, y - 4);
+        ctx.lineTo(markerX, y + height + 4);
+        ctx.stroke();
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "bold 10px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("LOB", x + lobWidth / 2, y - 8);
+        ctx.fillText("TOUCH", x + lobWidth + touchWidth / 2, y - 8);
+        ctx.fillText("BULLET", x + lobWidth + touchWidth + bulletWidth / 2, y - 8);
+
+        const passType = heldMs < 180 ? "LOB" : heldMs < 550 ? "TOUCH" : "BULLET";
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 11px Arial";
+        ctx.fillText(passType, x + width / 2, y + 28);
+        ctx.restore();
+    }
+
     function drawCatchPrompt(player, buttonName) {
         ctx.save();
         const x = player.x + 36;
@@ -1149,14 +1359,25 @@
 
         state.keysDown.add(event.code);
         const mapped = keyboardButtonForCode(event.code);
-        if (mapped !== null && !event.repeat) {
-            state.keyboardPressed.add(mapped);
+        if (mapped !== null) {
+            state.keyboardButtons.add(mapped);
+            if (!event.repeat) {
+                state.keyboardPressed.add(mapped);
+            }
         }
 
     });
 
     window.addEventListener("keyup", event => {
         state.keysDown.delete(event.code);
+
+        const mapped = keyboardButtonForCode(event.code);
+        if (mapped !== null) {
+            const wasDown = state.keyboardButtons.delete(mapped);
+            if (wasDown && !state.paused) {
+                state.keyboardReleased.add(mapped);
+            }
+        }
     });
 
     // Universal WURD practice controls:
@@ -1187,10 +1408,17 @@
             state.paused = true;
             state.pauseStartedAt = performance.now();
 
-            // Clear keyboard input and record currently held controller
-            // buttons so nothing fires beneath the pause overlay.
             state.keysDown.clear();
+            state.keyboardButtons.clear();
             state.keyboardPressed.clear();
+            state.keyboardReleased.clear();
+
+            if (state.rep?.kind === "offense" && !state.rep.thrown) {
+                state.rep.throwHolding = false;
+                state.rep.throwHeldAt = null;
+                state.rep.throwHoldMs = 0;
+            }
+
             syncCurrentControllerButtons();
             return;
         }
@@ -1201,13 +1429,10 @@
         state.paused = false;
         state.pauseStartedAt = 0;
 
-        // The result screen uses an absolute deadline. Move it forward
-        // so the next repetition waits for the same remaining time.
         if (state.phase === "result" && state.nextRepAt > 0) {
             state.nextRepAt += pausedFor;
         }
 
-        // Preserve any timestamps stored on the active repetition.
         if (state.rep?.startedAt) {
             state.rep.startedAt += pausedFor;
         }
