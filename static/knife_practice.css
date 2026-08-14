@@ -122,10 +122,19 @@ button:disabled {
     color: #ddd;
 }
 
-.settings select {
+.settings select,
+.settings input[type="number"] {
     border: 1px solid #444;
     background: #202020;
     color: #f3f4f6;
+}
+
+.settings input[type="number"] {
+    width: 105px;
+    padding: 10px 12px;
+    border-radius: 7px;
+    text-align: center;
+    font-weight: 800;
 }
 
 .secondary-btn {
@@ -203,6 +212,12 @@ button:disabled {
 }
 
 .arena {
+    --world-x: 0px;
+    --world-y: 0px;
+    --world-mid-x: 0px;
+    --world-mid-y: 0px;
+    --world-far-x: 0px;
+    --world-far-y: 0px;
     position: relative;
     width: min(1020px, 100%);
     aspect-ratio: 16 / 9;
@@ -226,6 +241,21 @@ button:disabled {
     min-height: 100vh;
     border: 0;
     border-radius: 0;
+}
+
+/* Left-stick world movement. The HUD/crosshair and knife layer stay fixed. */
+.range-light,
+.back-wall-lines {
+    translate: var(--world-far-x) var(--world-far-y);
+}
+
+.floor-grid {
+    translate: var(--world-mid-x) var(--world-mid-y);
+}
+
+.arena-cover,
+.target-layer {
+    translate: var(--world-x) var(--world-y);
 }
 
 .range-light {
@@ -708,6 +738,7 @@ button:disabled {
     }
 
     .settings select,
+    .settings input[type="number"],
     .settings button {
         min-width: 180px;
     }
@@ -716,3 +747,4 @@ button:disabled {
         min-width: 100%;
     }
 }
+

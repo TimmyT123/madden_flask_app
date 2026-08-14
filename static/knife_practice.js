@@ -41,6 +41,8 @@ const wrongSound = new Audio("/static/sounds/wrong.mp3");
 wrongSound.volume = 0.42;
 
 // Standard browser Gamepad mapping for a DualSense controller.
+const LEFT_STICK_X_AXIS = 0;
+const LEFT_STICK_Y_AXIS = 1;
 const RIGHT_STICK_X_AXIS = 2;
 const RIGHT_STICK_Y_AXIS = 3;
 const R1_BUTTON_INDEX = 5;
@@ -49,6 +51,11 @@ const WURD_HOME_URL = "/";
 const STICK_DEADZONE = 0.12;
 const KNIFE_RECOVERY_MS = 570;
 const NEXT_TARGET_DELAY_MS = 560;
+const AIM_SPEED_STORAGE_KEY = "wurdKnifePracticeAimSpeed";
+const DEFAULT_AIM_SPEED = 200;
+const MIN_AIM_SPEED = 25;
+const MAX_AIM_SPEED = 500;
+const WORLD_TO_AIM_SPEED_RATIO = 0.45;
 
 const SPEED_SETTINGS = {
     slow: { moving: 21, visible: 2600, peekHold: 1450 },
@@ -57,11 +64,9 @@ const SPEED_SETTINGS = {
     elite: { moving: 51, visible: 1150, peekHold: 590 },
 };
 
-const AIM_SPEED = {
-    low: 100,
-    normal: 200,
-    high: 300,
-};
+const WORLD_LIMIT_X = 18;
+const WORLD_LIMIT_Y = 9;
+const WORLD_VERTICAL_SPEED_FACTOR = 0.55;
 
 const TARGET_SCALE = {
     large: "target-large",
@@ -92,6 +97,8 @@ let roundLocked = true;
 let knifeIsReady = true;
 let crosshairX = 50;
 let crosshairY = 50;
+let worldOffsetX = 0;
+let worldOffsetY = 0;
 let drillLength = "free";
 
 let hits = 0;
@@ -226,6 +233,11 @@ function startPractice() {
     pressedKeys.clear();
     drillLength = drillLengthSelect.value;
 
+    // Normalize and save the exact Aim Speed whenever practice starts.
+    const aimSpeed = getAimSpeed();
+    sensitivitySelect.value = String(aimSpeed);
+    saveAimSpeed(aimSpeed);
+
     hits = 0;
     throwsMade = 0;
     escaped = 0;
@@ -238,7 +250,10 @@ function startPractice() {
 
     crosshairX = 50;
     crosshairY = 50;
+    worldOffsetX = 0;
+    worldOffsetY = 0;
     renderCrosshair();
+    renderWorldOffset();
     updateScoreboard();
     updateKnifeReady(true);
     hideHitMarker();
@@ -248,6 +263,15 @@ function startPractice() {
     startBtn.textContent = "Starting...";
     arena.focus({ preventScroll: true });
 
+    // Start/Restart Practice should bring the gameplay area into view.
+    // Wait one frame so the newly revealed game area affects page height first.
+    requestAnimationFrame(() => {
+        window.scrollTo({
+            top: document.documentElement.scrollHeight,
+            behavior: "smooth",
+        });
+    });
+
     logPracticeStart();
     runCountdown(thisSequence);
 }
@@ -255,7 +279,7 @@ function startPractice() {
 function runCountdown(sequenceId) {
     countdown.classList.remove("hidden");
     countdown.textContent = "3";
-    setFeedback("Get ready. Aim with the right stick and throw with R1.", "info");
+    setFeedback("Get ready. Move with the left stick, aim with the right stick, and throw with R1.", "info");
 
     countdownTimers.push(setTimeout(() => {
         if (sequenceId !== startSequenceId) return;
@@ -418,15 +442,24 @@ function updateInput(deltaMs) {
 
     lastPsHomePressed = psHomePressed;
 
-    const rawX = gamepad.axes[RIGHT_STICK_X_AXIS] || 0;
-    const rawY = gamepad.axes[RIGHT_STICK_Y_AXIS] || 0;
-    const vector = applyRadialDeadzone(rawX, rawY, STICK_DEADZONE);
-    moveCrosshair(vector.x, vector.y, deltaMs);
+    const rawMoveX = gamepad.axes[LEFT_STICK_X_AXIS] || 0;
+    const rawMoveY = gamepad.axes[LEFT_STICK_Y_AXIS] || 0;
+    const moveVector = applyRadialDeadzone(rawMoveX, rawMoveY, STICK_DEADZONE);
+    moveWorld(moveVector.x, moveVector.y, deltaMs);
 
-    const magnitude = Math.hypot(vector.x, vector.y);
-    aimStatus.textContent = magnitude > 0.05
-        ? `Right stick: aiming (${vector.x.toFixed(2)}, ${vector.y.toFixed(2)})`
-        : "Right stick: centered";
+    const rawAimX = gamepad.axes[RIGHT_STICK_X_AXIS] || 0;
+    const rawAimY = gamepad.axes[RIGHT_STICK_Y_AXIS] || 0;
+    const aimVector = applyRadialDeadzone(rawAimX, rawAimY, STICK_DEADZONE);
+    moveCrosshair(aimVector.x, aimVector.y, deltaMs);
+
+    const moveMagnitude = Math.hypot(moveVector.x, moveVector.y);
+    const aimMagnitude = Math.hypot(aimVector.x, aimVector.y);
+
+    if (moveMagnitude > 0.05 || aimMagnitude > 0.05) {
+        aimStatus.textContent = `L move: ${moveVector.x.toFixed(2)}, ${moveVector.y.toFixed(2)} | R aim: ${aimVector.x.toFixed(2)}, ${aimVector.y.toFixed(2)}`;
+    } else {
+        aimStatus.textContent = "Left stick: movement ready | Right stick: aim centered";
+    }
 
     const r1Pressed = Boolean(gamepad.buttons[R1_BUTTON_INDEX]?.pressed);
     r1Status.textContent = r1Pressed ? "R1: pressed" : (knifeIsReady ? "R1: ready" : "R1: recovering");
@@ -442,10 +475,51 @@ function updateInput(deltaMs) {
 function moveCrosshair(x, y, deltaMs) {
     if (!gameRunning || drillComplete || deltaMs <= 0) return;
 
-    const speed = AIM_SPEED[sensitivitySelect.value] || AIM_SPEED.normal;
+    const speed = getAimSpeed();
     crosshairX = clamp(crosshairX + x * speed * (deltaMs / 1000), 2.5, 97.5);
     crosshairY = clamp(crosshairY + y * speed * (deltaMs / 1000), 4, 96);
     renderCrosshair();
+}
+
+
+function moveWorld(x, y, deltaMs) {
+    if (!gameRunning || drillComplete || deltaMs <= 0) return;
+
+    const speed = getAimSpeed() * WORLD_TO_AIM_SPEED_RATIO;
+    const seconds = deltaMs / 1000;
+
+    // Moving the player right makes the world slide left, and vice versa.
+    worldOffsetX = clamp(
+        worldOffsetX - x * speed * seconds,
+        -WORLD_LIMIT_X,
+        WORLD_LIMIT_X
+    );
+
+    // Forward/back movement uses a smaller visual shift than strafing.
+    worldOffsetY = clamp(
+        worldOffsetY - y * speed * WORLD_VERTICAL_SPEED_FACTOR * seconds,
+        -WORLD_LIMIT_Y,
+        WORLD_LIMIT_Y
+    );
+
+    renderWorldOffset();
+}
+
+function renderWorldOffset() {
+    const rect = arena.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const x = (worldOffsetX / 100) * rect.width;
+    const y = (worldOffsetY / 100) * rect.height;
+
+    // Near objects/targets move the full amount. Far scenery moves less,
+    // creating a light parallax effect that feels more FPS-like.
+    arena.style.setProperty("--world-x", `${x}px`);
+    arena.style.setProperty("--world-y", `${y}px`);
+    arena.style.setProperty("--world-mid-x", `${x * 0.58}px`);
+    arena.style.setProperty("--world-mid-y", `${y * 0.58}px`);
+    arena.style.setProperty("--world-far-x", `${x * 0.28}px`);
+    arena.style.setProperty("--world-far-y", `${y * 0.28}px`);
 }
 
 function updateTarget(timestamp, deltaMs) {
@@ -838,7 +912,8 @@ function logPracticeStart() {
             drillType: drillTypeSelect.value,
             targetSpeed: targetSpeedSelect.value,
             targetSize: targetSizeSelect.value,
-            sensitivity: sensitivitySelect.value,
+            sensitivity: String(getAimSpeed()),
+            aimSpeed: getAimSpeed(),
             drillLength: drillLengthSelect.value,
         }),
     }).catch(error => {
@@ -855,7 +930,8 @@ function logPracticeResult({ accuracy, averageReaction }) {
             drillType: drillTypeSelect.value,
             targetSpeed: targetSpeedSelect.value,
             targetSize: targetSizeSelect.value,
-            sensitivity: sensitivitySelect.value,
+            sensitivity: String(getAimSpeed()),
+            aimSpeed: getAimSpeed(),
             drillLength: drillLengthSelect.value,
             hits,
             throws: throwsMade,
@@ -882,6 +958,49 @@ function clearAllTimers() {
     hitMarkerTimer = null;
 }
 
+function setupAimSpeedControl() {
+    if (!sensitivitySelect) return;
+
+    // Restore the exact Aim Speed last used in this browser.
+    sensitivitySelect.value = String(loadSavedAimSpeed(DEFAULT_AIM_SPEED));
+
+    const saveCurrentValue = () => {
+        const speed = getAimSpeed();
+        sensitivitySelect.value = String(speed);
+        saveAimSpeed(speed);
+    };
+
+    sensitivitySelect.addEventListener("change", saveCurrentValue);
+    sensitivitySelect.addEventListener("blur", saveCurrentValue);
+}
+
+function getAimSpeed() {
+    const value = Number(sensitivitySelect?.value);
+    if (!Number.isFinite(value)) return DEFAULT_AIM_SPEED;
+    return Math.round(clamp(value, MIN_AIM_SPEED, MAX_AIM_SPEED));
+}
+
+function loadSavedAimSpeed(fallback = DEFAULT_AIM_SPEED) {
+    try {
+        const saved = Number(localStorage.getItem(AIM_SPEED_STORAGE_KEY));
+        if (Number.isFinite(saved) && saved >= MIN_AIM_SPEED && saved <= MAX_AIM_SPEED) {
+            return Math.round(saved);
+        }
+    } catch (error) {
+        console.log("Could not load saved knife aim speed:", error);
+    }
+
+    return Math.round(clamp(fallback, MIN_AIM_SPEED, MAX_AIM_SPEED));
+}
+
+function saveAimSpeed(speed) {
+    try {
+        localStorage.setItem(AIM_SPEED_STORAGE_KEY, String(speed));
+    } catch (error) {
+        console.log("Could not save knife aim speed:", error);
+    }
+}
+
 function chooseRandom(items) {
     return items[Math.floor(Math.random() * items.length)];
 }
@@ -906,6 +1025,11 @@ function clamp(value, minimum, maximum) {
     return Math.max(minimum, Math.min(maximum, value));
 }
 
+window.addEventListener("resize", renderWorldOffset);
+document.addEventListener("fullscreenchange", renderWorldOffset);
+
 renderCrosshair();
+renderWorldOffset();
 updateScoreboard();
 updateInputHelp();
+

@@ -18,7 +18,7 @@
     </header>
 
     <p id="practiceInstructions" class="intro">
-        Aim with the right stick and press <strong>R1</strong> to throw. Build the habit of aiming first and pressing R1 only when the target is exposed.
+        Move with the left stick, aim with the right stick, and press <strong>R1</strong> to throw. Build the habit of aiming first and pressing R1 only when the target is exposed.
     </p>
 
     <div class="settings">
@@ -52,11 +52,17 @@
         </select>
 
         <label for="sensitivitySelect">Aim Speed:</label>
-        <select id="sensitivitySelect">
-            <option value="low">Low</option>
-            <option value="normal" selected>Normal</option>
-            <option value="high">High</option>
-        </select>
+        <input
+            id="sensitivitySelect"
+            type="number"
+            min="25"
+            max="500"
+            step="1"
+            value="200"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-label="Aim Speed"
+        >
 
         <label for="drillLengthSelect">Drill Length:</label>
         <select id="drillLengthSelect">
@@ -73,7 +79,7 @@
 
     <div class="status-row">
         <div id="controllerStatus" class="status-box">Waiting for controller...</div>
-        <div id="aimStatus" class="status-box">Right stick: centered</div>
+        <div id="aimStatus" class="status-box">Left stick: movement ready | Right stick: aim centered</div>
         <div id="r1Status" class="status-box">R1: ready</div>
     </div>
 
