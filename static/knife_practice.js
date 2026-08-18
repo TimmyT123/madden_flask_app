@@ -1028,6 +1028,7 @@ function clamp(value, minimum, maximum) {
 window.addEventListener("resize", renderWorldOffset);
 document.addEventListener("fullscreenchange", renderWorldOffset);
 
+setupAimSpeedControl();
 renderCrosshair();
 renderWorldOffset();
 updateScoreboard();
