@@ -167,6 +167,8 @@
       let spinning = false;
       let latestPayload = null;
       let finishTimer = null;
+      let holdTimer = null;
+      const RESULT_HOLD_MS = 4000;
 
       function polar(r, deg) {
         const a = deg * Math.PI / 180;
@@ -304,6 +306,9 @@
       function spinTo(evt) {
         if (!evt || !evt.number || !Array.isArray(evt.pool) || !evt.pool.length) return;
         if (finishTimer) clearTimeout(finishTimer);
+        if (holdTimer) clearTimeout(holdTimer);
+        finishTimer = null;
+        holdTimer = null;
         currentEventSeq = evt.seq || 0;
         spinning = true;
 
@@ -330,7 +335,7 @@
         statusSub.textContent = `${pool.length} number${pool.length === 1 ? '' : 's'} on this spin.`;
         result.textContent = 'The official result is being revealed…';
 
-        if (elapsed >= totalDuration + 500) {
+        if (elapsed >= totalDuration + RESULT_HOLD_MS) {
           spinning = false;
           result.innerHTML = `🎉 ${escapeHtml(evt.display_name)} landed on <strong>#${evt.number}</strong>`;
           if (latestPayload) showIdle(latestPayload);
@@ -345,12 +350,19 @@
         rotator.style.transform = `rotate(${target}deg)`;
 
         finishTimer = setTimeout(() => {
-          spinning = false;
+          finishTimer = null;
+
+          // Keep `spinning` true during the result hold. This prevents the
+          // 650 ms polling loop from redrawing/resetting the wheel immediately.
           result.innerHTML = `🎉 ${escapeHtml(evt.display_name)} landed on <strong>#${evt.number}</strong>`;
           statusTitle.textContent = `🎉 ${evt.display_name || 'Owner'} drew #${evt.number}!`;
-          statusSub.textContent = `${evt.remaining} number${evt.remaining === 1 ? '' : 's'} remain.`;
-          // Keep the landed wheel visible briefly, then show the newly reduced pool.
-          setTimeout(() => { if (!spinning && latestPayload) showIdle(latestPayload); }, 1300);
+          statusSub.textContent = `${evt.remaining} number${evt.remaining === 1 ? '' : 's'} remain. Next wheel loads in a few seconds…`;
+
+          holdTimer = setTimeout(() => {
+            holdTimer = null;
+            spinning = false;
+            if (latestPayload) showIdle(latestPayload);
+          }, RESULT_HOLD_MS);
         }, remaining + 80);
       }
 
