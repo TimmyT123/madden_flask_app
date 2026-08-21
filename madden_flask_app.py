@@ -70,6 +70,18 @@ DEFAULT_LEAGUE_ID = "26969931"
 DEFAULT_SEASON = "season_0"
 DEFAULT_WEEK = "week_1"
 
+# --- Madden 27 live team-number wheel ---------------------------------------
+# The Discord drawing bot and this Flask app must point at the SAME JSON file.
+# If they run from different folders, set TEAM_ORDER_STATE_FILE to the same
+# absolute path in both .env and .env.teamdraw.
+TEAM_ORDER_STATE_FILE = Path(
+    os.getenv(
+        "TEAM_ORDER_STATE_FILE",
+        str(Path(__file__).with_name("team_order_state.json")),
+    )
+).expanduser()
+TEAM_DRAW_TOTAL_NUMBERS = 32
+
 
 def normalize_period(value, default="week_1"):
     if value is None:
@@ -3732,10 +3744,129 @@ def streamers_hub():
                            twitch_parent=parent_domain)
 
 
+
+# --- Madden 27 Team Selection Wheel -----------------------------------------
+def _read_team_draw_state():
+    """Read the Discord bot's draw state without ever returning a partial file."""
+    try:
+        with open(TEAM_ORDER_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"⚠️ Team draw state read failed: {e}")
+        return {}
+
+
+def _public_spin_event(raw):
+    """Return only the fields the public wheel page needs."""
+    if not isinstance(raw, dict):
+        return None
+
+    try:
+        pool = sorted({int(n) for n in (raw.get("pool") or []) if 1 <= int(n) <= TEAM_DRAW_TOTAL_NUMBERS})
+    except Exception:
+        pool = []
+
+    try:
+        number = int(raw.get("number"))
+    except Exception:
+        number = None
+
+    return {
+        "seq": int(raw.get("seq") or 0),
+        "display_name": str(raw.get("display_name") or raw.get("username") or "Owner"),
+        "number": number,
+        "remaining": int(raw.get("remaining") or 0),
+        "started_at_ms": int(raw.get("started_at_ms") or 0),
+        "duration_ms": int(raw.get("duration_ms") or 7000),
+        "pool": pool,
+    }
+
+
+def _team_draw_public_payload(state):
+    available = []
+    for raw in state.get("available") or []:
+        try:
+            n = int(raw)
+        except Exception:
+            continue
+        if 1 <= n <= TEAM_DRAW_TOTAL_NUMBERS:
+            available.append(n)
+    available = sorted(set(available))
+
+    history = []
+    for raw in (state.get("spin_history") or [])[-10:]:
+        evt = _public_spin_event(raw)
+        if evt:
+            history.append(evt)
+
+    owner_names = state.get("owner_names") or {}
+    final_order = []
+    for row in state.get("final_mapping") or []:
+        if not isinstance(row, (list, tuple)) or len(row) != 3:
+            continue
+        uid, wheel_number, final_pick = row
+        info = owner_names.get(str(uid)) or {}
+        display = (
+            info.get("display_name")
+            or info.get("username")
+            or f"Owner {final_pick}"
+        )
+        final_order.append({
+            "display_name": str(display),
+            "wheel_number": wheel_number,
+            "final_pick": final_pick,
+            "did_spin": wheel_number is not None,
+        })
+
+    final_order.sort(key=lambda r: int(r.get("final_pick") or 999))
+
+    assigned = state.get("assigned") or {}
+    last_spin = _public_spin_event(state.get("last_spin"))
+
+    now_ms = int(time() * 1000)
+    spin_active = False
+    if last_spin and last_spin.get("started_at_ms"):
+        spin_active = now_ms < (
+            last_spin["started_at_ms"] + last_spin["duration_ms"] + 350
+        )
+
+    # Keep the initial wheel useful even before !startorder creates a state file.
+    if not state:
+        available = list(range(1, TEAM_DRAW_TOTAL_NUMBERS + 1))
+
+    return {
+        "ok": True,
+        "closed": bool(state.get("closed", False)),
+        "total_numbers": TEAM_DRAW_TOTAL_NUMBERS,
+        "assigned_count": len(assigned),
+        "remaining_count": len(available),
+        "available": available,
+        "spin_seq": int(state.get("spin_seq") or 0),
+        "spin_active": spin_active,
+        "last_spin": last_spin,
+        "spin_history": history,
+        "final_order": final_order,
+    }
+
+
+@app.get("/team-wheel")
+def team_selection_wheel():
+    return render_template("team_wheel.html")
+
+
+@app.get("/api/team-draw/state")
+def team_draw_state_api():
+    state = _read_team_draw_state()
+    response = make_response(jsonify(_team_draw_public_payload(state)))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
 import os
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)
-
-
