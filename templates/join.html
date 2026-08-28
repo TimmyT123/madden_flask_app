@@ -3,310 +3,749 @@
 <head>
     <title>Join WURD Madden League</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b0b0d">
 
     <style>
+        :root {
+            --gold: #f5c542;
+            --gold-bright: #ffd968;
+            --panel: #18181b;
+            --panel-2: #212125;
+            --line: #34343a;
+            --muted: #a9a9b2;
+            --green: #00a65a;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
             margin: 0;
-            font-family: Arial, sans-serif;
-            background: #101010;
-            color: #f2f2f2;
+            font-family: Arial, Helvetica, sans-serif;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(245,197,66,.08), transparent 34%),
+                #0b0b0d;
+            color: #f5f5f7;
+        }
+
+        a {
+            color: inherit;
         }
 
         .hero {
-            padding: 50px 20px;
+            position: relative;
+            overflow: hidden;
+            padding: 34px 20px 38px;
             text-align: center;
-            background: linear-gradient(135deg, #111, #242424);
-            border-bottom: 1px solid #333;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,0)),
+                linear-gradient(135deg, #111115, #1c1c20 55%, #111115);
+            border-bottom: 1px solid #33343a;
         }
 
-        .hero h1 {
-            font-size: 42px;
-            margin-bottom: 10px;
+        .hero::before,
+        .hero::after {
+            content: "";
+            position: absolute;
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: .14;
+            pointer-events: none;
         }
 
-        .hero p {
-            font-size: 18px;
-            max-width: 750px;
-            margin: 0 auto 25px;
-            color: #ccc;
-            line-height: 1.5;
+        .hero::before {
+            left: -120px;
+            top: -120px;
+            background: var(--gold);
         }
 
-        .join-btn {
-            display: inline-block;
-            background: #f5c542;
-            color: #111;
-            padding: 14px 26px;
-            border-radius: 8px;
-            font-weight: bold;
-            text-decoration: none;
-            font-size: 18px;
+        .hero::after {
+            right: -150px;
+            bottom: -180px;
+            background: #ffffff;
+            opacity: .05;
         }
 
-        .join-btn:hover {
-            background: #ffd95c;
+        .hero-inner {
+            position: relative;
+            z-index: 1;
+            max-width: 1040px;
+            margin: 0 auto;
         }
 
-        .motto {
-            margin: 0 0 8px;
-            color: #f5c542;
-            font-size: 15px;
-            font-weight: 800;
+        .wurd-logo {
+            width: 86px;
+            height: 86px;
+            object-fit: contain;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 8px 18px rgba(0,0,0,.42));
+        }
+
+        .brand-kicker {
+            margin: 0;
+            color: var(--gold);
+            font-size: clamp(34px, 5vw, 58px);
+            font-weight: 900;
+            letter-spacing: 2px;
+            line-height: 1;
+            text-transform: uppercase;
+            text-shadow: 0 2px 0 rgba(0,0,0,.55);
+        }
+
+        .brand-motto {
+            margin: 8px 0 13px;
+            font-size: clamp(18px, 2.4vw, 25px);
+            font-weight: 900;
             letter-spacing: 2px;
             text-transform: uppercase;
         }
 
+        .league-badges {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin: 0 auto 16px;
+        }
+
+        .league-badge {
+            padding: 7px 11px;
+            border: 1px solid #414149;
+            border-radius: 999px;
+            background: rgba(255,255,255,.045);
+            color: #e8e8ec;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .85px;
+            text-transform: uppercase;
+        }
+
+        .hero-copy {
+            max-width: 760px;
+            margin: 0 auto 18px;
+            color: #c7c7ce;
+            font-size: 17px;
+            line-height: 1.45;
+        }
+
+        .hero-availability {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 18px;
+            padding: 9px 14px;
+            border: 1px solid rgba(0,166,90,.48);
+            border-radius: 999px;
+            background: rgba(0,166,90,.10);
+            color: #dcffe9;
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+        }
+
+        .hero-availability::before {
+            content: "";
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #18ca74;
+            box-shadow: 0 0 12px rgba(24,202,116,.7);
+        }
+
+        .join-btn {
+            display: inline-block;
+            background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+            color: #111;
+            padding: 14px 27px;
+            border-radius: 9px;
+            font-weight: 900;
+            text-decoration: none;
+            font-size: 17px;
+            box-shadow: 0 7px 22px rgba(245,197,66,.15);
+            transition: transform .15s ease, filter .15s ease;
+        }
+
+        .join-btn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.05);
+        }
+
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 32px 20px 42px;
+        }
+
         .available-section {
-            margin-bottom: 30px;
+            margin-bottom: 28px;
         }
 
         .available-heading {
             display: flex;
             align-items: end;
             justify-content: space-between;
-            gap: 16px;
+            gap: 18px;
             margin-bottom: 16px;
+        }
+
+        .section-eyebrow {
+            margin: 0 0 4px;
+            color: #8e8e98;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
         }
 
         .available-heading h2 {
             margin: 0;
-            color: #f5c542;
-            font-size: 28px;
+            color: #fff;
+            font-size: clamp(28px, 3vw, 36px);
+            line-height: 1.05;
+        }
+
+        .available-heading h2 span {
+            color: var(--gold);
         }
 
         .available-count {
-            color: #ddd;
-            font-weight: 700;
+            padding: 8px 12px;
+            border: 1px solid #3d3d43;
+            border-radius: 999px;
+            background: #17171a;
+            color: #ededf0;
+            font-size: 13px;
+            font-weight: 900;
+            white-space: nowrap;
         }
 
         .team-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 18px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
         }
 
         .team-card {
+            --team-accent: #f5c542;
+            --team-accent-soft: rgba(245,197,66,.16);
             position: relative;
             overflow: hidden;
-            background: linear-gradient(145deg, #202020, #151515);
-            border: 1px solid #383838;
+            min-width: 0;
+            background:
+                linear-gradient(180deg, var(--team-accent-soft), transparent 82px),
+                linear-gradient(145deg, #1d1d21, #141417);
+            border: 1px solid #3a3a40;
+            border-top: 4px solid var(--team-accent);
             border-radius: 14px;
-            padding: 20px;
+            padding: 17px;
+            box-shadow: 0 10px 24px rgba(0,0,0,.16);
         }
 
+        .team-card::after {
+            content: "";
+            position: absolute;
+            top: -45px;
+            right: -48px;
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: var(--team-accent);
+            opacity: .08;
+            filter: blur(7px);
+            pointer-events: none;
+        }
+
+        /* Team-specific recruiting-card accents */
+        .team-card[data-team="49ers"]      { --team-accent:#aa0000; --team-accent-soft:rgba(170,0,0,.18); }
+        .team-card[data-team="bears"]      { --team-accent:#c83803; --team-accent-soft:rgba(200,56,3,.17); }
+        .team-card[data-team="bengals"]    { --team-accent:#fb4f14; --team-accent-soft:rgba(251,79,20,.18); }
+        .team-card[data-team="bills"]      { --team-accent:#1676d2; --team-accent-soft:rgba(22,118,210,.18); }
+        .team-card[data-team="broncos"]    { --team-accent:#fb4f14; --team-accent-soft:rgba(251,79,20,.18); }
+        .team-card[data-team="browns"]     { --team-accent:#ff3c00; --team-accent-soft:rgba(255,60,0,.18); }
+        .team-card[data-team="buccaneers"] { --team-accent:#d50a0a; --team-accent-soft:rgba(213,10,10,.18); }
+        .team-card[data-team="cardinals"]  { --team-accent:#97233f; --team-accent-soft:rgba(151,35,63,.18); }
+        .team-card[data-team="chargers"]   { --team-accent:#0080c6; --team-accent-soft:rgba(0,128,198,.18); }
+        .team-card[data-team="chiefs"]     { --team-accent:#e31837; --team-accent-soft:rgba(227,24,55,.18); }
+        .team-card[data-team="colts"]      { --team-accent:#003f84; --team-accent-soft:rgba(0,63,132,.20); }
+        .team-card[data-team="commanders"] { --team-accent:#ffb612; --team-accent-soft:rgba(255,182,18,.16); }
+        .team-card[data-team="cowboys"]    { --team-accent:#3f75a6; --team-accent-soft:rgba(63,117,166,.18); }
+        .team-card[data-team="dolphins"]   { --team-accent:#00a3a3; --team-accent-soft:rgba(0,163,163,.18); }
+        .team-card[data-team="eagles"]     { --team-accent:#00a088; --team-accent-soft:rgba(0,160,136,.18); }
+        .team-card[data-team="falcons"]    { --team-accent:#a71930; --team-accent-soft:rgba(167,25,48,.18); }
+        .team-card[data-team="giants"]     { --team-accent:#0b63ce; --team-accent-soft:rgba(11,99,206,.18); }
+        .team-card[data-team="jaguars"]    { --team-accent:#00a5b5; --team-accent-soft:rgba(0,165,181,.18); }
+        .team-card[data-team="jets"]       { --team-accent:#179447; --team-accent-soft:rgba(23,148,71,.18); }
+        .team-card[data-team="lions"]      { --team-accent:#28a9e2; --team-accent-soft:rgba(40,169,226,.18); }
+        .team-card[data-team="packers"]    { --team-accent:#2f6b4f; --team-accent-soft:rgba(47,107,79,.20); }
+        .team-card[data-team="panthers"]   { --team-accent:#0085ca; --team-accent-soft:rgba(0,133,202,.18); }
+        .team-card[data-team="patriots"]   { --team-accent:#c32032; --team-accent-soft:rgba(195,32,50,.18); }
+        .team-card[data-team="raiders"]    { --team-accent:#b7b7b7; --team-accent-soft:rgba(183,183,183,.14); }
+        .team-card[data-team="rams"]       { --team-accent:#2965cc; --team-accent-soft:rgba(41,101,204,.18); }
+        .team-card[data-team="ravens"]     { --team-accent:#6a4c9c; --team-accent-soft:rgba(106,76,156,.20); }
+        .team-card[data-team="saints"]     { --team-accent:#d3bc78; --team-accent-soft:rgba(211,188,120,.16); }
+        .team-card[data-team="seahawks"]   { --team-accent:#69be28; --team-accent-soft:rgba(105,190,40,.16); }
+        .team-card[data-team="steelers"]   { --team-accent:#ffb612; --team-accent-soft:rgba(255,182,18,.16); }
+        .team-card[data-team="texans"]     { --team-accent:#d8142d; --team-accent-soft:rgba(216,20,45,.18); }
+        .team-card[data-team="titans"]     { --team-accent:#4b92db; --team-accent-soft:rgba(75,146,219,.18); }
+        .team-card[data-team="vikings"]    { --team-accent:#7a4ca5; --team-accent-soft:rgba(122,76,165,.20); }
+
         .team-card-top {
+            position: relative;
+            z-index: 1;
             display: flex;
             align-items: center;
-            gap: 14px;
-            margin-bottom: 16px;
+            gap: 13px;
+            min-height: 72px;
+            margin-bottom: 13px;
+        }
+
+        .team-logo-wrap {
+            display: grid;
+            place-items: center;
+            width: 76px;
+            height: 68px;
+            flex: 0 0 76px;
         }
 
         .team-logo {
-            width: 70px;
-            height: 70px;
+            max-width: 74px;
+            max-height: 64px;
             object-fit: contain;
-            flex: 0 0 70px;
+            filter: drop-shadow(0 5px 8px rgba(0,0,0,.32));
         }
 
         .team-name {
             margin: 0;
-            font-size: 23px;
+            font-size: 24px;
             line-height: 1.05;
         }
 
         .available-badge {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
             margin-top: 6px;
-            padding: 4px 9px;
+            padding: 4px 8px;
             border-radius: 999px;
-            background: #1f7a39;
+            background: var(--green);
             color: #fff;
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: .8px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: .75px;
+        }
+
+        .available-badge::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #b9ffd5;
         }
 
         .team-meta {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 16px;
+            grid-template-columns: .9fr .9fr 1.2fr;
+            gap: 7px;
+            margin-bottom: 14px;
         }
 
         .meta-box {
-            background: #282828;
-            border: 1px solid #393939;
+            min-width: 0;
+            background: rgba(255,255,255,.055);
+            border: 1px solid rgba(255,255,255,.09);
             border-radius: 9px;
-            padding: 9px 6px;
+            padding: 8px 5px;
             text-align: center;
         }
 
         .meta-label {
             display: block;
-            color: #999;
-            font-size: 11px;
+            color: #aaaab3;
+            font-size: 9px;
+            font-weight: 800;
             text-transform: uppercase;
             letter-spacing: .7px;
+            white-space: nowrap;
         }
 
         .meta-value {
             display: block;
-            margin-top: 3px;
+            margin-top: 4px;
             font-size: 18px;
-            font-weight: 800;
+            font-weight: 900;
+        }
+
+        .meta-box:first-child .meta-value {
+            color: var(--team-accent);
+            filter: brightness(1.35);
         }
 
         .top-players-title {
-            margin: 0 0 8px;
-            color: #f5c542;
-            font-size: 13px;
+            margin: 0 0 5px;
+            color: var(--gold);
+            font-size: 11px;
+            font-weight: 900;
             text-transform: uppercase;
-            letter-spacing: .8px;
+            letter-spacing: 1px;
         }
 
         .player-row {
             display: flex;
             justify-content: space-between;
-            gap: 12px;
-            padding: 7px 0;
-            border-top: 1px solid #303030;
-        }
-
-        .player-row:first-of-type {
-            border-top: 0;
+            align-items: center;
+            gap: 10px;
+            min-height: 34px;
+            padding: 6px 0;
+            border-top: 1px solid #303036;
+            font-size: 14px;
         }
 
         .player-name {
-            font-weight: 700;
+            min-width: 0;
+            font-weight: 800;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .player-rating {
-            color: #f5c542;
+            color: var(--gold);
             white-space: nowrap;
-            font-weight: 800;
+            font-weight: 900;
         }
 
         .team-actions {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 17px;
+            grid-template-columns: .92fr 1.08fr;
+            gap: 8px;
+            margin-top: 14px;
         }
 
         .team-action {
-            display: block;
-            padding: 10px 8px;
+            display: grid;
+            place-items: center;
+            min-height: 44px;
+            padding: 9px 8px;
             border-radius: 8px;
             text-align: center;
             text-decoration: none;
-            font-weight: 800;
-            font-size: 14px;
+            font-weight: 900;
+            font-size: 13px;
+            transition: transform .15s ease, filter .15s ease;
+        }
+
+        .team-action:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.06);
         }
 
         .team-action-roster {
-            background: #2d2d2d;
+            background: #29292e;
             color: #fff;
-            border: 1px solid #444;
+            border: 1px solid #424249;
         }
 
         .team-action-join {
-            background: #f5c542;
+            background: linear-gradient(180deg, var(--gold-bright), var(--gold));
             color: #111;
         }
 
         .availability-message {
-            background: #1b1b1b;
-            border: 1px solid #3a3a3a;
+            background: #1b1b1f;
+            border: 1px solid #3a3a42;
             border-radius: 10px;
             padding: 18px;
-            color: #bbb;
+            color: #bbbcc4;
         }
 
-        @media (max-width: 600px) {
-            .available-heading {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-
-            .team-meta {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
-            }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 28px 0 16px;
         }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 35px 20px;
+        .info-card,
+        .process-card,
+        .rules-strip {
+            background: linear-gradient(145deg, #19191d, #151518);
+            border: 1px solid #33343a;
+            border-radius: 13px;
         }
 
-        .section {
-            background: #1b1b1b;
-            border: 1px solid #333;
-            border-radius: 10px;
-            padding: 25px;
-            margin-bottom: 25px;
+        .info-card {
+            padding: 20px;
         }
 
-        .section h2 {
-            margin-top: 0;
-            color: #f5c542;
+        .info-card h2,
+        .process-card h2 {
+            margin: 0 0 12px;
+            color: var(--gold);
+            font-size: 22px;
         }
 
-        ul {
-            line-height: 1.8;
+        .quick-list {
+            display: grid;
+            gap: 9px;
+        }
+
+        .quick-item {
+            display: grid;
+            grid-template-columns: 28px 1fr;
+            gap: 9px;
+            align-items: start;
+            color: #dedee3;
+            line-height: 1.35;
+        }
+
+        .quick-icon {
+            display: grid;
+            place-items: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: rgba(245,197,66,.10);
+            color: var(--gold);
+            font-weight: 900;
+        }
+
+        .quick-item strong {
+            display: block;
+            margin-bottom: 1px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .quick-item span {
+            color: #a9a9b2;
+            font-size: 13px;
+        }
+
+        .process-card {
+            padding: 20px;
+            margin-bottom: 16px;
         }
 
         .steps {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
         }
 
         .step {
-            background: #242424;
-            padding: 18px;
-            border-radius: 8px;
-            border: 1px solid #333;
+            position: relative;
+            min-height: 112px;
+            padding: 15px;
+            background: #222227;
+            border: 1px solid #37373e;
+            border-radius: 10px;
+        }
+
+        .step-number {
+            display: inline-grid;
+            place-items: center;
+            width: 27px;
+            height: 27px;
+            margin-bottom: 9px;
+            border-radius: 50%;
+            background: var(--gold);
+            color: #111;
+            font-weight: 900;
+            font-size: 13px;
         }
 
         .step strong {
-            color: #f5c542;
+            display: block;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .step p {
+            margin: 5px 0 0;
+            color: #aaaab3;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .rules-strip {
+            padding: 18px 20px;
+            margin-bottom: 22px;
+        }
+
+        .rules-strip h2 {
+            margin: 0 0 12px;
+            color: var(--gold);
+            font-size: 20px;
+        }
+
+        .rule-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .rule-chip {
+            padding: 8px 10px;
+            border: 1px solid #3a3a41;
+            border-radius: 999px;
+            background: #222227;
+            color: #d9d9de;
+            font-size: 12px;
+            font-weight: 700;
         }
 
         .bottom-cta {
+            position: relative;
+            overflow: hidden;
+            padding: 26px 22px;
             text-align: center;
-            margin-top: 35px;
+            background:
+                linear-gradient(135deg, rgba(245,197,66,.12), transparent 60%),
+                #19191d;
+            border: 1px solid #3a3a40;
+            border-radius: 14px;
+        }
+
+        .bottom-cta h2 {
+            margin: 0 0 5px;
+            color: #fff;
+            font-size: 27px;
+        }
+
+        .bottom-cta h2 span {
+            color: var(--gold);
+        }
+
+        .bottom-cta p {
+            margin: 0 auto 16px;
+            max-width: 650px;
+            color: #aaaab3;
+            font-size: 14px;
+            line-height: 1.4;
         }
 
         .small-note {
-            color: #aaa;
-            font-size: 14px;
-            margin-top: 12px;
+            color: #8f8f98;
+            font-size: 12px;
+            margin-top: 11px;
+        }
+
+        @media (max-width: 980px) {
+            .team-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .steps {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hero {
+                padding-top: 28px;
+            }
+
+            .wurd-logo {
+                width: 72px;
+                height: 72px;
+            }
+
+            .container {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+
+            .available-heading {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 9px;
+            }
+
+            .team-grid,
+            .info-grid,
+            .steps {
+                grid-template-columns: 1fr;
+            }
+
+            .team-card {
+                padding: 16px;
+            }
+
+            .team-logo-wrap {
+                width: 70px;
+                flex-basis: 70px;
+            }
+
+            .team-logo {
+                max-width: 68px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .team-meta {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .meta-value {
+                font-size: 16px;
+            }
+
+            .team-actions {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 
 <body>
 
-<div class="hero">
-    <div class="motto">The Word Is WURD &bull; Who&apos;s UR Daddy?</div>
-    <h1>Join WURD Madden League</h1>
-    <p>
-        Pick your team. Build your franchise. Compete against real users in an organized
-        Madden league with live stats, standings, schedules, rosters, and recaps.
-    </p>
-    <a class="join-btn" href="{{ discord_invite }}" target="_blank" rel="noopener">
-        Start Recruit Process
-    </a>
-</div>
+<header class="hero">
+    <div class="hero-inner">
+        <img class="wurd-logo" src="{{ url_for('static', filename='images/wurd_logo.png') }}" alt="WURD logo">
+        <h1 class="brand-kicker">The Word Is WURD</h1>
+        <div class="brand-motto">Who&apos;s UR Daddy?</div>
 
-<div class="container">
+        <div class="league-badges">
+            <span class="league-badge">Madden 27</span>
+            <span class="league-badge">PS5</span>
+            <span class="league-badge">Online Franchise</span>
+            <span class="league-badge">Live League Website</span>
+        </div>
 
-    <div class="available-section">
+        <p class="hero-copy">
+            Pick your team. Build your franchise. Compete against real users with live stats,
+            standings, schedules, rosters, recaps, and an organized recruit process.
+        </p>
+
+        {% if not availability_error %}
+            <div class="hero-availability">
+                {{ available_team_count }} team{% if available_team_count != 1 %}s{% endif %} available now
+            </div>
+            <br>
+        {% endif %}
+
+        <a class="join-btn" href="#available-teams">See Available Teams</a>
+    </div>
+</header>
+
+<main class="container">
+
+    <section class="available-section" id="available-teams">
         <div class="available-heading">
-            <h2>Available Teams</h2>
+            <div>
+                <div class="section-eyebrow">Choose your franchise</div>
+                <h2><span>Available</span> Teams</h2>
+            </div>
             {% if not availability_error %}
-                <div class="available-count">{{ available_team_count }} open now</div>
+                <div class="available-count">{{ available_team_count }} OPEN NOW</div>
             {% endif %}
         </div>
 
@@ -317,9 +756,11 @@
         {% elif available_teams %}
             <div class="team-grid">
                 {% for team in available_teams %}
-                    <div class="team-card">
+                    <article class="team-card" data-team="{{ team.name|lower }}">
                         <div class="team-card-top">
-                            <img class="team-logo" src="{{ team.logo }}" alt="{{ team.name }} logo">
+                            <div class="team-logo-wrap">
+                                <img class="team-logo" src="{{ team.logo }}" alt="{{ team.name }} logo">
+                            </div>
                             <div>
                                 <h3 class="team-name">{{ team.name }}</h3>
                                 <span class="available-badge">AVAILABLE</span>
@@ -336,7 +777,7 @@
                                 <span class="meta-value">{{ team.record }}</span>
                             </div>
                             <div class="meta-box">
-                                <span class="meta-label">Off / Def</span>
+                                <span class="meta-label">Off / Def Rank</span>
                                 <span class="meta-value">
                                     {% if team.offense_rank %}#{{ team.offense_rank }}{% else %}&mdash;{% endif %}
                                     /
@@ -359,9 +800,9 @@
 
                         <div class="team-actions">
                             <a class="team-action team-action-roster" href="{{ team.roster_url }}">View Roster</a>
-                            <a class="team-action team-action-join" href="{{ discord_invite }}" target="_blank" rel="noopener">I Want This Team</a>
+                            <a class="team-action team-action-join" href="{{ discord_invite }}" target="_blank" rel="noopener">Claim This Team</a>
                         </div>
-                    </div>
+                    </article>
                 {% endfor %}
             </div>
         {% else %}
@@ -369,78 +810,98 @@
                 No teams are currently available. You can still enter the recruit process for the queue.
             </div>
         {% endif %}
-    </div>
+    </section>
 
-    <div class="section">
-        <h2>Why Join WURD?</h2>
-        <ul>
-            <li>Active Madden franchise league</li>
-            <li>Organized Discord communication</li>
-            <li>Regular advance schedule</li>
-            <li>League website with stats, standings, schedules, and recaps</li>
-            <li>Commissioners who help manage games, rules, and activity</li>
-            <li>Queue system for new recruits</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>What We Look For</h2>
-        <ul>
-            <li>Reliable users who communicate</li>
-            <li>Players who can schedule games respectfully</li>
-            <li>Users who follow league rules</li>
-            <li>Stable internet connection</li>
-            <li>No quitting, drama, or disrespect toward commissioners</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>How It Works</h2>
-
-        <div class="steps">
-            <div class="step">
-                <strong>1. Join Discord</strong>
-                <p>Enter the WURD recruit area with limited Recruit access.</p>
-            </div>
-
-            <div class="step">
-                <strong>2. Read Rules</strong>
-                <p>Review the league rules and expectations before applying.</p>
-            </div>
-
-            <div class="step">
-                <strong>3. Complete App</strong>
-                <p>The WURD bot will send you the recruit application link.</p>
-            </div>
-
-            <div class="step">
-                <strong>4. Get Reviewed</strong>
-                <p>Commissioners review your application before moving you into Queue.</p>
+    <section class="info-grid">
+        <div class="info-card">
+            <h2>Why WURD?</h2>
+            <div class="quick-list">
+                <div class="quick-item">
+                    <div class="quick-icon">1</div>
+                    <div><strong>Active Franchise</strong><span>Real users, regular advances, organized Discord communication.</span></div>
+                </div>
+                <div class="quick-item">
+                    <div class="quick-icon">2</div>
+                    <div><strong>Real League Website</strong><span>Stats, standings, schedules, rosters, and recaps in one place.</span></div>
+                </div>
+                <div class="quick-item">
+                    <div class="quick-icon">3</div>
+                    <div><strong>Structured League</strong><span>Commissioners manage games, rules, activity, and the recruit queue.</span></div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="section">
+        <div class="info-card">
+            <h2>Who Fits WURD?</h2>
+            <div class="quick-list">
+                <div class="quick-item">
+                    <div class="quick-icon">✓</div>
+                    <div><strong>Reliable Communicators</strong><span>Schedule games respectfully and respond when your game channel opens.</span></div>
+                </div>
+                <div class="quick-item">
+                    <div class="quick-icon">✓</div>
+                    <div><strong>Fair Competitors</strong><span>Follow league rules, avoid cheese gameplay, and finish user games.</span></div>
+                </div>
+                <div class="quick-item">
+                    <div class="quick-icon">✓</div>
+                    <div><strong>Long-Term Users</strong><span>Stable connection, good attitude, no quitting, drama, or disrespect.</span></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="process-card">
+        <h2>How the Recruit Process Works</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <strong>Join Discord</strong>
+                <p>Enter the WURD Recruit Area with limited Recruit access.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <strong>Read the Rules</strong>
+                <p>Review league expectations before applying.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <strong>Complete the App</strong>
+                <p>The WURD bot sends the recruit application link.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">4</div>
+                <strong>Get Reviewed</strong>
+                <p>Commissioners review your application and move approved users toward a team or Queue.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="rules-strip">
         <h2>League Rules Snapshot</h2>
-        <ul>
-            <li>Communicate with your opponent</li>
-            <li>Respect commissioners and final rulings</li>
-            <li>Play fair and avoid cheese gameplay</li>
-            <li>Do not quit user vs user games</li>
-            <li>Stay active and respond when your game channel is created</li>
-        </ul>
-    </div>
+        <div class="rule-chips">
+            <span class="rule-chip">Communicate with your opponent</span>
+            <span class="rule-chip">Respect commissioner rulings</span>
+            <span class="rule-chip">Play fair &amp; avoid cheese gameplay</span>
+            <span class="rule-chip">Do not quit user vs user games</span>
+            <span class="rule-chip">Stay active in your game channel</span>
+        </div>
+    </section>
 
-    <div class="bottom-cta">
+    <section class="bottom-cta">
+        <h2>Ready to prove <span>Who&apos;s UR Daddy?</span></h2>
+        <p>
+            Pick an available franchise above, enter the WURD Recruit Area, and start the process.
+            Reliable Madden users are what keep WURD strong.
+        </p>
         <a class="join-btn" href="{{ discord_invite }}" target="_blank" rel="noopener">
             Join the WURD Recruit Area
         </a>
         <div class="small-note">
-            Already in WURD? Send this page to reliable Madden users who want to start the recruit process.
+            Already in WURD? Send this page to a reliable Madden player who belongs in the league.
         </div>
-    </div>
+    </section>
 
-</div>
+</main>
 
 </body>
 </html>
