@@ -47,6 +47,192 @@
             background: #ffd95c;
         }
 
+        .motto {
+            margin: 0 0 8px;
+            color: #f5c542;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .available-section {
+            margin-bottom: 30px;
+        }
+
+        .available-heading {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .available-heading h2 {
+            margin: 0;
+            color: #f5c542;
+            font-size: 28px;
+        }
+
+        .available-count {
+            color: #ddd;
+            font-weight: 700;
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 18px;
+        }
+
+        .team-card {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(145deg, #202020, #151515);
+            border: 1px solid #383838;
+            border-radius: 14px;
+            padding: 20px;
+        }
+
+        .team-card-top {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .team-logo {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+            flex: 0 0 70px;
+        }
+
+        .team-name {
+            margin: 0;
+            font-size: 23px;
+            line-height: 1.05;
+        }
+
+        .available-badge {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: #1f7a39;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .8px;
+        }
+
+        .team-meta {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .meta-box {
+            background: #282828;
+            border: 1px solid #393939;
+            border-radius: 9px;
+            padding: 9px 6px;
+            text-align: center;
+        }
+
+        .meta-label {
+            display: block;
+            color: #999;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .7px;
+        }
+
+        .meta-value {
+            display: block;
+            margin-top: 3px;
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .top-players-title {
+            margin: 0 0 8px;
+            color: #f5c542;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+        }
+
+        .player-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 7px 0;
+            border-top: 1px solid #303030;
+        }
+
+        .player-row:first-of-type {
+            border-top: 0;
+        }
+
+        .player-name {
+            font-weight: 700;
+        }
+
+        .player-rating {
+            color: #f5c542;
+            white-space: nowrap;
+            font-weight: 800;
+        }
+
+        .team-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 17px;
+        }
+
+        .team-action {
+            display: block;
+            padding: 10px 8px;
+            border-radius: 8px;
+            text-align: center;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 14px;
+        }
+
+        .team-action-roster {
+            background: #2d2d2d;
+            color: #fff;
+            border: 1px solid #444;
+        }
+
+        .team-action-join {
+            background: #f5c542;
+            color: #111;
+        }
+
+        .availability-message {
+            background: #1b1b1b;
+            border: 1px solid #3a3a3a;
+            border-radius: 10px;
+            padding: 18px;
+            color: #bbb;
+        }
+
+        @media (max-width: 600px) {
+            .available-heading {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .team-meta {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
         .container {
             max-width: 1000px;
             margin: 0 auto;
@@ -103,10 +289,11 @@
 <body>
 
 <div class="hero">
+    <div class="motto">The Word Is WURD &bull; Who&apos;s UR Daddy?</div>
     <h1>Join WURD Madden League</h1>
     <p>
-        WURD is an active Madden franchise league with real users, organized scheduling,
-        league stats, standings, game recaps, and a structured recruit queue.
+        Pick your team. Build your franchise. Compete against real users in an organized
+        Madden league with live stats, standings, schedules, rosters, and recaps.
     </p>
     <a class="join-btn" href="{{ discord_invite }}" target="_blank" rel="noopener">
         Start Recruit Process
@@ -114,6 +301,75 @@
 </div>
 
 <div class="container">
+
+    <div class="available-section">
+        <div class="available-heading">
+            <h2>Available Teams</h2>
+            {% if not availability_error %}
+                <div class="available-count">{{ available_team_count }} open now</div>
+            {% endif %}
+        </div>
+
+        {% if availability_error %}
+            <div class="availability-message">
+                Available teams could not be verified right now. {{ availability_error }}
+            </div>
+        {% elif available_teams %}
+            <div class="team-grid">
+                {% for team in available_teams %}
+                    <div class="team-card">
+                        <div class="team-card-top">
+                            <img class="team-logo" src="{{ team.logo }}" alt="{{ team.name }} logo">
+                            <div>
+                                <h3 class="team-name">{{ team.name }}</h3>
+                                <span class="available-badge">AVAILABLE</span>
+                            </div>
+                        </div>
+
+                        <div class="team-meta">
+                            <div class="meta-box">
+                                <span class="meta-label">Team OVR</span>
+                                <span class="meta-value">{{ team.ovr if team.ovr is not none else '&mdash;'|safe }}</span>
+                            </div>
+                            <div class="meta-box">
+                                <span class="meta-label">Record</span>
+                                <span class="meta-value">{{ team.record }}</span>
+                            </div>
+                            <div class="meta-box">
+                                <span class="meta-label">Off / Def</span>
+                                <span class="meta-value">
+                                    {% if team.offense_rank %}#{{ team.offense_rank }}{% else %}&mdash;{% endif %}
+                                    /
+                                    {% if team.defense_rank %}#{{ team.defense_rank }}{% else %}&mdash;{% endif %}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="top-players-title">Top Players</div>
+                        {% if team.top_players %}
+                            {% for player in team.top_players %}
+                                <div class="player-row">
+                                    <div class="player-name">{{ player.name }}{% if player.pos %} &middot; {{ player.pos }}{% endif %}</div>
+                                    <div class="player-rating">{{ player.ovr }} OVR</div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="player-row">Roster data is still processing.</div>
+                        {% endif %}
+
+                        <div class="team-actions">
+                            <a class="team-action team-action-roster" href="{{ team.roster_url }}">View Roster</a>
+                            <a class="team-action team-action-join" href="{{ discord_invite }}" target="_blank" rel="noopener">I Want This Team</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="availability-message">
+                No teams are currently available. You can still enter the recruit process for the queue.
+            </div>
+        {% endif %}
+    </div>
 
     <div class="section">
         <h2>Why Join WURD?</h2>

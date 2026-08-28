@@ -58,6 +58,15 @@ DISCORD_RECAP_WEBHOOK_URL = os.getenv("DISCORD_RECAP_WEBHOOK_URL")
 
 WURD_RECRUIT_DISCORD_INVITE = os.getenv("WURD_RECRUIT_DISCORD_INVITE", "")
 
+# Shared source of truth for Discord-owned teams.
+# time_madden_old.py refreshes this file from current Discord nicknames.
+WURD24_USERS_FILE = Path(
+    os.getenv(
+        "WURD24_USERS_FILE",
+        "/home/pi/projects/time_madden_old/wurd24users.csv"
+    )
+).expanduser()
+
 # Private Call of Duty knife-throw practice page. Set this in .env.
 KNIFE_PRACTICE_PIN = os.getenv("KNIFE_PRACTICE_PIN", "").strip()
 KNIFE_PRACTICE_COOKIE = "wurd_knife_practice_access"
@@ -1595,11 +1604,171 @@ def wurd_champions():
 def wurd_champions_api():
     return jsonify(load_wurd_champions())
 
+def _join_team_name_keys(info: dict) -> set[str]:
+    """Return normalized team-name keys used to match wurd24users.csv."""
+    values = [
+        info.get("nickName"),
+        info.get("name"),
+        info.get("displayName"),
+        info.get("teamName"),
+    ]
+
+    keys = set()
+    for value in values:
+        if not value:
+            continue
+
+        cleaned = re.sub(r"[^A-Z0-9 ]+", "", str(value).upper()).strip()
+        if not cleaned:
+            continue
+
+        keys.add(cleaned)
+
+        # Handles team_map names such as "Cincinnati Bengals" while
+        # wurd24users.csv stores the nickname "Bengals".
+        parts = cleaned.split()
+        if parts:
+            keys.add(parts[-1])
+
+    return keys
+
+
+def _load_claimed_wurd_teams() -> tuple[set[str], str | None]:
+    """Read Discord-owned teams written by time_madden_old.py."""
+    try:
+        with WURD24_USERS_FILE.open("r", encoding="utf-8") as f:
+            claimed = {
+                re.sub(r"[^A-Z0-9 ]+", "", line.strip().upper()).strip()
+                for line in f
+                if line.strip()
+            }
+        return claimed, None
+    except FileNotFoundError:
+        return set(), f"Available-team file not found: {WURD24_USERS_FILE}"
+    except Exception as e:
+        return set(), f"Could not read available-team file: {e}"
+
+
+def _join_rank(value):
+    try:
+        rank = int(value)
+        return rank if rank > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def build_join_available_teams():
+    """
+    Build every currently open WURD team for /join.
+
+    Ownership source: time_madden_old.py -> wurd24users.csv
+    Madden data source: current Flask uploads (team map, standings, roster, OVR).
+    """
+    league = str(league_data.get("latest_league") or DEFAULT_LEAGUE_ID)
+    season = league_data.get("latest_season") or DEFAULT_SEASON
+    root = os.path.join(app.config["UPLOAD_FOLDER"], league)
+
+    team_map = _load_json_safe(os.path.join(root, "team_map.json")) or {}
+    if not isinstance(team_map, dict) or not team_map:
+        return [], "Team map is not available yet."
+
+    claimed, claim_error = _load_claimed_wurd_teams()
+    if claim_error:
+        # Fail closed: if we cannot verify ownership, do not advertise all
+        # 32 teams as available by mistake.
+        return [], claim_error
+
+    records = load_team_records(root, season)
+    standings = load_standings_map(league, season)
+    team_ovr = load_team_ovr_by_id(league)
+    roster = load_roster_index(league).get("players", [])
+
+    available = []
+
+    for raw_tid, raw_info in team_map.items():
+        tid = str(raw_tid)
+        info = raw_info if isinstance(raw_info, dict) else {}
+
+        team_keys = _join_team_name_keys(info)
+        if team_keys & claimed:
+            continue
+
+        name = (
+            info.get("name")
+            or info.get("nickName")
+            or info.get("displayName")
+            or info.get("teamName")
+            or f"Team {tid}"
+        )
+
+        # Standings normally match teamId. Fall back to name/abbr for any
+        # Madden export where IDs differ between payloads.
+        standing = standings.get(tid) or {}
+        if not standing:
+            wanted_names = {
+                str(name).strip().lower(),
+                str(info.get("displayName") or "").strip().lower(),
+                str(info.get("nickName") or "").strip().lower(),
+            } - {""}
+            wanted_abbr = str(info.get("abbr") or info.get("teamAbbr") or "").strip().lower()
+
+            for row in standings.values():
+                if not isinstance(row, dict):
+                    continue
+                row_names = {
+                    str(row.get("teamName") or "").strip().lower(),
+                    str(row.get("name") or "").strip().lower(),
+                } - {""}
+                row_abbr = str(row.get("teamAbbr") or row.get("abbr") or "").strip().lower()
+                if wanted_names & row_names or (wanted_abbr and wanted_abbr == row_abbr):
+                    standing = row
+                    break
+
+        w, l, t = records.get(tid, (0, 0, 0))
+        record = f"{w}-{l}" if not t else f"{w}-{l}-{t}"
+
+        top_players = sorted(
+            [p for p in roster if str(p.get("teamId")) == tid],
+            key=lambda p: int(p.get("ovr") or 0),
+            reverse=True,
+        )[:3]
+
+        available.append({
+            "teamId": tid,
+            "name": name,
+            "abbr": info.get("abbr") or info.get("teamAbbr") or "",
+            "division": info.get("divisionName") or standing.get("divisionName") or "",
+            "record": record,
+            "ovr": team_ovr.get(tid),
+            "offense_rank": _join_rank(standing.get("offTotalYdsRank")),
+            "defense_rank": _join_rank(standing.get("defTotalYdsRank")),
+            "logo": team_logo(tid),
+            "roster_url": url_for("rosters", league=league, team=tid),
+            "top_players": [
+                {
+                    "name": p.get("name") or "Unknown",
+                    "pos": p.get("pos") or "",
+                    "ovr": p.get("ovr") or 0,
+                }
+                for p in top_players
+            ],
+        })
+
+    available.sort(key=lambda t: (t.get("division") or "ZZZ", str(t.get("name") or "")))
+    return available, None
+
+
 @app.route("/join")
 def join_wurd():
+    available_teams, availability_error = build_join_available_teams()
+
     return render_template(
         "join.html",
-        discord_invite=WURD_RECRUIT_DISCORD_INVITE
+        discord_invite=WURD_RECRUIT_DISCORD_INVITE,
+        available_teams=available_teams,
+        available_team_count=len(available_teams),
+        availability_error=availability_error,
+        league=league_data.get("latest_league") or DEFAULT_LEAGUE_ID,
     )
 
 
