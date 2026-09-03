@@ -3735,39 +3735,44 @@ def show_standings():
                 team_id_to_info[tid] = info
 
 
-        # Accumulate pointsFor and pointsAgainst across weeks
+        # Accumulate pointsFor and pointsAgainst across regular-season weeks.
+        # During preseason, Madden's parsed standings already contain the correct
+        # preseason PF/PA, so preserve those values instead of overwriting them
+        # with zeros from the regular-season week folders.
+        is_preseason = str(week).startswith("pre_")
         team_scores = defaultdict(lambda: {"pointsFor": 0, "pointsAgainst": 0})
 
-        try:
-            week_number = int(week.replace("week_", "")) if week.startswith("week_") else int(week)
-        except:
-            week_number = 0
+        if not is_preseason:
+            try:
+                week_number = int(week.replace("week_", "")) if week.startswith("week_") else int(week)
+            except:
+                week_number = 0
 
-        # Standings should show regular-season PF/PA only.
-        score_week_limit = min(week_number, 18)
+            # Regular-season standings should exclude playoff scoring.
+            score_week_limit = min(week_number, 18)
 
-        for w in range(1, score_week_limit + 1):
-            week_folder = os.path.join("uploads", league_id, season, f"week_{w}")
-            schedule_path = os.path.join(week_folder, "parsed_schedule.json")
+            for w in range(1, score_week_limit + 1):
+                week_folder = os.path.join("uploads", league_id, season, f"week_{w}")
+                schedule_path = os.path.join(week_folder, "parsed_schedule.json")
 
-            if os.path.exists(schedule_path):
-                with open(schedule_path) as f:
-                    try:
-                        weekly_games = json.load(f)
-                    except:
-                        continue
+                if os.path.exists(schedule_path):
+                    with open(schedule_path) as f:
+                        try:
+                            weekly_games = json.load(f)
+                        except:
+                            continue
 
-                    for game in weekly_games:
-                        home_id = str(game["homeTeamId"])
-                        away_id = str(game["awayTeamId"])
-                        home_pts = int(game.get("homeScore", 0))
-                        away_pts = int(game.get("awayScore", 0))
+                        for game in weekly_games:
+                            home_id = str(game["homeTeamId"])
+                            away_id = str(game["awayTeamId"])
+                            home_pts = int(game.get("homeScore", 0))
+                            away_pts = int(game.get("awayScore", 0))
 
-                        team_scores[home_id]["pointsFor"] += home_pts
-                        team_scores[home_id]["pointsAgainst"] += away_pts
+                            team_scores[home_id]["pointsFor"] += home_pts
+                            team_scores[home_id]["pointsAgainst"] += away_pts
 
-                        team_scores[away_id]["pointsFor"] += away_pts
-                        team_scores[away_id]["pointsAgainst"] += home_pts
+                            team_scores[away_id]["pointsFor"] += away_pts
+                            team_scores[away_id]["pointsAgainst"] += home_pts
 
         # Enhance team data with name, division, and points
         for team in teams:
@@ -3775,8 +3780,14 @@ def show_standings():
             info = team_id_to_info.get(tid, {})
             team["name"] = info.get("name", "")
             team["divisionName"] = info.get("divisionName", "Unknown Division")
-            team["pointsFor"] = team_scores[tid]["pointsFor"]
-            team["pointsAgainst"] = team_scores[tid]["pointsAgainst"]
+
+            if is_preseason:
+                # Keep the PF/PA supplied by parsed_standings.json.
+                team["pointsFor"] = safe_int(team.get("pointsFor"))
+                team["pointsAgainst"] = safe_int(team.get("pointsAgainst"))
+            else:
+                team["pointsFor"] = team_scores[tid]["pointsFor"]
+                team["pointsAgainst"] = team_scores[tid]["pointsAgainst"]
 
             # Clean up streaks that are invalid (e.g., 255 = bugged/unknown)
             try:
