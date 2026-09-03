@@ -522,8 +522,10 @@ def _standings_items(data):
 
 def standings_have_real_records(path: str) -> bool:
     """
-    Prevents archiving new-season 0-0 standings.
-    At the start of Week 19, most/all teams should have real records.
+    Legacy/lightweight check used elsewhere in the app.
+
+    The final-season archive uses the much stricter
+    validate_final_snapshot_sources() check below.
     """
     data = _load_json_safe(path)
     teams = _standings_items(data)
@@ -544,7 +546,6 @@ def standings_have_real_records(path: str) -> bool:
         if wins + losses + ties > 0:
             teams_with_games += 1
 
-    # Use a high threshold so we do not archive early-season/new-season data.
     return teams_with_games >= 20
 
 
@@ -557,10 +558,368 @@ def final_snapshot_meta_path(root_dir: str, season: str) -> str:
 
 
 def final_snapshot_exists(root_dir: str, season: str) -> bool:
+    """
+    Backward-compatible snapshot test used by historical page rendering.
+
+    Older/manual snapshots (including recovered historical seasons) may not
+    have the v7 `complete: true` flag, so the presence of _archive_meta.json
+    still means "use this historical archive" for display purposes.
+    """
     if not season or not str(season).startswith("season_"):
         return False
 
     return os.path.exists(final_snapshot_meta_path(root_dir, season))
+
+
+def final_snapshot_is_complete(root_dir: str, season: str) -> bool:
+    """True only for a v7+ archive that completed all validation and copy steps."""
+    meta_path = final_snapshot_meta_path(root_dir, season)
+    meta = _load_json_safe(meta_path)
+
+    if not isinstance(meta, dict) or meta.get("complete") is not True:
+        return False
+
+    final_folder = final_snapshot_folder(root_dir, season)
+    required = (
+        "parsed_standings.json",
+        "standings.json",
+        "team_map.json",
+        "parsed_league_info.json",
+        "league.json",
+    )
+
+    return all(os.path.exists(os.path.join(final_folder, name)) for name in required)
+
+
+def _season_index_from_name(season: str):
+    m = re.fullmatch(r"season_(\d+)", str(season or ""))
+    return int(m.group(1)) if m else None
+
+
+def _team_id(item) -> str:
+    if not isinstance(item, dict):
+        return ""
+    value = item.get("teamId")
+    if value is None:
+        value = item.get("id")
+    return str(value or "").strip()
+
+
+def _record_tuple(item):
+    if not isinstance(item, dict):
+        return (0, 0, 0)
+
+    def _i(*keys):
+        for key in keys:
+            value = item.get(key)
+            if value not in (None, ""):
+                try:
+                    return int(value)
+                except Exception:
+                    pass
+        return 0
+
+    return (
+        _i("wins", "overallWins", "totalWins"),
+        _i("losses", "overallLosses", "totalLosses"),
+        _i("ties", "overallTies", "totalTies"),
+    )
+
+
+def _extract_roster_players(data):
+    if isinstance(data, dict):
+        return (
+            data.get("rosterInfoList")
+            or data.get("players")
+            or data.get("items")
+            or []
+        )
+    if isinstance(data, list):
+        return data
+    return []
+
+
+def _find_week18_team_totals(week18_folder: str):
+    """
+    Find the Week 18 team-stat payload without depending on one exact filename.
+    A valid candidate contains many rows with teamId + totalWins.
+    """
+    folder = Path(week18_folder)
+    if not folder.is_dir():
+        return None, []
+
+    preferred = list(folder.glob("*week_reg_18_team.json"))
+    candidates = preferred + [p for p in folder.glob("*.json") if p not in preferred]
+
+    def collect(obj, out):
+        if isinstance(obj, dict):
+            if "teamId" in obj and "totalWins" in obj:
+                out.append(obj)
+            for value in obj.values():
+                collect(value, out)
+        elif isinstance(obj, list):
+            for value in obj:
+                collect(value, out)
+
+    for candidate in candidates:
+        try:
+            data = _load_json_safe(str(candidate))
+            rows = []
+            collect(data, rows)
+            unique_ids = {_team_id(row) for row in rows if _team_id(row)}
+            if len(unique_ids) >= 32:
+                return str(candidate), rows
+        except Exception:
+            continue
+
+    return None, []
+
+
+def validate_final_snapshot_sources(league_id: str, season: str) -> dict:
+    """
+    Strict pre-flight validation for the automatic final-season archive.
+
+    We only call a season safely archived when:
+      * all 32 standings rows exist and each team has 17 regular-season games,
+      * Week 18 team totals independently confirm those same records,
+      * the team map and league-team info cover all 32 team IDs,
+      * a roster payload exists,
+      * Weeks 1-18 and the stat files used by the website are present.
+
+    This prevents the exact failure mode where a stale/new-season global file
+    is frozen as though it were the completed prior season.
+    """
+    league_id = str(league_id or "")
+    season = str(season or "")
+
+    root = os.path.join(app.config["UPLOAD_FOLDER"], league_id)
+    global_folder = os.path.join(root, "season_global", "week_global")
+    season_folder = os.path.join(root, season)
+    week18_folder = os.path.join(season_folder, "week_18")
+
+    errors = []
+    warnings = []
+
+    parsed_standings_path = os.path.join(global_folder, "parsed_standings.json")
+    standings_path = os.path.join(global_folder, "standings.json")
+    league_path = os.path.join(global_folder, "league.json")
+    parsed_league_path = os.path.join(global_folder, "parsed_league_info.json")
+    team_map_path = os.path.join(root, "team_map.json")
+
+    for label, path in (
+        ("parsed standings", parsed_standings_path),
+        ("raw standings", standings_path),
+        ("league", league_path),
+        ("parsed league info", parsed_league_path),
+        ("team map", team_map_path),
+    ):
+        if not os.path.exists(path):
+            errors.append(f"Missing {label}: {path}")
+
+    standings_data = _load_json_safe(parsed_standings_path)
+    standings_rows = [x for x in _standings_items(standings_data) if isinstance(x, dict)]
+    standings_by_id = {}
+    duplicate_standing_ids = []
+
+    for row in standings_rows:
+        tid = _team_id(row)
+        if not tid:
+            continue
+        if tid in standings_by_id:
+            duplicate_standing_ids.append(tid)
+        standings_by_id[tid] = row
+
+    if len(standings_by_id) != 32:
+        errors.append(f"Expected 32 unique standings teams, found {len(standings_by_id)}")
+
+    if duplicate_standing_ids:
+        errors.append("Duplicate standings team IDs: " + ", ".join(sorted(set(duplicate_standing_ids))))
+
+    bad_game_counts = []
+    for tid, row in standings_by_id.items():
+        w, l, t = _record_tuple(row)
+        games = w + l + t
+        if games != 17:
+            bad_game_counts.append(f"{tid}:{w}-{l}-{t} ({games} games)")
+
+    if bad_game_counts:
+        errors.append(
+            "Final standings are not complete 17-game records: "
+            + ", ".join(bad_game_counts[:10])
+            + (" ..." if len(bad_game_counts) > 10 else "")
+        )
+
+    team_map = _load_json_safe(team_map_path)
+    team_map_ids = set()
+    if isinstance(team_map, dict):
+        team_map_ids = {str(k) for k in team_map.keys()}
+    else:
+        errors.append("team_map.json is not a dictionary")
+
+    missing_from_team_map = sorted(set(standings_by_id) - team_map_ids)
+    if missing_from_team_map:
+        errors.append(
+            "Standings IDs missing from team_map.json: "
+            + ", ".join(missing_from_team_map[:10])
+            + (" ..." if len(missing_from_team_map) > 10 else "")
+        )
+
+    parsed_league = _load_json_safe(parsed_league_path)
+    league_teams = []
+    if isinstance(parsed_league, dict):
+        league_teams = (
+            parsed_league.get("leagueTeamInfoList")
+            or parsed_league.get("teamInfoList")
+            or parsed_league.get("teams")
+            or []
+        )
+
+    league_team_ids = {_team_id(x) for x in league_teams if _team_id(x)}
+    if len(league_team_ids) != 32:
+        errors.append(f"Expected 32 teams in parsed_league_info.json, found {len(league_team_ids)}")
+
+    missing_from_league_info = sorted(set(standings_by_id) - league_team_ids)
+    if missing_from_league_info:
+        errors.append(
+            "Standings IDs missing from parsed league info: "
+            + ", ".join(missing_from_league_info[:10])
+            + (" ..." if len(missing_from_league_info) > 10 else "")
+        )
+
+    roster_candidates = [
+        os.path.join(global_folder, "parsed_rosters.json"),
+        os.path.join(global_folder, "rosters.json"),
+    ]
+    roster_path = next((x for x in roster_candidates if os.path.exists(x)), None)
+    roster_count = 0
+    if roster_path:
+        roster_count = len(_extract_roster_players(_load_json_safe(roster_path)))
+        if roster_count <= 0:
+            errors.append(f"Roster file is empty/unreadable: {roster_path}")
+    else:
+        errors.append("Missing roster snapshot source (parsed_rosters.json or rosters.json)")
+
+    missing_week_folders = []
+    missing_week_files = []
+    week_file_summary = {}
+
+    for week_num in range(1, 19):
+        week_name = f"week_{week_num}"
+        week_folder = os.path.join(season_folder, week_name)
+
+        if not os.path.isdir(week_folder):
+            missing_week_folders.append(week_name)
+            continue
+
+        alternatives = {
+            "schedule": ("parsed_schedule.json",),
+            "passing": ("passing.json",),
+            "receiving": ("receiving.json",),
+            "rushing": ("parsed_rushing.json", "rushing.json"),
+            "defense": ("parsed_defense.json", "defense.json"),
+        }
+
+        found_for_week = {}
+        for category, names in alternatives.items():
+            found = next((name for name in names if os.path.exists(os.path.join(week_folder, name))), None)
+            found_for_week[category] = found
+            if not found:
+                missing_week_files.append(f"{week_name}:{category}")
+
+        week_file_summary[week_name] = found_for_week
+
+    if missing_week_folders:
+        errors.append("Missing regular-season week folders: " + ", ".join(missing_week_folders))
+
+    if missing_week_files:
+        errors.append(
+            "Missing regular-season stat/schedule files: "
+            + ", ".join(missing_week_files[:20])
+            + (" ..." if len(missing_week_files) > 20 else "")
+        )
+
+    team_totals_path, team_total_rows = _find_week18_team_totals(week18_folder)
+    team_totals_by_id = {}
+
+    for row in team_total_rows:
+        tid = _team_id(row)
+        if tid:
+            team_totals_by_id[tid] = row
+
+    if not team_totals_path:
+        errors.append("Could not find a Week 18 team-stat file containing all 32 team totals")
+    elif len(team_totals_by_id) != 32:
+        errors.append(f"Week 18 team totals contain {len(team_totals_by_id)} unique teams, expected 32")
+
+    expected_season_index = _season_index_from_name(season)
+    team_total_bad_games = []
+    team_total_bad_season = []
+    record_mismatches = []
+
+    for tid, row in team_totals_by_id.items():
+        w, l, t = _record_tuple(row)
+        if w + l + t != 17:
+            team_total_bad_games.append(f"{tid}:{w}-{l}-{t}")
+
+        if expected_season_index is not None:
+            try:
+                row_season = int(row.get("seasonIndex"))
+            except Exception:
+                row_season = None
+            if row_season != expected_season_index:
+                team_total_bad_season.append(f"{tid}:{row_season}")
+
+        if tid in standings_by_id and _record_tuple(standings_by_id[tid]) != (w, l, t):
+            record_mismatches.append(
+                f"{tid}:standings={_record_tuple(standings_by_id[tid])},teamstats={(w,l,t)}"
+            )
+
+    if team_total_bad_games:
+        errors.append(
+            "Week 18 team totals do not show 17 games for every team: "
+            + ", ".join(team_total_bad_games[:10])
+            + (" ..." if len(team_total_bad_games) > 10 else "")
+        )
+
+    if team_total_bad_season:
+        errors.append(
+            f"Week 18 team totals do not match {season}: "
+            + ", ".join(team_total_bad_season[:10])
+            + (" ..." if len(team_total_bad_season) > 10 else "")
+        )
+
+    if record_mismatches:
+        errors.append(
+            "Global parsed standings do not match Week 18 Madden team totals: "
+            + ", ".join(record_mismatches[:10])
+            + (" ..." if len(record_mismatches) > 10 else "")
+        )
+
+    return {
+        "ok": not errors,
+        "league": league_id,
+        "season": season,
+        "errors": errors,
+        "warnings": warnings,
+        "counts": {
+            "standings_teams": len(standings_by_id),
+            "team_map_teams": len(team_map_ids),
+            "league_info_teams": len(league_team_ids),
+            "roster_players": roster_count,
+            "week18_team_totals": len(team_totals_by_id),
+            "regular_season_week_folders": 18 - len(missing_week_folders),
+        },
+        "sources": {
+            "parsed_standings": parsed_standings_path,
+            "standings": standings_path,
+            "league": league_path,
+            "parsed_league_info": parsed_league_path,
+            "team_map": team_map_path,
+            "roster": roster_path,
+            "week18_team_totals": team_totals_path,
+        },
+        "week_files": week_file_summary,
+    }
 
 
 def resolve_league_file(root_dir: str, season: str | None, filename: str) -> str:
@@ -585,14 +944,8 @@ def resolve_league_file(root_dir: str, season: str | None, filename: str) -> str
         and requested_season == latest_season
     )
 
-    # Archived snapshots are only authoritative for historical seasons.
-    # Never let a current-season final/ folder override live global files.
-    if (
-        requested_season.startswith("season_")
-        and not is_current_live_season
-    ):
+    if requested_season.startswith("season_") and not is_current_live_season:
         snapshot_path = os.path.join(root_dir, requested_season, "final", filename)
-
         if os.path.exists(snapshot_path):
             return snapshot_path
 
@@ -602,97 +955,168 @@ def resolve_league_file(root_dir: str, season: str | None, filename: str) -> str
     return os.path.join(root_dir, "season_global", "week_global", filename)
 
 
-def archive_season_final_snapshot(league_id: str, season: str) -> dict:
+def archive_season_final_snapshot(league_id: str, season: str, trigger_week: str | None = None) -> dict:
+    """
+    Build a validated, atomic final-season archive.
+
+    The archive is first built in a temporary sibling folder.  Only after all
+    validation/copy steps succeed is it promoted to `final/`.  Any pre-existing
+    incomplete `final/` is renamed rather than overwritten.
+    """
     import shutil
 
     league_id = str(league_id)
     season = str(season)
 
     root = os.path.join(app.config["UPLOAD_FOLDER"], league_id)
+    season_folder = os.path.join(root, season)
     global_folder = os.path.join(root, "season_global", "week_global")
     final_folder = final_snapshot_folder(root, season)
-    meta_path = final_snapshot_meta_path(root, season)
 
-    # Do not overwrite a good snapshot automatically.
-    if os.path.exists(meta_path):
+    if final_snapshot_is_complete(root, season):
         return {
             "skipped": True,
-            "reason": "snapshot already exists",
-            "meta_path": meta_path,
+            "reason": "complete snapshot already exists",
+            "meta_path": final_snapshot_meta_path(root, season),
         }
 
-    parsed_standings_path = os.path.join(global_folder, "parsed_standings.json")
-
-    if not standings_have_real_records(parsed_standings_path):
+    validation = validate_final_snapshot_sources(league_id, season)
+    if not validation.get("ok"):
         return {
             "skipped": True,
-            "reason": "standings do not have real records yet",
-            "checked": parsed_standings_path,
+            "reason": "snapshot validation failed",
+            "validation": validation,
         }
 
-    os.makedirs(final_folder, exist_ok=True)
+    os.makedirs(season_folder, exist_ok=True)
+    tmp_folder = tempfile.mkdtemp(prefix=".final_tmp_", dir=season_folder)
+    backup_folder = None
 
-    files_to_copy = [
-        # standings
-        (os.path.join(global_folder, "standings.json"), os.path.join(final_folder, "standings.json")),
-        (os.path.join(global_folder, "parsed_standings.json"), os.path.join(final_folder, "parsed_standings.json")),
+    try:
+        files_to_copy = [
+            (os.path.join(global_folder, "standings.json"), os.path.join(tmp_folder, "standings.json")),
+            (os.path.join(global_folder, "parsed_standings.json"), os.path.join(tmp_folder, "parsed_standings.json")),
+            (os.path.join(global_folder, "league.json"), os.path.join(tmp_folder, "league.json")),
+            (os.path.join(global_folder, "parsed_league_info.json"), os.path.join(tmp_folder, "parsed_league_info.json")),
+            (os.path.join(root, "team_map.json"), os.path.join(tmp_folder, "team_map.json")),
+        ]
 
-        # league/team info
-        (os.path.join(global_folder, "league.json"), os.path.join(final_folder, "league.json")),
-        (os.path.join(global_folder, "parsed_league_info.json"), os.path.join(final_folder, "parsed_league_info.json")),
+        for roster_name in ("rosters.json", "parsed_rosters.json"):
+            src = os.path.join(global_folder, roster_name)
+            if os.path.exists(src):
+                files_to_copy.append((src, os.path.join(tmp_folder, roster_name)))
 
-        # team map is at the league root
-        (os.path.join(root, "team_map.json"), os.path.join(final_folder, "team_map.json")),
-    ]
-
-    copied = []
-    missing = []
-
-    for src, dst in files_to_copy:
-        if os.path.exists(src):
+        copied = []
+        for src, dst in files_to_copy:
             shutil.copy2(src, dst)
-            copied.append(dst)
-        else:
-            missing.append(src)
+            copied.append(os.path.basename(dst))
 
-    meta = {
-        "league": league_id,
-        "season": season,
-        "trigger": "week_19_auto_snapshot",
-        "archived_at": datetime.now().isoformat(timespec="seconds"),
-        "copied": copied,
-        "missing": missing,
-    }
+        # Freeze the final regular-season stat payloads as an extra safety copy.
+        week18_src = os.path.join(season_folder, "week_18")
+        week18_dst = os.path.join(tmp_folder, "week_18")
+        shutil.copytree(week18_src, week18_dst)
 
-    _atomic_write_json(meta_path, meta)
+        regular_weeks = []
+        for week_num in range(1, 19):
+            week_name = f"week_{week_num}"
+            week_path = os.path.join(season_folder, week_name)
+            if os.path.isdir(week_path):
+                regular_weeks.append(week_name)
 
-    return meta
+        archive_index = {
+            "league": league_id,
+            "season": season,
+            "regular_season_weeks_preserved_in_season_folder": regular_weeks,
+            "final_week_stats_copy": "week_18",
+            "global_files_frozen": copied,
+        }
+        _atomic_write_json(os.path.join(tmp_folder, "_season_archive_index.json"), archive_index)
+
+        # Confirm the copied core files are readable before publishing final/.
+        for name in ("parsed_standings.json", "standings.json", "team_map.json", "parsed_league_info.json", "league.json"):
+            copied_path = os.path.join(tmp_folder, name)
+            if _load_json_safe(copied_path) is None:
+                raise RuntimeError(f"Copied snapshot file is unreadable: {copied_path}")
+
+        meta = {
+            "league": league_id,
+            "season": season,
+            "trigger": "week_19_23_auto_snapshot",
+            "trigger_week": normalize_period(trigger_week) if trigger_week else None,
+            "archived_at": datetime.now().isoformat(timespec="seconds"),
+            "complete": True,
+            "validation": validation,
+            "copied": copied,
+            "week18_copied": True,
+        }
+        _atomic_write_json(os.path.join(tmp_folder, "_archive_meta.json"), meta)
+
+        if os.path.exists(final_folder):
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_folder = f"{final_folder}_INCOMPLETE_{stamp}"
+            os.replace(final_folder, backup_folder)
+
+        os.replace(tmp_folder, final_folder)
+        tmp_folder = None
+
+        if backup_folder:
+            meta["previous_incomplete_snapshot_moved_to"] = backup_folder
+            _atomic_write_json(os.path.join(final_folder, "_archive_meta.json"), meta)
+
+        return meta
+
+    except Exception as exc:
+        if tmp_folder and os.path.isdir(tmp_folder):
+            shutil.rmtree(tmp_folder, ignore_errors=True)
+        return {
+            "skipped": True,
+            "reason": f"snapshot copy failed: {exc}",
+            "validation": validation,
+        }
 
 
 def auto_archive_final_snapshot_if_ready(league_id: str, season: str, week: str):
     """
-    Only snapshots at the beginning of playoffs, Week 19.
-    If no snapshot exists, old/current pages keep using global files.
+    Try throughout the playoff window (Weeks 19-23), not just once.
+
+    If validation is not ready on the first Week 19 webhook, later webhooks
+    retry automatically.  Once a complete v7 snapshot exists, attempts stop.
     """
     if not league_id or not season or not week:
         return None
 
     week = normalize_period(week)
+    m = re.fullmatch(r"week_(\d+)", week)
+    if not m:
+        return None
 
-    if week != "week_19":
+    week_num = int(m.group(1))
+    if week_num < 19 or week_num > 23:
         return None
 
     if not str(season).startswith("season_"):
         return None
 
-    result = archive_season_final_snapshot(league_id, season)
+    root = os.path.join(app.config["UPLOAD_FOLDER"], str(league_id))
+    if final_snapshot_is_complete(root, season):
+        return {
+            "skipped": True,
+            "reason": "complete snapshot already exists",
+            "meta_path": final_snapshot_meta_path(root, season),
+        }
+
+    result = archive_season_final_snapshot(league_id, season, trigger_week=week)
 
     if result:
         if result.get("skipped"):
-            print(f"🟡 Final snapshot skipped: {result.get('reason')}")
+            reason = result.get("reason")
+            print(f"🟡 Final snapshot not ready yet for {league_id} {season} {week}: {reason}")
+            validation = result.get("validation") or {}
+            for error in (validation.get("errors") or [])[:5]:
+                print(f"   ↳ {error}")
         else:
             print(
-                f"✅ Auto-snapshotted final season files for "
+                f"✅ Auto-snapshotted COMPLETE final season files for "
                 f"{league_id} {season} {week}"
             )
 
@@ -2229,6 +2653,55 @@ def flyer_health():
     })
 
 
+@app.get("/api/archive/status")
+def archive_status():
+    """Read-only, sanitized archive readiness/status check for Week 19+."""
+    league = request.args.get("league") or league_data.get("latest_league") or DEFAULT_LEAGUE_ID
+    season = request.args.get("season") or league_data.get("latest_season") or DEFAULT_SEASON
+
+    root = os.path.join(app.config["UPLOAD_FOLDER"], str(league))
+    meta = _load_json_safe(final_snapshot_meta_path(root, season))
+
+    meta_summary = None
+    if isinstance(meta, dict):
+        meta_validation = meta.get("validation") if isinstance(meta.get("validation"), dict) else {}
+        meta_summary = {
+            "trigger": meta.get("trigger"),
+            "trigger_week": meta.get("trigger_week"),
+            "archived_at": meta.get("archived_at") or meta.get("recovered_at"),
+            "complete": meta.get("complete"),
+            "counts": meta_validation.get("counts"),
+        }
+
+    response = {
+        "league": str(league),
+        "season": str(season),
+        "snapshot_exists": final_snapshot_exists(root, season),
+        "snapshot_complete_v7": final_snapshot_is_complete(root, season),
+        "meta": meta_summary,
+    }
+
+    latest_league = str(league_data.get("latest_league") or "")
+    latest_season = str(league_data.get("latest_season") or "")
+    is_current = str(league) == latest_league and str(season) == latest_season
+
+    if is_current or not response["snapshot_exists"]:
+        validation = validate_final_snapshot_sources(str(league), str(season))
+        upload_root = os.path.abspath(app.config["UPLOAD_FOLDER"])
+
+        def clean_message(message):
+            return str(message).replace(upload_root, "uploads")
+
+        response["source_validation"] = {
+            "ok": validation.get("ok"),
+            "counts": validation.get("counts"),
+            "errors": [clean_message(x) for x in (validation.get("errors") or [])],
+            "warnings": [clean_message(x) for x in (validation.get("warnings") or [])],
+        }
+
+    return jsonify(response)
+
+
 @app.route('/webhook', defaults={'subpath': ''}, methods=['POST'])
 @app.route('/webhook/<path:subpath>', methods=['POST'])
 def webhook(subpath):
@@ -2243,6 +2716,19 @@ def webhook(subpath):
     # Extract headers and body inside the request context
     headers = dict(request.headers)
     body = request.data
+
+    # V7 archive safety net:
+    # Before this webhook is allowed to change the in-memory/current global
+    # season state, give the previous playoff season one more chance to archive.
+    # This is especially important on the webhook that transitions into a new season.
+    previous_league = league_data.get("latest_league") or find_league_in_subpath(subpath)
+    previous_season = league_data.get("latest_season")
+    previous_week = league_data.get("latest_week")
+
+    try:
+        auto_archive_final_snapshot_if_ready(previous_league, previous_season, previous_week)
+    except Exception as e:
+        print(f"⚠️ Pre-webhook final snapshot attempt failed: {e}")
 
     # 🚫 Removed threading — now it runs immediately in order
     process_webhook_data(
@@ -2259,6 +2745,8 @@ def webhook(subpath):
         season = league_data.get("latest_season")
         week = league_data.get("latest_week")
 
+        # Try again after processing.  On the first Week 19 webhook the pre-check
+        # may still see Week 18; this post-check catches the newly-entered playoffs.
         auto_archive_final_snapshot_if_ready(league, season, week)
 
         if league:
@@ -2455,6 +2943,99 @@ def ui_player(p, _dev_to_label):
     q["dev"] = _dev_to_label(p.get("dev"))
     return q
 
+def enrich_with_pos_jersey_for_season(players, league: str, season: str | None):
+    """
+    Use the live roster for the live season, but use the archived roster for
+    historical seasons.  If an older legacy snapshot has no roster, leave the
+    historical row alone rather than enriching it with the wrong current roster.
+    """
+    if not players or not league:
+        return players
+
+    root = os.path.join(app.config['UPLOAD_FOLDER'], str(league))
+    requested_season = str(season or "")
+    latest_league = str(league_data.get("latest_league") or "")
+    latest_season = str(league_data.get("latest_season") or "")
+
+    is_historical = (
+        requested_season.startswith("season_")
+        and not (
+            str(league) == latest_league
+            and requested_season == latest_season
+        )
+        and final_snapshot_exists(root, requested_season)
+    )
+
+    if not is_historical:
+        return enrich_with_pos_jersey(players, league)
+
+    idx = load_roster_index(str(league), requested_season)
+    rplayers = idx.get("players", [])
+    if not rplayers:
+        return players
+
+    pos_by_roster = {}
+    pos_by_pid = {}
+    pos_by_name_team = {}
+    jersey_by_roster = {}
+    jersey_by_pid = {}
+    jersey_by_name_team = {}
+
+    for rp in rplayers:
+        raw = rp.get("_raw") or {}
+        pos = rp.get("pos") or rp.get("position") or raw.get("position") or raw.get("pos")
+        jersey = (
+            rp.get("jerseyNum") or raw.get("jerseyNum")
+            or raw.get("uniformNumber") or raw.get("jerseyNumber")
+            or raw.get("jersey") or raw.get("number")
+        )
+        rid = str(raw.get("rosterId") or raw.get("id") or "")
+        pid = str(raw.get("playerId") or rp.get("playerId") or "")
+        name = rp.get("name") or raw.get("fullName") or raw.get("playerName")
+        tid = str(rp.get("teamId") or raw.get("teamId") or raw.get("team") or "")
+
+        if pos:
+            if rid:
+                pos_by_roster[rid] = pos
+            if pid:
+                pos_by_pid[pid] = pos
+            if name and tid:
+                pos_by_name_team[(name, tid)] = pos
+
+        if jersey not in (None, "", -1):
+            if rid:
+                jersey_by_roster[rid] = jersey
+            if pid:
+                jersey_by_pid[pid] = jersey
+            if name and tid:
+                jersey_by_name_team[(name, tid)] = jersey
+
+    for row in players:
+        rid = str(row.get("rosterId") or row.get("id") or "")
+        pid = str(row.get("playerId") or "")
+        name = row.get("playerName") or row.get("fullName") or row.get("name")
+        tid = str(row.get("teamId") or row.get("team") or "")
+
+        if not (row.get("position") or row.get("pos")):
+            pos = (
+                pos_by_roster.get(rid)
+                or pos_by_pid.get(pid)
+                or pos_by_name_team.get((name, tid))
+            )
+            if pos:
+                row["position"] = pos
+
+        if not row.get("jerseyNum"):
+            jersey = (
+                jersey_by_roster.get(rid)
+                or jersey_by_pid.get(pid)
+                or jersey_by_name_team.get((name, tid))
+            )
+            if jersey not in (None, "", -1):
+                row["jerseyNum"] = jersey
+
+    return players
+
 @app.get("/stats-hash")
 def stats_hash():
     return jsonify({"hash": webhook_helpers.current_stats_hash})
@@ -2487,7 +3068,8 @@ def show_stats():
 
         # team names
         teams = {}
-        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
+        root_dir = os.path.join(app.config['UPLOAD_FOLDER'], league)
+        team_map_path = resolve_league_file(root_dir, season, "team_map.json")
         if os.path.exists(team_map_path):
             with open(team_map_path, "r", encoding="utf-8") as tf:
                 teams = json.load(tf)
@@ -2497,7 +3079,7 @@ def show_stats():
 
         # ⭐ ADD THIS: enrich with position + jersey from the roster
         try:
-            enrich_with_pos_jersey(players, league)
+            enrich_with_pos_jersey_for_season(players, league, season)
         except Exception as e:
             app.logger.warning("enrich_with_pos_jersey failed: %s", e)
 
@@ -2551,7 +3133,8 @@ def show_receiving_stats():
             players = data.get("playerReceivingStatInfoList", [])
 
         # Load team names
-        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
+        root_dir = os.path.join(app.config['UPLOAD_FOLDER'], league)
+        team_map_path = resolve_league_file(root_dir, season, "team_map.json")
         teams = {}
         if os.path.exists(team_map_path):
             with open(team_map_path, "r", encoding="utf-8") as f:
@@ -2565,7 +3148,7 @@ def show_receiving_stats():
 
         # Fill jerseyNum + position from roster data
         try:
-            enrich_with_pos_jersey(players, league)
+            enrich_with_pos_jersey_for_season(players, league, season)
         except Exception as e:
             print(f"enrich_with_pos_jersey failed: {e}")
 
@@ -2617,7 +3200,8 @@ def show_rushing_stats():
             players = data if isinstance(data, list) else data.get("playerRushingStatInfoList", [])
 
         # Load team names
-        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
+        root_dir = os.path.join(app.config['UPLOAD_FOLDER'], league)
+        team_map_path = resolve_league_file(root_dir, season, "team_map.json")
         teams = {}
         if os.path.exists(team_map_path):
             with open(team_map_path, "r", encoding="utf-8") as f:
@@ -2635,7 +3219,7 @@ def show_rushing_stats():
 
     # Fill jerseyNum + position from roster data
     try:
-        enrich_with_pos_jersey(players, league)
+        enrich_with_pos_jersey_for_season(players, league, season)
     except Exception as e:
         print(f"enrich_with_pos_jersey failed: {e}")
 
@@ -2687,7 +3271,7 @@ def show_defense_stats():
             players = []
 
         # Enrich with position via roster index (defense payload lacks pos)
-        idx = load_roster_index(league)  # already defined in your app
+        idx = load_roster_index(league, season)
         rplayers = idx.get("players", [])
 
         # Build fast lookups from roster -> position and jersey
@@ -2750,7 +3334,8 @@ def show_defense_stats():
 
         # Load team names
         teams = {}
-        team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league, "team_map.json")
+        root_dir = os.path.join(app.config['UPLOAD_FOLDER'], league)
+        team_map_path = resolve_league_file(root_dir, season, "team_map.json")
         if os.path.exists(team_map_path):
             with open(team_map_path, "r", encoding="utf-8") as f:
                 teams = json.load(f)
@@ -3308,27 +3893,45 @@ def _normalize_player(p: dict) -> dict:
     }
 
 
-def load_roster_index(league_id: str) -> dict:
+def load_roster_index(league_id: str, season: str | None = None) -> dict:
     """
-    Reads uploads/<league>/season_global/week_global/rosters.json (or parsed one),
-    normalizes to a compact list and caches it.
-    Returns {"players": [...], "positions": set([...])}
+    Load/normalize a roster for either the live season or an archived season.
+
+    Historical seasons intentionally do NOT fall back to the current/global
+    roster.  If the old snapshot predates v7 and has no roster, return an empty
+    roster rather than attaching the wrong players/jerseys to historical stats.
     """
-    base = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "season_global", "week_global")
+    league_id = str(league_id)
+    root = os.path.join(app.config['UPLOAD_FOLDER'], league_id)
+    requested_season = str(season or "")
+
+    latest_league = str(league_data.get("latest_league") or "")
+    latest_season = str(league_data.get("latest_season") or "")
+    historical = (
+        requested_season.startswith("season_")
+        and not (league_id == latest_league and requested_season == latest_season)
+        and final_snapshot_exists(root, requested_season)
+    )
+
+    if historical:
+        base = final_snapshot_folder(root, requested_season)
+    else:
+        base = os.path.join(root, "season_global", "week_global")
+
     path_candidates = [
         os.path.join(base, "parsed_rosters.json"),
-        os.path.join(base, "rosters.json")
+        os.path.join(base, "rosters.json"),
     ]
-    roster_path = next((p for p in path_candidates if os.path.exists(p)), None)
+    roster_path = next((path for path in path_candidates if os.path.exists(path)), None)
     if not roster_path:
         return {"players": [], "positions": set()}
 
     mtime = os.path.getmtime(roster_path)
-    cached = _roster_cache.get(league_id)
+    cache_key = f"{league_id}|{requested_season or '__live__'}|{roster_path}"
+    cached = _roster_cache.get(cache_key)
     if cached and cached["mtime"] == mtime:
         return cached
 
-    # load and normalize
     try:
         with open(roster_path, "r", encoding="utf-8") as f:
             raw = json.load(f)
@@ -3336,18 +3939,16 @@ def load_roster_index(league_id: str) -> dict:
         app.logger.error("⚠️ Corrupted roster file %s: %s", roster_path, e)
         return {"players": [], "positions": set()}
 
-    # Support either the Companion raw shape or your parsed shape
-    if isinstance(raw, dict):
-        players_raw = raw.get("rosterInfoList") or raw.get("players") or raw.get("items") or []
-    elif isinstance(raw, list):
-        players_raw = raw
-    else:
-        players_raw = []
-
-    players = [_normalize_player(p) for p in players_raw]
-    positions = {p["pos"] for p in players if p.get("pos")}
-    out = {"players": players, "positions": positions, "mtime": mtime}
-    _roster_cache[league_id] = out
+    players_raw = _extract_roster_players(raw)
+    players = [_normalize_player(player) for player in players_raw]
+    positions = {player["pos"] for player in players if player.get("pos")}
+    out = {
+        "players": players,
+        "positions": positions,
+        "mtime": mtime,
+        "source": roster_path,
+    }
+    _roster_cache[cache_key] = out
     return out
 
 def load_team_ovr_by_id(league_id: str) -> dict[str, int]:
