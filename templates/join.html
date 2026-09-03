@@ -135,6 +135,27 @@
             line-height: 1.45;
         }
 
+        .current-week-strip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: 0 auto 14px;
+            padding: 9px 14px;
+            border: 1px solid rgba(245,197,66,.50);
+            border-radius: 999px;
+            background: rgba(245,197,66,.10);
+            color: #fff4c7;
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: .55px;
+            text-transform: uppercase;
+        }
+
+        .current-week-strip strong {
+            color: var(--gold-bright);
+        }
+
         .hero-availability {
             display: inline-flex;
             align-items: center;
@@ -724,6 +745,11 @@
             Pick your team. Build your franchise. Compete against real users with live stats,
             standings, schedules, rosters, recaps, and an organized recruit process.
         </p>
+
+        <div class="current-week-strip">
+            League Status: <strong>{{ current_week }}</strong>
+        </div>
+        <br>
 
         {% if not availability_error %}
             <div class="hero-availability">

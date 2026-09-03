@@ -2205,6 +2205,27 @@ def build_join_available_teams():
 def join_wurd():
     available_teams, availability_error = build_join_available_teams()
 
+    # Show recruits the league's actual current period (Preseason Week X / Week X).
+    # league_data is normally kept current by the webhook and rehydrated from
+    # uploads/_latest.json on startup. Read _latest.json as a final fallback.
+    current_period = league_data.get("latest_week")
+
+    if not current_period:
+        latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
+        if os.path.exists(latest_path):
+            try:
+                with open(latest_path, "r", encoding="utf-8") as f:
+                    saved = json.load(f) or {}
+                current_period = saved.get("week")
+            except Exception as e:
+                app.logger.warning("Could not read current week for /join: %s", e)
+
+    if current_period:
+        current_period = normalize_period(current_period)
+        current_week_label = period_display_name(current_period)
+    else:
+        current_week_label = "Week unavailable"
+
     return render_template(
         "join.html",
         discord_invite=WURD_RECRUIT_DISCORD_INVITE,
@@ -2212,6 +2233,7 @@ def join_wurd():
         available_team_count=len(available_teams),
         availability_error=availability_error,
         league=league_data.get("latest_league") or DEFAULT_LEAGUE_ID,
+        current_week=current_week_label,
     )
 
 
