@@ -3710,11 +3710,24 @@ def show_standings():
 
         root = os.path.join(app.config["UPLOAD_FOLDER"], str(league_id))
 
-        # If viewing an archived season and no week was provided, use week_18
-        # so playoff scores do not get mixed into regular-season PF/PA.
+        # A final/ snapshot is authoritative only for a historical season.
+        # Never let an accidentally-created final/ folder change the behavior
+        # of the currently active league/season.
+        latest_league = str(league_data.get("latest_league") or "")
+        latest_season = str(league_data.get("latest_season") or "")
+        is_current_live_season = (
+            str(league_id) == latest_league
+            and str(season or "") == latest_season
+        )
+        is_archived_historical = (
+            not is_current_live_season
+            and final_snapshot_exists(root, season)
+        )
+
+        # Archived standings are end-of-regular-season snapshots.
         if request.args.get("week"):
             week = normalize_period(request.args.get("week"))
-        elif final_snapshot_exists(root, season):
+        elif is_archived_historical:
             week = "week_18"
         else:
             week = normalize_period(league_data.get("latest_week") or "week_1")
@@ -3754,14 +3767,17 @@ def show_standings():
                 team_id_to_info[tid] = info
 
 
-        # Accumulate pointsFor and pointsAgainst across regular-season weeks.
-        # During preseason, Madden's parsed standings already contain the correct
-        # preseason PF/PA, so preserve those values instead of overwriting them
-        # with zeros from the regular-season week folders.
+        # PF/PA source:
+        #   * Current preseason: preserve Companion parsed_standings PF/PA.
+        #   * Current regular season/playoffs: calculate from saved Weeks 1-18.
+        #   * Historical archived season: preserve the archived final PF/PA.
+        #
+        # Historical schedules can contain stale/force-win results, so an
+        # archived season must not have its recovered official PF/PA overwritten.
         is_preseason = str(week).startswith("pre_")
         team_scores = defaultdict(lambda: {"pointsFor": 0, "pointsAgainst": 0})
 
-        if not is_preseason:
+        if not is_preseason and not is_archived_historical:
             try:
                 week_number = int(week.replace("week_", "")) if week.startswith("week_") else int(week)
             except:
@@ -3800,8 +3816,9 @@ def show_standings():
             team["name"] = info.get("name", "")
             team["divisionName"] = info.get("divisionName", "Unknown Division")
 
-            if is_preseason:
-                # Keep the PF/PA supplied by parsed_standings.json.
+            if is_preseason or is_archived_historical:
+                # Preserve PF/PA already stored in parsed_standings.json.
+                # For historical seasons these are the recovered official totals.
                 team["pointsFor"] = safe_int(team.get("pointsFor"))
                 team["pointsAgainst"] = safe_int(team.get("pointsAgainst"))
             else:
