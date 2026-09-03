@@ -568,11 +568,30 @@ def resolve_league_file(root_dir: str, season: str | None, filename: str) -> str
     Historical season:
         Use uploads/<league>/season_X/final/<filename> if it exists.
 
-    Current season / no snapshot yet:
-        Use the normal global/current file.
+    Current live season:
+        ALWAYS use the normal global/current file, even if a stale or
+        accidentally-created season_X/final snapshot exists.
+
+    This prevents a bad current-season snapshot from overriding fresh
+    Companion/webhook data.
     """
-    if season and str(season).startswith("season_"):
-        snapshot_path = os.path.join(root_dir, season, "final", filename)
+    requested_league = os.path.basename(os.path.normpath(root_dir))
+    latest_league = str(league_data.get("latest_league") or "")
+    latest_season = str(league_data.get("latest_season") or "")
+    requested_season = str(season or "")
+
+    is_current_live_season = (
+        requested_league == latest_league
+        and requested_season == latest_season
+    )
+
+    # Archived snapshots are only authoritative for historical seasons.
+    # Never let a current-season final/ folder override live global files.
+    if (
+        requested_season.startswith("season_")
+        and not is_current_live_season
+    ):
+        snapshot_path = os.path.join(root_dir, requested_season, "final", filename)
 
         if os.path.exists(snapshot_path):
             return snapshot_path
