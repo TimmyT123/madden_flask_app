@@ -597,8 +597,43 @@
         }
 
         .rules-strip {
-            padding: 18px 20px;
-            margin-bottom: 22px;
+            padding: 20px;
+            margin: 0 0 22px;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 11px 12px;
+            background: #222227;
+            border: 1px solid #3a3a41;
+            border-radius: 9px;
+            color: #dedee3;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .setting-check {
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            background: rgba(0,166,90,.18);
+            color: #4ee68e;
+            font-weight: 900;
+        }
+
+        .setting-item strong {
+            color: #fff;
         }
 
         .rules-strip h2 {
@@ -692,7 +727,8 @@
 
             .team-grid,
             .info-grid,
-            .steps {
+            .steps,
+            .settings-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -838,6 +874,40 @@
         {% endif %}
     </section>
 
+    <section class="rules-strip">
+        <h2>League Settings &amp; Expectations</h2>
+        <div class="settings-grid">
+            <div class="setting-item">
+                <span class="setting-check">✓</span>
+                <div><strong>48-hour advance cycles</strong><br>For User vs User games.</div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-check">✓</span>
+                <div><strong>24-hour response requirement</strong><br>Once a game channel is created.</div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-check">✓</span>
+                <div><strong>Stay active</strong><br>Play your games or communicate.</div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-check">✓</span>
+                <div><strong>Respect the league</strong><br>Members and commissioners.</div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-check">✓</span>
+                <div><strong>All-Madden difficulty</strong></div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-check">✓</span>
+                <div><strong>7-minute quarters</strong></div>
+            </div>
+            <div class="setting-item">
+                <span class="setting-check">✓</span>
+                <div><strong>5 playcall limit / 5 play cooldown</strong></div>
+            </div>
+        </div>
+    </section>
+
     <section class="info-grid">
         <div class="info-card">
             <h2>Why WURD?</h2>
@@ -899,17 +969,6 @@
                 <strong>Get Reviewed</strong>
                 <p>Commissioners review your application and move approved users toward a team or Queue.</p>
             </div>
-        </div>
-    </section>
-
-    <section class="rules-strip">
-        <h2>League Rules Snapshot</h2>
-        <div class="rule-chips">
-            <span class="rule-chip">Communicate with your opponent</span>
-            <span class="rule-chip">Respect commissioner rulings</span>
-            <span class="rule-chip">Play fair &amp; avoid cheese gameplay</span>
-            <span class="rule-chip">Do not quit user vs user games</span>
-            <span class="rule-chip">Stay active in your game channel</span>
         </div>
     </section>
 
