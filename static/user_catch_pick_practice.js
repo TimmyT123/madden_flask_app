@@ -1,4 +1,3 @@
-// VERIFIED FOUR-WAY LEVERAGE VERSION: left, right, above, below
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
@@ -62,6 +61,10 @@
             routeSpeed: 58,
             steerSpeed: 205,
             catchRadius: 68,
+            catchMeterDuration: 700,
+            catchSweetStart: 0.52,
+            catchSweetEnd: 0.78,
+            catchReadyProgress: 0.44,
             switchStart: 0.12,
             switchEnd: 0.80,
             guideStrength: 1,
@@ -73,6 +76,10 @@
             routeSpeed: 67,
             steerSpeed: 220,
             catchRadius: 55,
+            catchMeterDuration: 540,
+            catchSweetStart: 0.56,
+            catchSweetEnd: 0.76,
+            catchReadyProgress: 0.50,
             switchStart: 0.20,
             switchEnd: 0.70,
             guideStrength: 0.78,
@@ -84,6 +91,10 @@
             routeSpeed: 76,
             steerSpeed: 235,
             catchRadius: 44,
+            catchMeterDuration: 450,
+            catchSweetStart: 0.59,
+            catchSweetEnd: 0.75,
+            catchReadyProgress: 0.55,
             switchStart: 0.27,
             switchEnd: 0.62,
             guideStrength: 0.36,
@@ -95,6 +106,10 @@
             routeSpeed: 84,
             steerSpeed: 248,
             catchRadius: 36,
+            catchMeterDuration: 390,
+            catchSweetStart: 0.61,
+            catchSweetEnd: 0.74,
+            catchReadyProgress: 0.59,
             switchStart: 0.33,
             switchEnd: 0.57,
             guideStrength: 0,
@@ -274,15 +289,13 @@
         if (routeType === "outLeft") receiver.vx = -53;
         if (routeType === "outRight") receiver.vx = 53;
 
-        // The defender can align left, right, above, or below the receiver.
-        // Both players run the same route speed, and the safe lead appears on
-        // the side directly opposite the defender.
-        const leverage = randomChoice(["left", "right", "above", "below"]);
+        // The defender is always aligned on one side of the receiver and runs
+        // the exact same route speed. The open side becomes the safe lead side.
+        const leverage = randomChoice(["left", "right"]);
         const coverageOffset = 46;
-        const coverage = coverageOffsetFor(leverage, coverageOffset);
         const defender = {
-            x: receiver.x + coverage.x,
-            y: receiver.y + coverage.y,
+            x: receiver.x + (leverage === "left" ? -coverageOffset : coverageOffset),
+            y: receiver.y,
             vx: receiver.vx,
             vy: receiver.vy,
             radius: 18
@@ -313,9 +326,16 @@
             thrown: false,
             switched: false,
             catchAttempted: false,
+            catchHolding: false,
+            catchHeldAt: null,
+            catchHoldMs: 0,
+            catchButtonHeld: null,
+            catchMeterStarted: false,
+            catchMeterStartedAt: null,
+            catchMeterLocked: false,
             success: false,
             placementPoints: 0,
-            switchPoints: 0,
+            catchTimingPoints: 0,
             movementPoints: 0,
             catchPoints: 0,
             switchedAt: null,
@@ -504,6 +524,24 @@
             return;
         }
 
+        // Keep watching the offensive catch button even after the play itself
+        // has ended. This lets the meter freeze when the user releases the
+        // button after a missed catch / result transition.
+        if (
+            state.rep.kind === "offense" &&
+            state.rep.catchMeterStarted &&
+            !state.rep.catchMeterLocked &&
+            state.rep.catchButtonHeld
+        ) {
+            const heldButtonIndex = BUTTONS[state.rep.catchButtonHeld];
+            const releaseEdge = released(input, state.rep.catchButtonHeld);
+            const noLongerDown = !input.down.has(heldButtonIndex);
+
+            if (releaseEdge || noLongerDown) {
+                stopOffenseCatchMeter(state.rep, now);
+            }
+        }
+
         if (state.phase === "result") {
             if (now >= state.nextRepAt) {
                 beginRep();
@@ -534,11 +572,11 @@
                 y: rep.receiver.y + rep.receiver.vy * 1.35
             };
 
-            // Put the safe lead directly opposite the defender. Examples:
-            // left defender -> right lead; above defender -> below lead.
-            const openLead = safeLeadOffsetFor(rep.leverage);
-            rep.safePoint.x = clamp(projectedReceiver.x + openLead.x, 95, 905);
-            rep.safePoint.y = clamp(projectedReceiver.y + openLead.y, 80, 520);
+            // If the defender is on the receiver's left, the open side is
+            // right. If the defender is on the right, the open side is left.
+            const openSide = rep.leverage === "left" ? 1 : -1;
+            rep.safePoint.x = clamp(projectedReceiver.x + openSide * 105, 95, 905);
+            rep.safePoint.y = clamp(projectedReceiver.y + 4, 80, 500);
 
             rep.reticle.x = clamp(projectedReceiver.x + input.axisX * 150, 65, 935);
 
@@ -587,45 +625,75 @@
 
         updateBall(rep.ball, dt);
 
-        if (!rep.switched) {
-            moveAutoRoute(rep.receiver, dt);
-            moveCoverageDefender(rep);
-            if (pressed(input, "CIRCLE")) {
-                rep.switched = true;
-                rep.switchedAt = rep.ball.progress;
-                rep.switchPoints = scoreSwitchTiming(rep.ball.progress, difficulty);
-                setTiming(switchTimingLabel(rep.switchPoints), rep.switchPoints >= 18 ? "good" : "warn");
-                setInstruction(
-                    `Steer to the ball spot and press ${BUTTON_LABELS[rep.catchType.button]} for a ${rep.catchType.name} catch.`
-                );
-                vibrate(45, 0.22);
-            }
-        } else {
-            // After the user clicks on, the defender keeps running the same
-            // route speed while the receiver can be steered toward the ball.
-            moveAutoRoute(rep.defender, dt);
-            rep.receiver.x = clamp(
-                rep.receiver.x + input.axisX * difficulty.steerSpeed * dt,
-                35,
-                965
-            );
-            rep.receiver.y = clamp(
-                rep.receiver.y + input.axisY * difficulty.steerSpeed * dt,
-                45,
-                520
-            );
-        }
+        // Madden 27 offense: control transfers to the receiver automatically.
+        // Circle is no longer required before steering or making the catch.
+        moveAutoRoute(rep.defender, dt);
+        rep.receiver.x = clamp(
+            rep.receiver.x + input.axisX * difficulty.steerSpeed * dt,
+            35,
+            965
+        );
+        rep.receiver.y = clamp(
+            rep.receiver.y + input.axisY * difficulty.steerSpeed * dt,
+            45,
+            520
+        );
 
+        // Madden 27 catch meter behavior:
+        // PRESS a catch button to START the meter.
+        // HOLD the button while the meter moves.
+        // RELEASE that same button to FREEZE/STOP the meter.
         const catchButtons = ["X", "SQUARE", "TRIANGLE"];
-        for (const buttonName of catchButtons) {
-            if (pressed(input, buttonName)) {
-                attemptOffenseCatch(rep, buttonName);
-                break;
+
+        if (!rep.catchMeterStarted && !rep.catchAttempted) {
+            for (const buttonName of catchButtons) {
+                if (pressed(input, buttonName)) {
+                    startOffenseCatchMeter(rep, buttonName, now);
+                    break;
+                }
             }
         }
 
-        if (rep.ball.progress >= 1.06 && !rep.catchAttempted) {
-            rep.resultReason = rep.switched ? "No catch input" : "No click-on";
+        if (
+            rep.catchMeterStarted &&
+            !rep.catchMeterLocked &&
+            rep.catchMeterStartedAt !== null
+        ) {
+            rep.catchHoldMs = Math.max(0, now - rep.catchMeterStartedAt);
+        }
+
+        if (
+            rep.catchMeterStarted &&
+            !rep.catchMeterLocked &&
+            rep.catchButtonHeld
+        ) {
+            const heldButtonIndex = BUTTONS[rep.catchButtonHeld];
+            const releaseEdge = released(input, rep.catchButtonHeld);
+            const noLongerDown = !input.down.has(heldButtonIndex);
+
+            // Normally releaseEdge catches the exact transition. noLongerDown
+            // is a safety net for browsers/controllers that occasionally miss
+            // that one-frame release transition.
+            if (releaseEdge || noLongerDown) {
+                stopOffenseCatchMeter(rep, now);
+            }
+        }
+
+        // Once the meter has been frozen by RELEASE, let the play continue.
+        // The eventual catch can still succeed or fail independently.
+        if (rep.catchMeterLocked && !rep.catchAttempted && rep.ball.progress >= 1.0) {
+            finishOffenseCatch(rep, rep.catchButtonHeld);
+            return;
+        }
+
+        if (rep.ball.progress >= 1.08 && !rep.catchAttempted) {
+            if (rep.catchMeterStarted && !rep.catchMeterLocked) {
+                rep.resultReason = "Catch button held too long";
+            } else if (!rep.catchMeterStarted) {
+                rep.resultReason = "No catch input";
+            } else {
+                rep.resultReason = "Catch attempt did not reach the ball";
+            }
             finishRep(false);
         }
     }
@@ -638,7 +706,7 @@
                 type: "lob",
                 durationFactor: 1.22,
                 arcHeight: 108,
-                timingText: "Lob pass — click on and run under it."
+                timingText: "Lob pass — run under it."
             };
         }
 
@@ -647,7 +715,7 @@
                 type: "touch",
                 durationFactor: 1.0,
                 arcHeight: 78,
-                timingText: "Touch pass — click on now."
+                timingText: "Touch pass — get ready to catch."
             };
         }
 
@@ -679,6 +747,9 @@
             arcHeight: profile.arcHeight
         };
 
+        // Madden 27 gives the user receiver control immediately after the throw.
+        rep.switched = true;
+
         if (rep.placementPoints >= 32) {
             setTiming(`${profile.timingText} Good placement.`, "good");
         } else if (rep.placementPoints >= 20) {
@@ -686,44 +757,145 @@
         } else {
             setTiming(`${profile.timingText} Throw is too close to the defender.`, "bad");
         }
-        setInstruction("Press Circle to click on to the receiver.");
+        setInstruction(
+            `Steer to the ball spot. Hold ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}; release it to stop the fast catch meter in the green.`
+        );
         beep(520, 0.05);
     }
 
-    function attemptOffenseCatch(rep, buttonName) {
-        if (rep.catchAttempted || !rep.ball) return;
-
-        const ballDistance = distance(rep.receiver, rep.ball);
-        const catchRadius = currentDifficulty().catchRadius;
-        const inWindow = ballDistance <= catchRadius;
-
-        if (!inWindow) {
-            if (rep.ball.progress < 0.72) {
-                setTiming("Catch button too early.", "warn");
-            } else {
-                setTiming("Move closer to the ball.", "bad");
-            }
+    function startOffenseCatchMeter(rep, buttonName, now) {
+        if (
+            rep.catchAttempted ||
+            rep.catchMeterStarted ||
+            rep.catchMeterLocked ||
+            !rep.ball
+        ) {
             return;
         }
+
+        // The catch meter begins at the exact instant the catch button is pressed.
+        rep.catchMeterStarted = true;
+        rep.catchMeterStartedAt = now;
+        rep.catchHolding = true;
+        rep.catchHeldAt = now;
+        rep.catchHoldMs = 0;
+        rep.catchButtonHeld = buttonName;
+
+        if (buttonName === rep.catchType.button) {
+            setTiming(
+                `Catch meter started — release ${BUTTON_LABELS[buttonName]} in the green.`,
+                "good"
+            );
+        } else {
+            setTiming(
+                `Catch meter started, but ${BUTTON_LABELS[rep.catchType.button]} is the requested ${rep.catchType.name} catch.`,
+                "warn"
+            );
+        }
+
+        vibrate(28, 0.14);
+    }
+
+    function stopOffenseCatchMeter(rep, now) {
+        if (
+            rep.catchMeterLocked ||
+            !rep.catchMeterStarted ||
+            rep.catchMeterStartedAt === null
+        ) {
+            return;
+        }
+
+        // Freeze the meter at the exact instant the held catch button is released.
+        rep.catchHoldMs = Math.max(0, now - rep.catchMeterStartedAt);
+        rep.catchMeterLocked = true;
+        rep.catchHolding = false;
+        rep.catchHeldAt = null;
+
+        rep.catchTimingPoints = scoreCatchRelease(
+            rep.catchHoldMs,
+            currentDifficulty()
+        );
+
+        if (rep.catchButtonHeld === rep.catchType.button) {
+            if (rep.catchTimingPoints >= 22) {
+                setTiming("Catch meter stopped: PERFECT.", "good");
+            } else if (rep.catchTimingPoints >= 15) {
+                setTiming("Catch meter stopped: GOOD.", "good");
+            } else if (rep.catchTimingPoints >= 8) {
+                setTiming("Catch meter stopped: marginal timing.", "warn");
+            } else {
+                setTiming("Catch meter stopped outside the green.", "bad");
+            }
+        } else {
+            setTiming(
+                `Meter stopped, but wrong catch type — use ${BUTTON_LABELS[rep.catchType.button]} (${rep.catchType.name}).`,
+                "bad"
+            );
+        }
+
+        vibrate(38, 0.20);
+    }
+
+    function scoreCatchRelease(holdMs, difficulty) {
+        const ratio = clamp(holdMs / difficulty.catchMeterDuration, 0, 1.25);
+
+        if (ratio >= difficulty.catchSweetStart && ratio <= difficulty.catchSweetEnd) {
+            const middle = (difficulty.catchSweetStart + difficulty.catchSweetEnd) / 2;
+            const half = (difficulty.catchSweetEnd - difficulty.catchSweetStart) / 2;
+            const quality = 1 - Math.abs(ratio - middle) / Math.max(half, 0.01);
+            return Math.round(22 + clamp(quality, 0, 1) * 3);
+        }
+
+        if (ratio < difficulty.catchSweetStart) {
+            const quality = ratio / Math.max(difficulty.catchSweetStart, 0.01);
+            return Math.round(clamp(quality, 0, 1) * 18);
+        }
+
+        const lateSpan = Math.max(1 - difficulty.catchSweetEnd, 0.01);
+        const quality = 1 - (ratio - difficulty.catchSweetEnd) / lateSpan;
+        return Math.round(clamp(quality, 0, 1) * 18);
+    }
+
+    function finishOffenseCatch(rep, buttonName) {
+        if (rep.catchAttempted || !rep.ball) return;
 
         rep.catchAttempted = true;
         rep.catchAttemptAt = rep.ball.progress;
 
+        const difficulty = currentDifficulty();
+        const ballDistance = distance(rep.receiver, rep.ball);
+        const catchRadius = difficulty.catchRadius;
         const movementQuality = clamp(1 - ballDistance / catchRadius, 0, 1);
+
+        // catchTimingPoints was frozen when the catch button was released.
         rep.movementPoints = Math.round(movementQuality * 15);
 
         const correctCatch = buttonName === rep.catchType.button;
-        rep.catchPoints = correctCatch ? 20 : 11;
+        rep.catchPoints = correctCatch ? 20 : 0;
 
+        const inCatchRadius = ballDistance <= catchRadius;
         const success =
-            rep.switched &&
+            correctCatch &&
+            inCatchRadius &&
             rep.placementPoints >= 16 &&
-            rep.switchPoints >= 8 &&
+            rep.catchTimingPoints >= 8 &&
             rep.movementPoints >= 5;
 
-        rep.resultReason = correctCatch
-            ? `${rep.catchType.name} catch`
-            : `Caught, but ${BUTTON_LABELS[rep.catchType.button]} fit the situation better`;
+        if (!correctCatch) {
+            rep.resultReason = `Wrong catch type—use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
+        } else if (!inCatchRadius) {
+            rep.resultReason = "Catch timing registered, but you were not close enough to the ball";
+        } else if (rep.catchTimingPoints >= 22) {
+            rep.resultReason = `Perfect ${rep.catchType.name} timing`;
+        } else if (rep.catchTimingPoints >= 15) {
+            rep.resultReason = `Good ${rep.catchType.name} timing`;
+        } else if (rep.catchTimingPoints >= 8) {
+            rep.resultReason = `${rep.catchType.name} catch—timing was marginal`;
+        } else {
+            rep.resultReason = rep.catchHoldMs < difficulty.catchMeterDuration * difficulty.catchSweetStart
+                ? "Released the catch button too early"
+                : "Released the catch button too late";
+        }
 
         finishRep(success);
     }
@@ -852,7 +1024,7 @@
 
         const rep = state.rep;
         const repScore = rep.kind === "offense"
-            ? rep.placementPoints + rep.switchPoints + rep.movementPoints + rep.catchPoints
+            ? rep.placementPoints + rep.catchTimingPoints + rep.movementPoints + rep.catchPoints
             : rep.switchPoints + rep.movementPoints + rep.catchPoints;
 
         state.totalScore += repScore;
@@ -875,7 +1047,7 @@
         if (rep.kind === "offense") {
             setFeedback(
                 feedbackPlacement(rep.placementPoints),
-                feedbackSwitch(rep.switchPoints),
+                feedbackCatchTiming(rep.catchTimingPoints),
                 feedbackMovement(rep.movementPoints),
                 feedbackCatch(rep.catchPoints)
             );
@@ -897,6 +1069,13 @@
         if (points >= 25) return "Good";
         if (points >= 16) return "Catchable";
         return "Too close to coverage";
+    }
+
+    function feedbackCatchTiming(points) {
+        if (points >= 22) return "Perfect";
+        if (points >= 15) return "Good";
+        if (points >= 8) return "Marginal";
+        return "Missed";
     }
 
     function feedbackSwitch(points) {
@@ -928,32 +1107,16 @@
         player.y = clamp(player.y + player.vy * dt, 55, 525);
     }
 
-    function coverageOffsetFor(leverage, amount = 46) {
-        if (leverage === "left") return { x: -amount, y: 0 };
-        if (leverage === "right") return { x: amount, y: 0 };
-        if (leverage === "above") return { x: 0, y: -amount };
-        return { x: 0, y: amount }; // below
-    }
-
-    function safeLeadOffsetFor(leverage) {
-        // The safe area is intentionally farther from the receiver than the
-        // defender's alignment so the user has a clear open-side target.
-        if (leverage === "left") return { x: 110, y: 0 };
-        if (leverage === "right") return { x: -110, y: 0 };
-        if (leverage === "above") return { x: 0, y: 120 };
-        return { x: 0, y: -120 }; // below
-    }
-
     function moveCoverageDefender(rep) {
-        const coverage = coverageOffsetFor(rep.leverage, 46);
+        const side = rep.leverage === "left" ? -1 : 1;
+        const coverageOffset = 46;
 
-        // Lock the defender to the chosen position while matching the
-        // receiver's route velocity exactly. The coverage picture therefore
-        // stays left, right, above, or below for the entire pre-throw route.
+        // Lock the defender to the chosen hip while matching the receiver's
+        // route velocity exactly. This keeps the coverage picture consistent.
         rep.defender.vx = rep.receiver.vx;
         rep.defender.vy = rep.receiver.vy;
-        rep.defender.x = clamp(rep.receiver.x + coverage.x, 38, 962);
-        rep.defender.y = clamp(rep.receiver.y + coverage.y, 55, 525);
+        rep.defender.x = clamp(rep.receiver.x + side * coverageOffset, 38, 962);
+        rep.defender.y = clamp(rep.receiver.y, 55, 525);
     }
 
     function updateBall(ball, dt) {
@@ -1043,11 +1206,14 @@
             drawBall(rep.ball);
         }
 
-        if (rep.thrown && rep.switched) {
+        if (rep.thrown) {
             drawCatchPrompt(rep.receiver, rep.catchType.button);
+            if (rep.catchMeterStarted) {
+                drawCatchMeter(rep);
+            }
         }
 
-        drawMiniLegend("Blue = receiver", "Red = defender");
+        drawMiniLegend("M27: auto receiver control", `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name}`);
     }
 
     function drawDefense(rep) {
@@ -1249,6 +1415,61 @@
         ctx.restore();
     }
 
+    function drawCatchMeter(rep) {
+        const difficulty = currentDifficulty();
+        const heldMs =
+            rep.catchMeterStarted &&
+            !rep.catchMeterLocked &&
+            rep.catchMeterStartedAt !== null
+                ? Math.max(0, performance.now() - rep.catchMeterStartedAt)
+                : rep.catchHoldMs;
+
+        const progress = clamp(heldMs / difficulty.catchMeterDuration, 0, 1);
+        const width = 150;
+        const height = 12;
+        const x = clamp(rep.receiver.x - width / 2, 20, canvas.width - width - 20);
+        const y = clamp(rep.receiver.y + 46, 38, canvas.height - 38);
+
+        ctx.save();
+        ctx.fillStyle = "rgba(4, 9, 13, 0.92)";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 7);
+        ctx.fill();
+        ctx.stroke();
+
+        // Neutral meter track with the release sweet spot highlighted.
+        ctx.fillStyle = "rgba(148, 163, 184, 0.38)";
+        ctx.fillRect(x, y, width, height);
+
+        const sweetX = x + width * difficulty.catchSweetStart;
+        const sweetWidth = width * (difficulty.catchSweetEnd - difficulty.catchSweetStart);
+        ctx.fillStyle = "rgba(34, 197, 94, 0.72)";
+        ctx.fillRect(sweetX, y, sweetWidth, height);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(x, y, width * progress, height);
+
+        const markerX = x + width * progress;
+        ctx.strokeStyle = "#071015";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(markerX, y - 4);
+        ctx.lineTo(markerX, y + height + 4);
+        ctx.stroke();
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.font = "bold 10px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(
+            `${BUTTON_SYMBOLS[rep.catchType.button]} ${rep.catchType.name.toUpperCase()} — RELEASE IN GREEN`,
+            x + width / 2,
+            y - 8
+        );
+        ctx.restore();
+    }
+
     function drawCatchPrompt(player, buttonName) {
         ctx.save();
         const x = player.x + 36;
@@ -1417,6 +1638,20 @@
                 state.rep.throwHolding = false;
                 state.rep.throwHeldAt = null;
                 state.rep.throwHoldMs = 0;
+            }
+
+            if (
+                state.rep?.kind === "offense" &&
+                state.rep.catchMeterStarted &&
+                !state.rep.catchMeterLocked
+            ) {
+                state.rep.catchHolding = false;
+                state.rep.catchHeldAt = null;
+                state.rep.catchHoldMs = 0;
+                state.rep.catchButtonHeld = null;
+                state.rep.catchMeterStarted = false;
+                state.rep.catchMeterStartedAt = null;
+                state.rep.catchMeterLocked = false;
             }
 
             syncCurrentControllerButtons();
