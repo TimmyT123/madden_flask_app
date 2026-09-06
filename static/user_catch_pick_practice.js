@@ -54,6 +54,11 @@
 
     const THROW_BUTTONS = ["X", "SQUARE", "TRIANGLE", "R1"];
 
+    // DualSense PS/Home button in the standard browser Gamepad mapping.
+    // Keep this independent of drill length so Infinite practice can always exit.
+    const PS_HOME_BUTTON_INDEX = 16;
+    const WURD_HOME_URL = "/";
+
     const DIFFICULTIES = {
         rookie: {
             label: "Rookie",
@@ -136,6 +141,7 @@
         keyboardReleased: new Set(),
         keysDown: new Set(),
         gamepadIndex: null,
+        psHomeDown: false,
         flash: null,
         paused: false,
         pauseStartedAt: 0
@@ -475,6 +481,34 @@
             released,
             down
         };
+    }
+
+    function checkPsHomeButton() {
+        const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+        let pad = null;
+
+        if (state.gamepadIndex !== null && pads[state.gamepadIndex]) {
+            pad = pads[state.gamepadIndex];
+        } else {
+            pad = Array.from(pads).find(Boolean) || null;
+            state.gamepadIndex = pad ? pad.index : null;
+        }
+
+        if (!pad) {
+            state.psHomeDown = false;
+            return false;
+        }
+
+        const homePressed = Boolean(pad.buttons[PS_HOME_BUTTON_INDEX]?.pressed);
+
+        if (homePressed && !state.psHomeDown) {
+            state.psHomeDown = true;
+            window.location.assign(WURD_HOME_URL);
+            return true;
+        }
+
+        state.psHomeDown = homePressed;
+        return false;
     }
 
     function syncCurrentControllerButtons() {
@@ -1552,6 +1586,9 @@
     }
 
     function loop(now) {
+        // Always poll PS/Home, even while paused, idle, complete, or using Infinite reps.
+        if (checkPsHomeButton()) return;
+
         const dt = Math.min((now - state.lastTime) / 1000, 0.033);
         state.lastTime = now;
         update(dt, now);
