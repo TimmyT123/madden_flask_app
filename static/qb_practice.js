@@ -1,3 +1,7 @@
+// WURD QB Passing Practice v2
+// Mobile refresh-rate fix: moving meter now uses elapsed time instead of movement-per-frame.
+// Modified section: animation/gameLoop timing (originally around lines 304-337).
+
 const modeSelect = document.getElementById("modeSelect");
 const startBtn = document.getElementById("startBtn");
 const gameArea = document.getElementById("gameArea");
@@ -49,6 +53,7 @@ let linePosition = 0;
 let lineSpeed = 4.4;
 let gameRunning = false;
 let animationId = null;
+let lastAnimationTimestamp = null;
 let lineMoving = false;
 let practicePaused = false;
 let nextRoundTimerId = null;
@@ -202,6 +207,7 @@ function startGame() {
 
     gameRunning = false;
     lineMoving = false;
+    lastAnimationTimestamp = null;
     drillComplete = false;
     roundLocked = false;
     pressedCorrectButton = false;
@@ -301,18 +307,32 @@ function nextRound() {
     roundLocked = false;
 }
 
-function gameLoop() {
+function gameLoop(timestamp) {
     if (!gameRunning) return;
+
+    const now = Number.isFinite(timestamp) ? timestamp : performance.now();
 
     // Keep the animation loop alive, but freeze the moving line,
     // controller input, releases, scoring, and target changes.
     if (practicePaused) {
+        // Keep the timing reference current so resuming cannot create
+        // one large catch-up frame.
+        lastAnimationTimestamp = now;
         animationId = requestAnimationFrame(gameLoop);
         return;
     }
 
+    const deltaMs = lastAnimationTimestamp === null
+        ? 0
+        : Math.min(50, Math.max(0, now - lastAnimationTimestamp));
+    lastAnimationTimestamp = now;
+
     if (lineMoving) {
-        linePosition += lineSpeed;
+        // lineSpeed was originally tuned as percent-per-frame at ~60 Hz.
+        // Scale by elapsed time so 90/120 Hz phones run at the same speed.
+        const sixtyHzFrameMs = 1000 / 60;
+        const frameScale = deltaMs / sixtyHzFrameMs;
+        linePosition += lineSpeed * frameScale;
 
         if (linePosition > 100 && !roundLocked) {
             roundLocked = true;
