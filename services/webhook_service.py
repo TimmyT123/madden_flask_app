@@ -1,4 +1,6 @@
-# webhook_service.py
+# webhook_service_v2.py
+# Version: 2.0
+# Modified section: schedule webhook parsing — pass Arizona webhook receipt time to schedule parser.
 import os
 import json
 import re
@@ -6,6 +8,8 @@ from pathlib import Path
 from threading import Timer
 from time import time
 from hashlib import sha256
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from parsers.passing_parser import parse_passing_stats
 from parsers.schedule_parser import parse_schedule_data
@@ -475,7 +479,13 @@ def process_webhook_data(
     if "playerPassingStatInfoList" in data:
         parse_passing_stats(league_id, data, league_folder)
     elif "gameScheduleInfoList" in data:
-        parse_schedule_data(data, subpath, league_folder)
+        webhook_received_at = datetime.now(ZoneInfo("America/Phoenix")).isoformat(timespec="seconds")
+        parse_schedule_data(
+            data,
+            subpath,
+            league_folder,
+            webhook_received_at=webhook_received_at,
+        )
     elif "teamInfoList" in data or "leagueTeamInfoList" in data:
         parse_league_info_data(data, subpath, league_folder)
     elif "teamStandingInfoList" in data:

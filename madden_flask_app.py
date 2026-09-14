@@ -1,3 +1,7 @@
+# madden_flask_app_v8.py
+# Version: 8.0
+# Modified section: League Schedule (~show_schedule) — format webhook completion timestamps for display.
+
 from flask import Flask, request, jsonify, url_for, redirect, make_response
 from flask import send_from_directory
 
@@ -4291,6 +4295,23 @@ def show_schedule():
 
         game["awayName"] = make_label_with_record(away_id, team_map, records, prefer=prefer)
         game["homeName"] = make_label_with_record(home_id, team_map, records, prefer=prefer)
+
+        # Display the immutable first-completion timestamp recorded by schedule_parser.
+        # Keep old completed games blank if they predate timestamp tracking.
+        completed_at = game.get("completedAt")
+        game["completedDisplay"] = ""
+        if completed_at:
+            try:
+                completed_dt = datetime.fromisoformat(str(completed_at))
+                time_text = completed_dt.strftime("%I:%M %p").lstrip("0")
+                game["completedDisplay"] = (
+                    f"{completed_dt.strftime('%b')} {completed_dt.day}, {completed_dt.year} "
+                    f"{time_text} AZ"
+                )
+            except (TypeError, ValueError):
+                # If an unexpected timestamp format ever appears, show the stored
+                # value rather than hiding potentially useful completion data.
+                game["completedDisplay"] = str(completed_at)
 
     # ✅ Compute BYE teams once (and hide in playoffs). Include record in BYE label too.
     bye_teams = []
