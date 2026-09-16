@@ -164,3 +164,7 @@ button {
     font-weight: bold;
     margin-top: 12px;
 }
+
+body {
+    background: red !important;
+}
