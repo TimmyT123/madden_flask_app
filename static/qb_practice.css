@@ -158,3 +158,9 @@ button {
     margin-top: 35px;
     min-height: 40px;
 }
+
+.tempoDisplay {
+    font-size: 28px;
+    font-weight: bold;
+    margin-top: 12px;
+}
