@@ -160,7 +160,7 @@ button {
 }
 
 #tempoDisplay {
-    font-size: 28px;
+    font-size: 28px !important;
     font-weight: bold;
     margin-top: 12px;
 }
