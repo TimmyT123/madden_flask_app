@@ -3918,6 +3918,79 @@ def _normalize_player(p: dict) -> dict:
         "isInjured": inj_len_int > 0,  # handy boolean for templates
     }
 
+def normalize_roster_team_ids(players, league_id, team_map_path):
+    """
+    Translate roster-team IDs into league/schedule team IDs.
+
+    Madden can expose two team-ID namespaces. For this franchise the
+    roster IDs are +131072 from the league/schedule IDs.
+
+    Detect the offset dynamically so we do not depend on a hardcoded value.
+    """
+    try:
+        if not players or not os.path.exists(team_map_path):
+            return players
+
+        with open(team_map_path, "r", encoding="utf-8") as f:
+            team_map = json.load(f) or {}
+
+        league_ids = sorted(
+            int(x)
+            for x in team_map.keys()
+            if str(x).isdigit()
+        )
+
+        roster_ids = sorted({
+            int(p.get("teamId"))
+            for p in players
+            if str(p.get("teamId") or "").isdigit()
+        })
+
+        # Only attempt translation when both sides look like complete NFL sets.
+        if len(league_ids) < 32 or len(roster_ids) < 32:
+            return players
+
+        # With matching namespaces, the sorted IDs have the same structure.
+        offset = roster_ids[0] - league_ids[0]
+
+        translated_league_ids = {
+            rid - offset for rid in roster_ids
+        }
+
+        # Validate before applying anything.
+        if not set(league_ids).issubset(translated_league_ids):
+            app.logger.warning(
+                "Roster team-ID translation rejected: offset=%s",
+                offset
+            )
+            return players
+
+        app.logger.info(
+            "Roster team-ID namespace detected: offset=%s",
+            offset
+        )
+
+        valid_league_ids = set(league_ids)
+
+        for player in players:
+            value = player.get("teamId")
+
+            try:
+                roster_tid = int(value)
+            except (TypeError, ValueError):
+                continue
+
+            league_tid = roster_tid - offset
+
+            if league_tid in valid_league_ids:
+                player["teamId"] = str(league_tid)
+
+        return players
+
+    except Exception as e:
+        app.logger.warning("Roster team-ID normalization failed: %s", e)
+        return players
+
 
 def load_roster_index(league_id: str, season: str | None = None) -> dict:
     """
@@ -3967,6 +4040,18 @@ def load_roster_index(league_id: str, season: str | None = None) -> dict:
 
     players_raw = _extract_roster_players(raw)
     players = [_normalize_player(player) for player in players_raw]
+
+    if historical:
+        team_map_path = os.path.join(base, "team_map.json")
+    else:
+        team_map_path = os.path.join(root, "team_map.json")
+
+    players = normalize_roster_team_ids(
+        players,
+        league_id,
+        team_map_path
+    )
+
     positions = {player["pos"] for player in players if player.get("pos")}
     out = {
         "players": players,
