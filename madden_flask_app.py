@@ -2579,26 +2579,81 @@ def flyer_game():
     team_ovr = load_team_ovr_by_id(league)
     roster   = load_roster_index(league)["players"]
 
+
     def team_block(team_id):
-        team_id = str(team_id)
-        info = team_map.get(team_id, {})
-        wlt = records.get(team_id, (0,0,0))
-        record = f"{wlt[0]}-{wlt[1]}" if wlt[2] == 0 else f"{wlt[0]}-{wlt[1]}-{wlt[2]}"
+        original_team_id = str(team_id)
+        league_team_id = original_team_id
+
+        # Madden roster endpoints can use a second team-ID namespace.
+        # Flyer/league data uses the league/schedule namespace.
+        if league_team_id not in team_map:
+            try:
+                candidate = str(int(league_team_id) - 131072)
+
+                if candidate in team_map:
+                    print(
+                        f"🔄 Flyer team ID translated: "
+                        f"{original_team_id} -> {candidate}"
+                    )
+                    league_team_id = candidate
+
+            except (TypeError, ValueError):
+                pass
+
+        info = team_map.get(league_team_id, {})
+        wlt = records.get(league_team_id, (0, 0, 0))
+
+        record = (
+            f"{wlt[0]}-{wlt[1]}"
+            if wlt[2] == 0
+            else f"{wlt[0]}-{wlt[1]}-{wlt[2]}"
+        )
+
+        # Roster players may still use the roster namespace (+131072).
+        roster_ids_to_match = {
+            original_team_id,
+            league_team_id,
+        }
+
+        try:
+            roster_ids_to_match.add(str(int(league_team_id) + 131072))
+        except (TypeError, ValueError):
+            pass
 
         top_players = sorted(
-            [p for p in roster if str(p.get("teamId")) == team_id],
+            [
+                p for p in roster
+                if str(p.get("teamId")) in roster_ids_to_match
+            ],
             key=lambda p: p.get("ovr", 0),
             reverse=True
         )[:3]
 
+        team_name = (
+                info.get("name")
+                or info.get("displayName")
+                or info.get("teamName")
+                or info.get("nickName")
+                or f"Team {league_team_id}"
+        )
+
         return {
-            "teamId": team_id,
-            "name": info.get("name", f"Team {team_id}"),
-            "user": info.get("userName") or info.get("displayName") or "CPU",
+            "teamId": league_team_id,
+            "name": team_name,
+            "user": (
+                    info.get("user")
+                    or info.get("userName")
+                    or info.get("displayName")
+                    or "CPU"
+            ),
             "record": record,
-            "ovr": team_ovr.get(team_id),
+            "ovr": team_ovr.get(league_team_id),
             "top_players": [
-                {"name": p["name"], "pos": p["pos"], "ovr": p["ovr"]}
+                {
+                    "name": p["name"],
+                    "pos": p["pos"],
+                    "ovr": p["ovr"]
+                }
                 for p in top_players
             ]
         }
