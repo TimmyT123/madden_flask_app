@@ -1,4 +1,4 @@
-// VERSION 9: 2-second pre-route pause + slower receivers + 40-yard field
+// VERSION 10: slightly slower catch meter + catch-meter starts shifted left
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
@@ -75,7 +75,7 @@
             routeSpeed: 38,
             steerSpeed: 205,
             catchRadius: 68,
-            catchMeterDuration: 700,
+            catchMeterDuration: 800,
             catchSweetStart: 0.52,
             catchSweetEnd: 0.78,
             catchReadyProgress: 0.44,
@@ -90,7 +90,7 @@
             routeSpeed: 44,
             steerSpeed: 220,
             catchRadius: 55,
-            catchMeterDuration: 540,
+            catchMeterDuration: 620,
             catchSweetStart: 0.56,
             catchSweetEnd: 0.76,
             catchReadyProgress: 0.50,
@@ -105,7 +105,7 @@
             routeSpeed: 50,
             steerSpeed: 235,
             catchRadius: 44,
-            catchMeterDuration: 450,
+            catchMeterDuration: 520,
             catchSweetStart: 0.59,
             catchSweetEnd: 0.75,
             catchReadyProgress: 0.55,
@@ -120,7 +120,7 @@
             routeSpeed: 55,
             steerSpeed: 248,
             catchRadius: 36,
-            catchMeterDuration: 390,
+            catchMeterDuration: 450,
             catchSweetStart: 0.61,
             catchSweetEnd: 0.74,
             catchReadyProgress: 0.59,
@@ -862,23 +862,25 @@
         // backward until a ~30+ yd catch can show the full meter.
         if (depthYards < 10) {
             const t = clamp((depthYards - 5) / 5, 0, 1);
-            const lateGreen = difficulty.catchSweetEnd - 0.035;
-            const earlyGreen = difficulty.catchSweetStart + 0.02;
+            // Still starts in/near green on very short catches, but slightly
+            // farther left than before to give the user a touch more reaction time.
+            const lateGreen = difficulty.catchSweetEnd - 0.095;
+            const earlyGreen = difficulty.catchSweetStart - 0.02;
             return lerp(lateGreen, earlyGreen, t);
         }
 
         if (depthYards < 15) {
             const t = clamp((depthYards - 10) / 5, 0, 1);
             return lerp(
-                difficulty.catchSweetStart - 0.025,
-                Math.max(0, difficulty.catchSweetStart - 0.11),
+                difficulty.catchSweetStart - 0.065,
+                Math.max(0, difficulty.catchSweetStart - 0.15),
                 t
             );
         }
 
         if (depthYards < 30) {
             const t = clamp((depthYards - 15) / 15, 0, 1);
-            return lerp(Math.max(0, difficulty.catchSweetStart - 0.11), 0, t);
+            return lerp(Math.max(0, difficulty.catchSweetStart - 0.15), 0, t);
         }
 
         return 0;
