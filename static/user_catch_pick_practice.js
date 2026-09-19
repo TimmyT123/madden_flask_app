@@ -1,14 +1,14 @@
-// VERSION 7: 2.5-second pre-route pause + slower receivers + 5-yard field/catch-depth meter
+// VERSION 8: 4.5-second pre-route pause + slower receivers + 40-yard field
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
     "use strict";
 
-    // Offense field geometry: show exactly 0-50 yards past the line of scrimmage
+    // Offense field geometry: show exactly 0-40 yards past the line of scrimmage
     // across the full practice canvas so catch depth is easy to judge.
     const OFFENSE_LOS_Y = 540;
     const OFFENSE_FIELD_TOP_Y = 40;
-    const OFFENSE_FIELD_YARDS = 50;
+    const OFFENSE_FIELD_YARDS = 40;
     const OFFENSE_PIXELS_PER_YARD = (OFFENSE_LOS_Y - OFFENSE_FIELD_TOP_Y) / OFFENSE_FIELD_YARDS;
 
     const canvas = document.getElementById("practiceCanvas");
@@ -66,13 +66,13 @@
     // Keep this independent of drill length so Infinite practice can always exit.
     const PS_HOME_BUTTON_INDEX = 16;
     const WURD_HOME_URL = "/";
-    const OFFENSE_ROUTE_DELAY_MS = 2500;
+    const OFFENSE_ROUTE_DELAY_MS = 4500;
 
     const DIFFICULTIES = {
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 44,
+            routeSpeed: 38,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 700,
@@ -87,7 +87,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 51,
+            routeSpeed: 44,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 540,
@@ -102,7 +102,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 58,
+            routeSpeed: 50,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 450,
@@ -117,7 +117,7 @@
         allMadden: {
             label: "All-Madden",
             ballSpeed: 585,
-            routeSpeed: 64,
+            routeSpeed: 55,
             steerSpeed: 248,
             catchRadius: 36,
             catchMeterDuration: 390,
@@ -1320,7 +1320,7 @@
         ctx.font = "bold 16px Arial";
         ctx.textAlign = "left";
 
-        // 0-50 yards stretched over the full vertical practice area.
+        // 0-40 yards stretched over the full vertical practice area.
         // Madden's catch-meter starting behavior changes in roughly 5-yard
         // bands, so show every 5 yards. Ten-yard lines are slightly stronger.
         for (let yards = 0; yards <= OFFENSE_FIELD_YARDS; yards += 5) {
