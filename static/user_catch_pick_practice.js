@@ -1,4 +1,4 @@
-// VERSION 8: 4.5-second pre-route pause + slower receivers + 40-yard field
+// VERSION 9: 2-second pre-route pause + slower receivers + 40-yard field
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
@@ -66,7 +66,7 @@
     // Keep this independent of drill length so Infinite practice can always exit.
     const PS_HOME_BUTTON_INDEX = 16;
     const WURD_HOME_URL = "/";
-    const OFFENSE_ROUTE_DELAY_MS = 4500;
+    const OFFENSE_ROUTE_DELAY_MS = 2000;
 
     const DIFFICULTIES = {
         rookie: {
