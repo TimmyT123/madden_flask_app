@@ -1,4 +1,4 @@
-// VERSION 11: slightly slower catch meter only; throw meter unchanged
+// VERSION 12: persistent 0/5/10/20-yard catch-meter minimum selector
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
@@ -17,6 +17,7 @@
     const ui = {
         mode: document.getElementById("modeSelect"),
         difficulty: document.getElementById("difficultySelect"),
+        catchMeterMin: document.getElementById("catchMeterMinSelect"),
         reps: document.getElementById("repsSelect"),
         start: document.getElementById("startBtn"),
         reset: document.getElementById("resetBtn"),
@@ -67,6 +68,7 @@
     const PS_HOME_BUTTON_INDEX = 16;
     const WURD_HOME_URL = "/";
     const OFFENSE_ROUTE_DELAY_MS = 2000;
+    const CATCH_METER_MIN_STORAGE_KEY = "wurdCatchMeterMinYards";
 
     const DIFFICULTIES = {
         rookie: {
@@ -135,6 +137,7 @@
         running: false,
         mode: "offense",
         difficultyKey: "pro",
+        catchMeterMinYards: 5,
         totalReps: 10,
         completedReps: 0,
         successCount: 0,
@@ -232,6 +235,7 @@
 
         state.mode = ui.mode.value;
         state.difficultyKey = ui.difficulty.value;
+        state.catchMeterMinYards = Number(ui.catchMeterMin?.value ?? 5);
         state.totalReps =
             ui.reps.value === "infinite"
                 ? Infinity
@@ -820,7 +824,10 @@
             0,
             OFFENSE_FIELD_YARDS
         );
-        rep.catchMeterEnabled = rep.catchDepthYards > 5;
+        // Respect the user's selected Madden minimum-distance setting.
+        // Default is 5 yards. A 0-yard setting enables timing-based catching
+        // even on catches inside 5 yards.
+        rep.catchMeterEnabled = rep.catchDepthYards >= state.catchMeterMinYards;
         rep.catchMeterStartProgress = getCatchMeterStartProgress(
             rep.catchDepthYards,
             currentDifficulty()
@@ -838,7 +845,7 @@
         }
         if (!rep.catchMeterEnabled) {
             setInstruction(
-                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Inside 5 yards: no timing meter.`
+                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Timing meter begins at ${state.catchMeterMinYards} yards.`
             );
         } else if (rep.catchDepthYards < 10) {
             setInstruction(
@@ -853,15 +860,17 @@
     }
 
     function getCatchMeterStartProgress(depthYards, difficulty) {
-        if (depthYards <= 5) return 0;
+        // With Madden's minimum set to 0, practice testing showed 0-5 yard
+        // catches use the same short-pass meter behavior as the 5-10 yard band.
+        const effectiveDepthYards = Math.max(depthYards, 5);
 
         // Empirical Madden 27 behavior from practice testing:
         // 5-10 yd catches open inside the green near its late edge (quick tap).
         // 10-15 yd catches open just before green (very short hold).
         // From 15 to about 30 yd, the starting point moves progressively
         // backward until a ~30+ yd catch can show the full meter.
-        if (depthYards < 10) {
-            const t = clamp((depthYards - 5) / 5, 0, 1);
+        if (effectiveDepthYards < 10) {
+            const t = clamp((effectiveDepthYards - 5) / 5, 0, 1);
             // Still starts in/near green on very short catches, but slightly
             // farther left than before to give the user a touch more reaction time.
             const lateGreen = difficulty.catchSweetEnd - 0.095;
@@ -869,8 +878,8 @@
             return lerp(lateGreen, earlyGreen, t);
         }
 
-        if (depthYards < 15) {
-            const t = clamp((depthYards - 10) / 5, 0, 1);
+        if (effectiveDepthYards < 15) {
+            const t = clamp((effectiveDepthYards - 10) / 5, 0, 1);
             return lerp(
                 difficulty.catchSweetStart - 0.065,
                 Math.max(0, difficulty.catchSweetStart - 0.15),
@@ -878,8 +887,8 @@
             );
         }
 
-        if (depthYards < 30) {
-            const t = clamp((depthYards - 15) / 15, 0, 1);
+        if (effectiveDepthYards < 30) {
+            const t = clamp((effectiveDepthYards - 15) / 15, 0, 1);
             return lerp(Math.max(0, difficulty.catchSweetStart - 0.15), 0, t);
         }
 
@@ -919,8 +928,8 @@
         rep.catchHoldMs = 0;
         rep.catchButtonHeld = buttonName;
 
-        // Inside the 5-yard minimum, Madden does not display timing-based
-        // catching. The catch type still matters, but there is no meter to hold.
+        // Below the selected minimum distance, Madden does not display
+        // timing-based catching. The catch type still matters, but there is no meter.
         if (!rep.catchMeterEnabled) {
             rep.catchMeterLocked = true;
             rep.catchHolding = false;
@@ -1758,6 +1767,42 @@
         update(dt, now);
         requestAnimationFrame(loop);
     }
+
+    function loadCatchMeterMinimumSetting() {
+        const allowed = new Set(["0", "5", "10", "20"]);
+        let saved = "5";
+
+        try {
+            const stored = localStorage.getItem(CATCH_METER_MIN_STORAGE_KEY);
+            if (stored && allowed.has(stored)) saved = stored;
+        } catch (error) {
+            // localStorage may be unavailable in some private/browser modes.
+        }
+
+        if (ui.catchMeterMin) {
+            ui.catchMeterMin.value = saved;
+        }
+        state.catchMeterMinYards = Number(saved);
+    }
+
+    function saveCatchMeterMinimumSetting() {
+        if (!ui.catchMeterMin) return;
+
+        const value = ["0", "5", "10", "20"].includes(ui.catchMeterMin.value)
+            ? ui.catchMeterMin.value
+            : "5";
+
+        state.catchMeterMinYards = Number(value);
+
+        try {
+            localStorage.setItem(CATCH_METER_MIN_STORAGE_KEY, value);
+        } catch (error) {
+            // The selector still works for this session if storage is unavailable.
+        }
+    }
+
+    loadCatchMeterMinimumSetting();
+    ui.catchMeterMin?.addEventListener("change", saveCatchMeterMinimumSetting);
 
     window.addEventListener("gamepadconnected", event => {
         state.gamepadIndex = event.gamepad.index;
