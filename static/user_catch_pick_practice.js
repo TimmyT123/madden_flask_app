@@ -1,4 +1,4 @@
-// VERSION 6: 50-yard offense field with 5-yard increments + LOS-based Madden 27 distance catch meter
+// VERSION 7: 2.5-second pre-route pause + slower receivers + 5-yard field/catch-depth meter
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
@@ -66,12 +66,13 @@
     // Keep this independent of drill length so Infinite practice can always exit.
     const PS_HOME_BUTTON_INDEX = 16;
     const WURD_HOME_URL = "/";
+    const OFFENSE_ROUTE_DELAY_MS = 2500;
 
     const DIFFICULTIES = {
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 58,
+            routeSpeed: 44,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 700,
@@ -86,7 +87,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 67,
+            routeSpeed: 51,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 540,
@@ -101,7 +102,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 76,
+            routeSpeed: 58,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 450,
@@ -116,7 +117,7 @@
         allMadden: {
             label: "All-Madden",
             ballSpeed: 585,
-            routeSpeed: 84,
+            routeSpeed: 64,
             steerSpeed: 248,
             catchRadius: 36,
             catchMeterDuration: 390,
@@ -264,7 +265,7 @@
         if (state.mode === "offense") {
             state.rep = createOffenseRep();
             setInstruction(
-                `Defender is on the ${state.rep.leverage}. Hold ${BUTTON_LABELS[state.rep.throwButton]} and lead to the open side.`
+                `Get ready... route starts in ${Math.ceil(OFFENSE_ROUTE_DELAY_MS / 1000)} seconds.`
             );
         } else {
             state.rep = createDefenseRep();
@@ -358,7 +359,9 @@
             switchedAt: null,
             catchAttemptAt: null,
             resultReason: "",
-            startedAt: performance.now()
+            startedAt: performance.now(),
+            routeStartAt: performance.now() + OFFENSE_ROUTE_DELAY_MS,
+            routeInstructionShown: false
         };
     }
 
@@ -609,6 +612,23 @@
         const difficulty = currentDifficulty();
 
         if (!rep.thrown) {
+            // Give the user a short setup pause before the receiver starts moving.
+            if (now < rep.routeStartAt) {
+                const remainingMs = Math.max(0, rep.routeStartAt - now);
+                const remainingSeconds = Math.ceil(remainingMs / 1000);
+                setInstruction(
+                    `Get ready... route starts in ${remainingSeconds} second${remainingSeconds === 1 ? "" : "s"}.`
+                );
+                return;
+            }
+
+            if (!rep.routeInstructionShown) {
+                rep.routeInstructionShown = true;
+                setInstruction(
+                    `Defender is on the ${rep.leverage}. Hold ${BUTTON_LABELS[rep.throwButton]} and lead to the open side.`
+                );
+            }
+
             moveAutoRoute(rep.receiver, dt);
             moveCoverageDefender(rep);
 
