@@ -1,3 +1,4 @@
+// VERSION 4: Madden 27 distance-based catch meter
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
@@ -339,6 +340,9 @@
             catchMeterStarted: false,
             catchMeterStartedAt: null,
             catchMeterLocked: false,
+            catchMeterEnabled: true,
+            catchMeterStartProgress: 0,
+            catchDepthYards: 0,
             success: false,
             placementPoints: 0,
             catchTimingPoints: 0,
@@ -781,6 +785,16 @@
             arcHeight: profile.arcHeight
         };
 
+        // Madden 27 catch timing is keyed to the catch point's depth past the
+        // line of scrimmage, not QB-to-receiver air distance or pass trajectory.
+        // On this field, y=550 is the LOS and 6 canvas pixels = 1 yard.
+        rep.catchDepthYards = Math.max(0, (550 - rep.ball.target.y) / 6);
+        rep.catchMeterEnabled = rep.catchDepthYards > 5;
+        rep.catchMeterStartProgress = getCatchMeterStartProgress(
+            rep.catchDepthYards,
+            currentDifficulty()
+        );
+
         // Madden 27 gives the user receiver control immediately after the throw.
         rep.switched = true;
 
@@ -791,10 +805,68 @@
         } else {
             setTiming(`${profile.timingText} Throw is too close to the defender.`, "bad");
         }
-        setInstruction(
-            `Steer to the ball spot. Hold ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}; release it to stop the fast catch meter in the green.`
-        );
+        if (!rep.catchMeterEnabled) {
+            setInstruction(
+                `Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Inside 5 yards: no timing meter.`
+            );
+        } else if (rep.catchDepthYards < 10) {
+            setInstruction(
+                `Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Short catch: TAP / release immediately in green.`
+            );
+        } else {
+            setInstruction(
+                `Steer to the ball spot. Hold ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}; release it when the distance-based meter reaches green.`
+            );
+        }
         beep(520, 0.05);
+    }
+
+    function getCatchMeterStartProgress(depthYards, difficulty) {
+        if (depthYards <= 5) return 0;
+
+        // Empirical Madden 27 behavior from practice testing:
+        // 5-10 yd catches open inside the green near its late edge (quick tap).
+        // 10-15 yd catches open just before green (very short hold).
+        // From 15 to about 30 yd, the starting point moves progressively
+        // backward until a ~30+ yd catch can show the full meter.
+        if (depthYards < 10) {
+            const t = clamp((depthYards - 5) / 5, 0, 1);
+            const lateGreen = difficulty.catchSweetEnd - 0.035;
+            const earlyGreen = difficulty.catchSweetStart + 0.02;
+            return lerp(lateGreen, earlyGreen, t);
+        }
+
+        if (depthYards < 15) {
+            const t = clamp((depthYards - 10) / 5, 0, 1);
+            return lerp(
+                difficulty.catchSweetStart - 0.025,
+                Math.max(0, difficulty.catchSweetStart - 0.11),
+                t
+            );
+        }
+
+        if (depthYards < 30) {
+            const t = clamp((depthYards - 15) / 15, 0, 1);
+            return lerp(Math.max(0, difficulty.catchSweetStart - 0.11), 0, t);
+        }
+
+        return 0;
+    }
+
+    function currentCatchMeterProgress(rep, now = performance.now()) {
+        if (!rep.catchMeterStarted) return rep.catchMeterStartProgress || 0;
+
+        const difficulty = currentDifficulty();
+        const heldMs =
+            !rep.catchMeterLocked && rep.catchMeterStartedAt !== null
+                ? Math.max(0, now - rep.catchMeterStartedAt)
+                : rep.catchHoldMs;
+
+        return clamp(
+            (rep.catchMeterStartProgress || 0) + heldMs / difficulty.catchMeterDuration,
+            0,
+            1.25
+        );
     }
 
     function startOffenseCatchMeter(rep, buttonName, now) {
@@ -807,7 +879,6 @@
             return;
         }
 
-        // The catch meter begins at the exact instant the catch button is pressed.
         rep.catchMeterStarted = true;
         rep.catchMeterStartedAt = now;
         rep.catchHolding = true;
@@ -815,9 +886,31 @@
         rep.catchHoldMs = 0;
         rep.catchButtonHeld = buttonName;
 
+        // Inside the 5-yard minimum, Madden does not display timing-based
+        // catching. The catch type still matters, but there is no meter to hold.
+        if (!rep.catchMeterEnabled) {
+            rep.catchMeterLocked = true;
+            rep.catchHolding = false;
+            rep.catchTimingPoints = 25;
+            setTiming(
+                buttonName === rep.catchType.button
+                    ? `No catch meter inside 5 yards — ${BUTTON_LABELS[buttonName]} registered.`
+                    : `No catch meter inside 5 yards, but use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}.`,
+                buttonName === rep.catchType.button ? "good" : "warn"
+            );
+            return;
+        }
+
+        const startProgress = rep.catchMeterStartProgress || 0;
+        const startsGreen =
+            startProgress >= currentDifficulty().catchSweetStart &&
+            startProgress <= currentDifficulty().catchSweetEnd;
+
         if (buttonName === rep.catchType.button) {
             setTiming(
-                `Catch meter started — release ${BUTTON_LABELS[buttonName]} in the green.`,
+                startsGreen
+                    ? `Catch meter opened GREEN — release ${BUTTON_LABELS[buttonName]} NOW.`
+                    : `Catch meter started — release ${BUTTON_LABELS[buttonName]} in the green.`,
                 "good"
             );
         } else {
@@ -846,7 +939,7 @@
         rep.catchHeldAt = null;
 
         rep.catchTimingPoints = scoreCatchRelease(
-            rep.catchHoldMs,
+            currentCatchMeterProgress(rep, now),
             currentDifficulty()
         );
 
@@ -870,8 +963,8 @@
         vibrate(38, 0.20);
     }
 
-    function scoreCatchRelease(holdMs, difficulty) {
-        const ratio = clamp(holdMs / difficulty.catchMeterDuration, 0, 1.25);
+    function scoreCatchRelease(ratio, difficulty) {
+        ratio = clamp(ratio, 0, 1.25);
 
         if (ratio >= difficulty.catchSweetStart && ratio <= difficulty.catchSweetEnd) {
             const middle = (difficulty.catchSweetStart + difficulty.catchSweetEnd) / 2;
@@ -926,7 +1019,8 @@
         } else if (rep.catchTimingPoints >= 8) {
             rep.resultReason = `${rep.catchType.name} catch—timing was marginal`;
         } else {
-            rep.resultReason = rep.catchHoldMs < difficulty.catchMeterDuration * difficulty.catchSweetStart
+            const releaseProgress = currentCatchMeterProgress(rep);
+            rep.resultReason = releaseProgress < difficulty.catchSweetStart
                 ? "Released the catch button too early"
                 : "Released the catch button too late";
         }
@@ -1428,8 +1522,8 @@
         ctx.fillRect(x, y, width * progress, height);
 
         const markerX = x + width * progress;
-        ctx.strokeStyle = "#071015";
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(markerX, y - 4);
         ctx.lineTo(markerX, y + height + 4);
@@ -1450,15 +1544,10 @@
     }
 
     function drawCatchMeter(rep) {
-        const difficulty = currentDifficulty();
-        const heldMs =
-            rep.catchMeterStarted &&
-            !rep.catchMeterLocked &&
-            rep.catchMeterStartedAt !== null
-                ? Math.max(0, performance.now() - rep.catchMeterStartedAt)
-                : rep.catchHoldMs;
+        if (!rep.catchMeterEnabled) return;
 
-        const progress = clamp(heldMs / difficulty.catchMeterDuration, 0, 1);
+        const difficulty = currentDifficulty();
+        const progress = clamp(currentCatchMeterProgress(rep), 0, 1);
         const width = 150;
         const height = 12;
         const x = clamp(rep.receiver.x - width / 2, 20, canvas.width - width - 20);
@@ -1473,17 +1562,19 @@
         ctx.fill();
         ctx.stroke();
 
-        // Neutral meter track with the release sweet spot highlighted.
+        // Madden-style timing zones: neutral before green, green release window,
+        // then red for a late release. The marker itself shows current progress.
         ctx.fillStyle = "rgba(148, 163, 184, 0.38)";
-        ctx.fillRect(x, y, width, height);
+        ctx.fillRect(x, y, width * difficulty.catchSweetStart, height);
 
         const sweetX = x + width * difficulty.catchSweetStart;
         const sweetWidth = width * (difficulty.catchSweetEnd - difficulty.catchSweetStart);
-        ctx.fillStyle = "rgba(34, 197, 94, 0.72)";
+        ctx.fillStyle = "rgba(34, 197, 94, 0.78)";
         ctx.fillRect(sweetX, y, sweetWidth, height);
 
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(x, y, width * progress, height);
+        const lateX = x + width * difficulty.catchSweetEnd;
+        ctx.fillStyle = "rgba(239, 68, 68, 0.78)";
+        ctx.fillRect(lateX, y, width * (1 - difficulty.catchSweetEnd), height);
 
         const markerX = x + width * progress;
         ctx.strokeStyle = "#071015";
