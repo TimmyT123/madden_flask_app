@@ -1,4 +1,4 @@
-// VERSION 10: slightly slower catch meter + catch-meter starts shifted left
+// VERSION 11: slightly slower catch meter only; throw meter unchanged
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
@@ -75,7 +75,7 @@
             routeSpeed: 38,
             steerSpeed: 205,
             catchRadius: 68,
-            catchMeterDuration: 800,
+            catchMeterDuration: 870,
             catchSweetStart: 0.52,
             catchSweetEnd: 0.78,
             catchReadyProgress: 0.44,
@@ -90,7 +90,7 @@
             routeSpeed: 44,
             steerSpeed: 220,
             catchRadius: 55,
-            catchMeterDuration: 620,
+            catchMeterDuration: 675,
             catchSweetStart: 0.56,
             catchSweetEnd: 0.76,
             catchReadyProgress: 0.50,
@@ -105,7 +105,7 @@
             routeSpeed: 50,
             steerSpeed: 235,
             catchRadius: 44,
-            catchMeterDuration: 520,
+            catchMeterDuration: 565,
             catchSweetStart: 0.59,
             catchSweetEnd: 0.75,
             catchReadyProgress: 0.55,
@@ -120,7 +120,7 @@
             routeSpeed: 55,
             steerSpeed: 248,
             catchRadius: 36,
-            catchMeterDuration: 450,
+            catchMeterDuration: 490,
             catchSweetStart: 0.61,
             catchSweetEnd: 0.74,
             catchReadyProgress: 0.59,
