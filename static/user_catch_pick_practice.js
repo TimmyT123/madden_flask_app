@@ -1,8 +1,15 @@
-// VERSION 4: Madden 27 distance-based catch meter
+// VERSION 6: 50-yard offense field with 5-yard increments + LOS-based Madden 27 distance catch meter
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
     "use strict";
+
+    // Offense field geometry: show exactly 0-50 yards past the line of scrimmage
+    // across the full practice canvas so catch depth is easy to judge.
+    const OFFENSE_LOS_Y = 540;
+    const OFFENSE_FIELD_TOP_Y = 40;
+    const OFFENSE_FIELD_YARDS = 50;
+    const OFFENSE_PIXELS_PER_YARD = (OFFENSE_LOS_Y - OFFENSE_FIELD_TOP_Y) / OFFENSE_FIELD_YARDS;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -285,7 +292,7 @@
         const routeType = randomChoice(["go", "slantLeft", "slantRight", "outLeft", "outRight"]);
         const receiver = {
             x: randomRange(300, 700),
-            y: 475,
+            y: OFFENSE_LOS_Y,
             vx: 0,
             vy: -currentDifficulty().routeSpeed,
             radius: 18
@@ -318,12 +325,12 @@
             kind: "offense",
             routeType,
             leverage,
-            qb: { x: 500, y: 555 },
+            qb: { x: 500, y: 578 },
             receiver,
             defender,
             ball: null,
-            reticle: { x: receiver.x, y: receiver.y - 125 },
-            safePoint: { x: receiver.x, y: receiver.y - 125 },
+            reticle: { x: receiver.x, y: receiver.y - 12.5 * OFFENSE_PIXELS_PER_YARD },
+            safePoint: { x: receiver.x, y: receiver.y - 12.5 * OFFENSE_PIXELS_PER_YARD },
             throwButton: randomChoice(THROW_BUTTONS),
             catchType,
             throwHolding: false,
@@ -614,7 +621,7 @@
             // right. If the defender is on the right, the open side is left.
             const openSide = rep.leverage === "left" ? 1 : -1;
             rep.safePoint.x = clamp(projectedReceiver.x + openSide * 105, 95, 905);
-            rep.safePoint.y = clamp(projectedReceiver.y + 4, 80, 500);
+            rep.safePoint.y = clamp(projectedReceiver.y + 4, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
 
             rep.reticle.x = clamp(projectedReceiver.x + input.axisX * 150, 65, 935);
 
@@ -624,8 +631,8 @@
             const verticalAimRange = input.axisY >= 0 ? 225 : 125;
             rep.reticle.y = clamp(
                 projectedReceiver.y + input.axisY * verticalAimRange,
-                65,
-                540
+                OFFENSE_FIELD_TOP_Y,
+                OFFENSE_LOS_Y
             );
 
             if (pressed(input, rep.throwButton)) {
@@ -673,8 +680,8 @@
         );
         rep.receiver.y = clamp(
             rep.receiver.y + input.axisY * difficulty.steerSpeed * dt,
-            45,
-            520
+            OFFENSE_FIELD_TOP_Y,
+            OFFENSE_LOS_Y
         );
 
         // Madden 27 catch meter behavior:
@@ -787,8 +794,12 @@
 
         // Madden 27 catch timing is keyed to the catch point's depth past the
         // line of scrimmage, not QB-to-receiver air distance or pass trajectory.
-        // On this field, y=550 is the LOS and 6 canvas pixels = 1 yard.
-        rep.catchDepthYards = Math.max(0, (550 - rep.ball.target.y) / 6);
+        // The offense field now displays exactly 50 yards from LOS to the top.
+        rep.catchDepthYards = clamp(
+            (OFFENSE_LOS_Y - rep.ball.target.y) / OFFENSE_PIXELS_PER_YARD,
+            0,
+            OFFENSE_FIELD_YARDS
+        );
         rep.catchMeterEnabled = rep.catchDepthYards > 5;
         rep.catchMeterStartProgress = getCatchMeterStartProgress(
             rep.catchDepthYards,
@@ -807,15 +818,15 @@
         }
         if (!rep.catchMeterEnabled) {
             setInstruction(
-                `Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Inside 5 yards: no timing meter.`
+                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Inside 5 yards: no timing meter.`
             );
         } else if (rep.catchDepthYards < 10) {
             setInstruction(
-                `Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Short catch: TAP / release immediately in green.`
+                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Short catch: TAP / release immediately in green.`
             );
         } else {
             setInstruction(
-                `Steer to the ball spot. Hold ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}; release it when the distance-based meter reaches green.`
+                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer to the ball spot. Hold ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}; release when the distance-based meter reaches green.`
             );
         }
         beep(520, 0.05);
@@ -1232,7 +1243,7 @@
 
     function moveAutoRoute(player, dt) {
         player.x = clamp(player.x + player.vx * dt, 38, 962);
-        player.y = clamp(player.y + player.vy * dt, 55, 525);
+        player.y = clamp(player.y + player.vy * dt, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
     }
 
     function moveCoverageDefender(rep) {
@@ -1244,7 +1255,7 @@
         rep.defender.vx = rep.receiver.vx;
         rep.defender.vy = rep.receiver.vy;
         rep.defender.x = clamp(rep.receiver.x + side * coverageOffset, 38, 962);
-        rep.defender.y = clamp(rep.receiver.y, 55, 525);
+        rep.defender.y = clamp(rep.receiver.y, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
     }
 
     function updateBall(ball, dt) {
@@ -1286,25 +1297,60 @@
 
         ctx.strokeStyle = "rgba(255,255,255,0.28)";
         ctx.lineWidth = 2;
+        ctx.font = "bold 16px Arial";
+        ctx.textAlign = "left";
 
-        for (let y = 70; y <= 550; y += 60) {
+        // 0-50 yards stretched over the full vertical practice area.
+        // Madden's catch-meter starting behavior changes in roughly 5-yard
+        // bands, so show every 5 yards. Ten-yard lines are slightly stronger.
+        for (let yards = 0; yards <= OFFENSE_FIELD_YARDS; yards += 5) {
+            const y = OFFENSE_LOS_Y - yards * OFFENSE_PIXELS_PER_YARD;
+            const isTenYardLine = yards % 10 === 0;
+
+            ctx.strokeStyle = yards === 0
+                ? "rgba(255, 209, 102, 0.95)"
+                : isTenYardLine
+                    ? "rgba(255,255,255,0.36)"
+                    : "rgba(255,255,255,0.20)";
+            ctx.lineWidth = yards === 0 ? 4 : isTenYardLine ? 2 : 1;
+
             ctx.beginPath();
             ctx.moveTo(30, y);
             ctx.lineTo(970, y);
             ctx.stroke();
 
-            ctx.fillStyle = "rgba(255,255,255,0.45)";
-            ctx.font = "16px Arial";
-            ctx.fillText(String(Math.round((550 - y) / 6)), 45, y - 7);
-            ctx.fillText(String(Math.round((550 - y) / 6)), 925, y - 7);
+            ctx.fillStyle = yards === 0
+                ? "rgba(255, 209, 102, 0.95)"
+                : isTenYardLine
+                    ? "rgba(255,255,255,0.70)"
+                    : "rgba(255,255,255,0.48)";
+            const label = yards === 0 ? "LOS" : `${yards}`;
+            ctx.font = yards === 0
+                ? "bold 17px Arial"
+                : isTenYardLine
+                    ? "bold 16px Arial"
+                    : "14px Arial";
+            ctx.fillText(label, 45, y - 6);
+            ctx.fillText(label, 925, y - 6);
         }
 
+        ctx.font = "bold 16px Arial";
+        ctx.lineWidth = 2;
+
+        ctx.strokeStyle = "rgba(255, 209, 102, 0.9)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(30, OFFENSE_LOS_Y);
+        ctx.lineTo(970, OFFENSE_LOS_Y);
+        ctx.stroke();
+
         ctx.strokeStyle = "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 2;
         ctx.setLineDash([8, 9]);
         for (let x = 210; x <= 790; x += 145) {
             ctx.beginPath();
-            ctx.moveTo(x, 25);
-            ctx.lineTo(x, 575);
+            ctx.moveTo(x, OFFENSE_FIELD_TOP_Y - 15);
+            ctx.lineTo(x, OFFENSE_LOS_Y + 35);
             ctx.stroke();
         }
         ctx.setLineDash([]);
@@ -1480,7 +1526,12 @@
         ctx.fillStyle = "#fff6cc";
         ctx.font = "bold 13px Arial";
         ctx.textAlign = "center";
-        ctx.fillText("BALL SPOT", point.x, point.y - 32);
+        const targetDepth = clamp(
+            (OFFENSE_LOS_Y - point.y) / OFFENSE_PIXELS_PER_YARD,
+            0,
+            OFFENSE_FIELD_YARDS
+        );
+        ctx.fillText(`BALL SPOT • ${targetDepth.toFixed(1)} YDS`, point.x, point.y - 32);
         ctx.restore();
     }
 
