@@ -1,14 +1,14 @@
-// VERSION 12: persistent 0/5/10/20-yard catch-meter minimum selector
+// VERSION 13: X-to-hike snap, 30-yard field, slightly faster receiver and throw meter
 // VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
 // VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
 (() => {
     "use strict";
 
-    // Offense field geometry: show exactly 0-40 yards past the line of scrimmage
+    // Offense field geometry: show exactly 0-30 yards past the line of scrimmage
     // across the full practice canvas so catch depth is easy to judge.
     const OFFENSE_LOS_Y = 540;
     const OFFENSE_FIELD_TOP_Y = 40;
-    const OFFENSE_FIELD_YARDS = 40;
+    const OFFENSE_FIELD_YARDS = 30;
     const OFFENSE_PIXELS_PER_YARD = (OFFENSE_LOS_Y - OFFENSE_FIELD_TOP_Y) / OFFENSE_FIELD_YARDS;
 
     const canvas = document.getElementById("practiceCanvas");
@@ -67,14 +67,16 @@
     // Keep this independent of drill length so Infinite practice can always exit.
     const PS_HOME_BUTTON_INDEX = 16;
     const WURD_HOME_URL = "/";
-    const OFFENSE_ROUTE_DELAY_MS = 2000;
+    const THROW_METER_DURATION_MS = 820;
+    const LOB_MAX_HOLD_MS = 165;
+    const TOUCH_MAX_HOLD_MS = 500;
     const CATCH_METER_MIN_STORAGE_KEY = "wurdCatchMeterMinYards";
 
     const DIFFICULTIES = {
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 38,
+            routeSpeed: 42,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 870,
@@ -89,7 +91,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 44,
+            routeSpeed: 48,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 675,
@@ -104,7 +106,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 50,
+            routeSpeed: 60,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 565,
@@ -268,9 +270,7 @@
 
         if (state.mode === "offense") {
             state.rep = createOffenseRep();
-            setInstruction(
-                `Get ready... route starts in ${Math.ceil(OFFENSE_ROUTE_DELAY_MS / 1000)} seconds.`
-            );
+            setInstruction("Press X to hike the ball.");
         } else {
             state.rep = createDefenseRep();
             setInstruction("Read the pass. Press Circle to click on at the right time.");
@@ -364,8 +364,7 @@
             catchAttemptAt: null,
             resultReason: "",
             startedAt: performance.now(),
-            routeStartAt: performance.now() + OFFENSE_ROUTE_DELAY_MS,
-            routeInstructionShown: false
+            snapped: false
         };
     }
 
@@ -616,21 +615,19 @@
         const difficulty = currentDifficulty();
 
         if (!rep.thrown) {
-            // Give the user a short setup pause before the receiver starts moving.
-            if (now < rep.routeStartAt) {
-                const remainingMs = Math.max(0, rep.routeStartAt - now);
-                const remainingSeconds = Math.ceil(remainingMs / 1000);
-                setInstruction(
-                    `Get ready... route starts in ${remainingSeconds} second${remainingSeconds === 1 ? "" : "s"}.`
-                );
+            // Match Madden's flow: X hikes the ball and starts the route.
+            // Return on the hike frame so the same X press can never also
+            // count as a receiver throw input.
+            if (!rep.snapped) {
+                if (pressed(input, "X")) {
+                    rep.snapped = true;
+                    setInstruction(
+                        `Defender is on the ${rep.leverage}. Hold ${BUTTON_LABELS[rep.throwButton]} and lead to the open side.`
+                    );
+                    setTiming("Ball hiked.", "good");
+                    beep(420, 0.04);
+                }
                 return;
-            }
-
-            if (!rep.routeInstructionShown) {
-                rep.routeInstructionShown = true;
-                setInstruction(
-                    `Defender is on the ${rep.leverage}. Hold ${BUTTON_LABELS[rep.throwButton]} and lead to the open side.`
-                );
             }
 
             moveAutoRoute(rep.receiver, dt);
@@ -770,7 +767,7 @@
     function getPassProfile(holdMs, difficulty) {
         const baseSpeed = difficulty.ballSpeed;
 
-        if (holdMs < 180) {
+        if (holdMs < LOB_MAX_HOLD_MS) {
             return {
                 type: "lob",
                 durationFactor: 1.22,
@@ -779,7 +776,7 @@
             };
         }
 
-        if (holdMs < 550) {
+        if (holdMs < TOUCH_MAX_HOLD_MS) {
             return {
                 type: "touch",
                 durationFactor: 1.0,
@@ -818,7 +815,7 @@
 
         // Madden 27 catch timing is keyed to the catch point's depth past the
         // line of scrimmage, not QB-to-receiver air distance or pass trajectory.
-        // The offense field now displays exactly 50 yards from LOS to the top.
+        // The offense field now displays exactly 30 yards from LOS to the top.
         rep.catchDepthYards = clamp(
             (OFFENSE_LOS_Y - rep.ball.target.y) / OFFENSE_PIXELS_PER_YARD,
             0,
@@ -1331,7 +1328,7 @@
         ctx.font = "bold 16px Arial";
         ctx.textAlign = "left";
 
-        // 0-40 yards stretched over the full vertical practice area.
+        // 0-30 yards stretched over the full vertical practice area.
         // Madden's catch-meter starting behavior changes in roughly 5-yard
         // bands, so show every 5 yards. Ten-yard lines are slightly stronger.
         for (let yards = 0; yards <= OFFENSE_FIELD_YARDS; yards += 5) {
@@ -1574,7 +1571,7 @@
             ? Math.max(0, performance.now() - rep.throwHeldAt)
             : rep.throwHoldMs;
 
-        const progress = clamp(heldMs / 900, 0, 1);
+        const progress = clamp(heldMs / THROW_METER_DURATION_MS, 0, 1);
         const width = 150;
         const height = 12;
         const x = clamp(rep.receiver.x - width / 2, 20, canvas.width - width - 20);
@@ -1618,7 +1615,7 @@
         ctx.fillText("TOUCH", x + lobWidth + touchWidth / 2, y - 8);
         ctx.fillText("BULLET", x + lobWidth + touchWidth + bulletWidth / 2, y - 8);
 
-        const passType = heldMs < 180 ? "LOB" : heldMs < 550 ? "TOUCH" : "BULLET";
+        const passType = heldMs < LOB_MAX_HOLD_MS ? "LOB" : heldMs < TOUCH_MAX_HOLD_MS ? "TOUCH" : "BULLET";
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 11px Arial";
         ctx.fillText(passType, x + width / 2, y + 28);
