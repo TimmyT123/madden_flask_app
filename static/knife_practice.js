@@ -466,8 +466,8 @@ function updateInput(deltaMs) {
     r1Status.textContent = r1Pressed ? "R1: pressed" : (knifeIsReady ? "R1: ready" : "R1: recovering");
     r1Status.classList.toggle("active", r1Pressed);
 
-    // Throw immediately on the R1 down-edge: the instant the button is depressed.
-    if (!lastR1Pressed && r1Pressed) {
+    // Throw only when R1 transitions from pressed to released.
+    if (lastR1Pressed && !r1Pressed) {
         throwKnife();
     }
 
