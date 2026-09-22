@@ -1,6 +1,6 @@
-// VERSION 13: X-to-hike snap, 30-yard field, slightly faster receiver and throw meter
-// VERIFIED SIDE-LEVERAGE VERSION: defender matches receiver speed; safe lead is opposite coverage
-// VERIFIED LOWER-THROW VERSION: meter + Infinite + back-shoulder aiming
+// VERSION 14: selectable pre-snap routes + adjustable cut depth + ball-spot catch grading
+// Catch success now requires BOTH: release in the green timing zone AND receiver inside the ball spot.
+// Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
     "use strict";
 
@@ -71,6 +71,9 @@
     const LOB_MAX_HOLD_MS = 165;
     const TOUCH_MAX_HOLD_MS = 500;
     const CATCH_METER_MIN_STORAGE_KEY = "wurdCatchMeterMinYards";
+    const ROUTE_TYPE_STORAGE_KEY = "wurdCatchRouteType";
+    const ROUTE_CUT_STORAGE_KEY = "wurdCatchRouteCutYards";
+    const BALL_SPOT_RADIUS = 30;
 
     const DIFFICULTIES = {
         rookie: {
@@ -158,7 +161,9 @@
         psHomeDown: false,
         flash: null,
         paused: false,
-        pauseStartedAt: 0
+        pauseStartedAt: 0,
+        routeType: "out",
+        routeCutYards: 10
     };
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -174,6 +179,103 @@
 
     function currentDifficulty() {
         return DIFFICULTIES[state.difficultyKey];
+    }
+
+    function ensureOffenseRouteControls() {
+        if (document.getElementById("wurdRouteControls")) return;
+
+        const host = ui.start?.parentElement || canvas?.parentElement;
+        if (!host) return;
+
+        const wrapper = document.createElement("div");
+        wrapper.id = "wurdRouteControls";
+        wrapper.style.cssText = [
+            "display:flex",
+            "gap:12px",
+            "align-items:center",
+            "flex-wrap:wrap",
+            "margin:10px 0",
+            "padding:10px 12px",
+            "border:1px solid rgba(255,255,255,.18)",
+            "border-radius:10px",
+            "background:rgba(8,15,22,.72)",
+            "color:#fff"
+        ].join(";");
+
+        wrapper.innerHTML = `
+            <label style="font-weight:700">Route
+                <select id="wurdRouteType" style="margin-left:6px;padding:5px 8px">
+                    <option value="go">Go</option>
+                    <option value="out" selected>Out</option>
+                    <option value="in">In</option>
+                    <option value="dig">Dig</option>
+                    <option value="post">Post</option>
+                    <option value="corner">Corner</option>
+                </select>
+            </label>
+            <label style="font-weight:700">Cut at
+                <input id="wurdRouteCut" type="range" min="3" max="20" step="1" value="10" style="vertical-align:middle;margin:0 6px">
+                <span id="wurdRouteCutValue">10 yds</span>
+            </label>
+            <span id="wurdRouteHint" style="opacity:.8;font-size:13px">Choose before hiking.</span>
+        `;
+
+        host.insertBefore(wrapper, ui.start || host.firstChild);
+
+        const routeSelect = wrapper.querySelector("#wurdRouteType");
+        const cutSlider = wrapper.querySelector("#wurdRouteCut");
+        const cutValue = wrapper.querySelector("#wurdRouteCutValue");
+
+        try {
+            const savedRoute = localStorage.getItem(ROUTE_TYPE_STORAGE_KEY);
+            if (["go", "out", "in", "dig", "post", "corner"].includes(savedRoute)) {
+                routeSelect.value = savedRoute;
+            }
+            const savedCut = Number(localStorage.getItem(ROUTE_CUT_STORAGE_KEY));
+            if (Number.isFinite(savedCut) && savedCut >= 3 && savedCut <= 20) {
+                cutSlider.value = String(savedCut);
+            }
+        } catch (error) {}
+
+        const sync = () => {
+            state.routeType = routeSelect.value;
+            state.routeCutYards = Number(cutSlider.value);
+            cutValue.textContent = `${state.routeCutYards} yds`;
+            cutSlider.disabled = state.routeType === "go";
+            cutValue.style.opacity = state.routeType === "go" ? ".45" : "1";
+
+            // Route changes are live until the snap. Once X hikes the ball,
+            // that rep's route is locked so the play cannot change underneath it.
+            if (state.rep?.kind === "offense" && !state.rep.snapped && !state.rep.thrown) {
+                state.rep.routeType = state.routeType;
+                state.rep.routeCutYards = state.routeCutYards;
+                state.rep.receiver.routeType = state.routeType;
+                state.rep.receiver.cutYards = state.routeCutYards;
+                state.rep.receiver.cutMade = false;
+                state.rep.receiver.vx = 0;
+                state.rep.receiver.vy = -currentDifficulty().routeSpeed;
+                const cutText = state.routeType === "go" ? "" : ` • cut at ${state.routeCutYards} yds`;
+                setInstruction(`${state.routeType.toUpperCase()}${cutText}. Press X to hike the ball.`);
+            }
+
+            try {
+                localStorage.setItem(ROUTE_TYPE_STORAGE_KEY, state.routeType);
+                localStorage.setItem(ROUTE_CUT_STORAGE_KEY, String(state.routeCutYards));
+            } catch (error) {}
+        };
+
+        routeSelect.addEventListener("change", sync);
+        cutSlider.addEventListener("input", sync);
+        sync();
+    }
+
+    function selectedRouteSettings() {
+        const routeSelect = document.getElementById("wurdRouteType");
+        const cutSlider = document.getElementById("wurdRouteCut");
+        return {
+            type: routeSelect?.value || state.routeType || "out",
+            cutYards: Number(cutSlider?.value || state.routeCutYards || 10)
+        };
     }
 
     function setInstruction(text) {
@@ -270,7 +372,9 @@
 
         if (state.mode === "offense") {
             state.rep = createOffenseRep();
-            setInstruction("Press X to hike the ball.");
+            const routeName = state.rep.routeType.toUpperCase();
+            const cutText = state.rep.routeType === "go" ? "" : ` • cut at ${state.rep.routeCutYards} yds`;
+            setInstruction(`${routeName}${cutText}. Press X to hike the ball.`);
         } else {
             state.rep = createDefenseRep();
             setInstruction("Read the pass. Press Circle to click on at the right time.");
@@ -294,22 +398,21 @@
     }
 
     function createOffenseRep() {
-        const routeType = randomChoice(["go", "slantLeft", "slantRight", "outLeft", "outRight"]);
+        const route = selectedRouteSettings();
+        const receiverX = randomRange(300, 700);
         const receiver = {
-            x: randomRange(300, 700),
+            x: receiverX,
             y: OFFENSE_LOS_Y,
+            startX: receiverX,
+            startY: OFFENSE_LOS_Y,
             vx: 0,
             vy: -currentDifficulty().routeSpeed,
-            radius: 18
+            radius: 18,
+            routeType: route.type,
+            cutYards: route.cutYards,
+            cutMade: false
         };
 
-        if (routeType === "slantLeft") receiver.vx = -34;
-        if (routeType === "slantRight") receiver.vx = 34;
-        if (routeType === "outLeft") receiver.vx = -53;
-        if (routeType === "outRight") receiver.vx = 53;
-
-        // The defender is always aligned on one side of the receiver and runs
-        // the exact same route speed. The open side becomes the safe lead side.
         const leverage = randomChoice(["left", "right"]);
         const coverageOffset = 46;
         const defender = {
@@ -320,24 +423,18 @@
             radius: 18
         };
 
-        const catchType = randomChoice([
-            { button: "X", name: "Possession" },
-            { button: "SQUARE", name: "RAC" },
-            { button: "TRIANGLE", name: "Aggressive" }
-        ]);
-
         return {
             kind: "offense",
-            routeType,
+            routeType: route.type,
+            routeCutYards: route.cutYards,
             leverage,
             qb: { x: 500, y: 578 },
             receiver,
             defender,
             ball: null,
             reticle: { x: receiver.x, y: receiver.y - 12.5 * OFFENSE_PIXELS_PER_YARD },
-            safePoint: { x: receiver.x, y: receiver.y - 12.5 * OFFENSE_PIXELS_PER_YARD },
             throwButton: randomChoice(THROW_BUTTONS),
-            catchType,
+            catchType: { button: null, name: "User Catch" },
             throwHolding: false,
             throwHeldAt: null,
             throwHoldMs: 0,
@@ -622,7 +719,7 @@
                 if (pressed(input, "X")) {
                     rep.snapped = true;
                     setInstruction(
-                        `Defender is on the ${rep.leverage}. Hold ${BUTTON_LABELS[rep.throwButton]} and lead to the open side.`
+                        `${rep.routeType.toUpperCase()} route. Hold ${BUTTON_LABELS[rep.throwButton]} to throw, then steer the receiver into the ball spot.`
                     );
                     setTiming("Ball hiked.", "good");
                     beep(420, 0.04);
@@ -630,19 +727,13 @@
                 return;
             }
 
-            moveAutoRoute(rep.receiver, dt);
+            moveOffenseRoute(rep, dt);
             moveCoverageDefender(rep);
 
             const projectedReceiver = {
                 x: rep.receiver.x + rep.receiver.vx * 1.35,
                 y: rep.receiver.y + rep.receiver.vy * 1.35
             };
-
-            // If the defender is on the receiver's left, the open side is
-            // right. If the defender is on the right, the open side is left.
-            const openSide = rep.leverage === "left" ? 1 : -1;
-            rep.safePoint.x = clamp(projectedReceiver.x + openSide * 105, 95, 905);
-            rep.safePoint.y = clamp(projectedReceiver.y + 4, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
 
             rep.reticle.x = clamp(projectedReceiver.x + input.axisX * 150, 65, 935);
 
@@ -795,8 +886,9 @@
 
     function throwOffensePass(rep) {
         rep.thrown = true;
-        const distToSafe = distance(rep.reticle, rep.safePoint);
-        rep.placementPoints = Math.round(clamp(1 - distToSafe / 190, 0, 1) * 40);
+        // There is no separate safe-lead target anymore. The throw creates the
+        // ball spot, and the receiver must physically reach that spot to catch it.
+        rep.placementPoints = 0;
 
         const dist = distance(rep.qb, rep.reticle);
         const profile = getPassProfile(rep.throwHoldMs, currentDifficulty());
@@ -833,24 +925,18 @@
         // Madden 27 gives the user receiver control immediately after the throw.
         rep.switched = true;
 
-        if (rep.placementPoints >= 32) {
-            setTiming(`${profile.timingText} Good placement.`, "good");
-        } else if (rep.placementPoints >= 20) {
-            setTiming(`${profile.timingText} Catchable, but lead farther from coverage.`, "warn");
-        } else {
-            setTiming(`${profile.timingText} Throw is too close to the defender.`, "bad");
-        }
+        setTiming(`${profile.timingText} Get the receiver into the BALL SPOT.`, "good");
         if (!rep.catchMeterEnabled) {
             setInstruction(
-                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Timing meter begins at ${state.catchMeterMinYards} yards.`
+                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer into the BALL SPOT and use X, Square, or Triangle to catch.`
             );
         } else if (rep.catchDepthYards < 10) {
             setInstruction(
-                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer to the ball spot. ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Short catch: TAP / release immediately in green.`
+                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Get inside the BALL SPOT. Press a catch button and release it in green.`
             );
         } else {
             setInstruction(
-                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer to the ball spot. Hold ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}; release when the distance-based meter reaches green.`
+                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Get inside the BALL SPOT and release your catch button when the meter reaches green.`
             );
         }
         beep(520, 0.05);
@@ -924,6 +1010,10 @@
         rep.catchHeldAt = now;
         rep.catchHoldMs = 0;
         rep.catchButtonHeld = buttonName;
+        rep.catchType = {
+            button: buttonName,
+            name: buttonName === "X" ? "Possession" : buttonName === "SQUARE" ? "RAC" : "Aggressive"
+        };
 
         // Below the selected minimum distance, Madden does not display
         // timing-based catching. The catch type still matters, but there is no meter.
@@ -931,12 +1021,7 @@
             rep.catchMeterLocked = true;
             rep.catchHolding = false;
             rep.catchTimingPoints = 25;
-            setTiming(
-                buttonName === rep.catchType.button
-                    ? `No catch meter inside 5 yards — ${BUTTON_LABELS[buttonName]} registered.`
-                    : `No catch meter inside 5 yards, but use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}.`,
-                buttonName === rep.catchType.button ? "good" : "warn"
-            );
+            setTiming(`No catch meter at this depth — ${BUTTON_LABELS[buttonName]} registered. Reach the BALL SPOT.`, "good");
             return;
         }
 
@@ -945,19 +1030,12 @@
             startProgress >= currentDifficulty().catchSweetStart &&
             startProgress <= currentDifficulty().catchSweetEnd;
 
-        if (buttonName === rep.catchType.button) {
-            setTiming(
-                startsGreen
-                    ? `Catch meter opened GREEN — release ${BUTTON_LABELS[buttonName]} NOW.`
-                    : `Catch meter started — release ${BUTTON_LABELS[buttonName]} in the green.`,
-                "good"
-            );
-        } else {
-            setTiming(
-                `Catch meter started, but ${BUTTON_LABELS[rep.catchType.button]} is the requested ${rep.catchType.name} catch.`,
-                "warn"
-            );
-        }
+        setTiming(
+            startsGreen
+                ? `Catch meter opened GREEN — release ${BUTTON_LABELS[buttonName]} NOW.`
+                : `Catch meter started — release ${BUTTON_LABELS[buttonName]} in the green.`,
+            "good"
+        );
 
         vibrate(28, 0.14);
     }
@@ -982,21 +1060,12 @@
             currentDifficulty()
         );
 
-        if (rep.catchButtonHeld === rep.catchType.button) {
-            if (rep.catchTimingPoints >= 22) {
-                setTiming("Catch meter stopped: PERFECT.", "good");
-            } else if (rep.catchTimingPoints >= 15) {
-                setTiming("Catch meter stopped: GOOD.", "good");
-            } else if (rep.catchTimingPoints >= 8) {
-                setTiming("Catch meter stopped: marginal timing.", "warn");
-            } else {
-                setTiming("Catch meter stopped outside the green.", "bad");
-            }
+        if (rep.catchTimingPoints >= 22) {
+            setTiming("Catch meter stopped: GREEN.", "good");
+        } else if (rep.catchTimingPoints >= 15) {
+            setTiming("Catch meter stopped near green.", "warn");
         } else {
-            setTiming(
-                `Meter stopped, but wrong catch type — use ${BUTTON_LABELS[rep.catchType.button]} (${rep.catchType.name}).`,
-                "bad"
-            );
+            setTiming("Catch meter stopped outside the green.", "bad");
         }
 
         vibrate(38, 0.20);
@@ -1029,39 +1098,30 @@
         rep.catchAttemptAt = rep.ball.progress;
 
         const difficulty = currentDifficulty();
-        const ballDistance = distance(rep.receiver, rep.ball);
-        const catchRadius = difficulty.catchRadius;
-        const movementQuality = clamp(1 - ballDistance / catchRadius, 0, 1);
+        const ballSpotDistance = distance(rep.receiver, rep.ball.target);
+        const inBallSpot = ballSpotDistance <= BALL_SPOT_RADIUS;
+        const releaseProgress = currentCatchMeterProgress(rep);
 
-        // catchTimingPoints was frozen when the catch button was released.
-        rep.movementPoints = Math.round(movementQuality * 15);
+        // The two offensive catch requirements are intentionally simple:
+        // 1) catch-button release must be inside the green timing window, and
+        // 2) the receiver must be physically inside the visible ball-spot circle.
+        const inGreen = !rep.catchMeterEnabled || (
+            releaseProgress >= difficulty.catchSweetStart &&
+            releaseProgress <= difficulty.catchSweetEnd
+        );
 
-        const correctCatch = buttonName === rep.catchType.button;
-        rep.catchPoints = correctCatch ? 20 : 0;
+        rep.movementPoints = Math.round(clamp(1 - ballSpotDistance / BALL_SPOT_RADIUS, 0, 1) * 35);
+        rep.catchPoints = inGreen && inBallSpot ? 40 : 0;
+        const success = inGreen && inBallSpot;
 
-        const inCatchRadius = ballDistance <= catchRadius;
-        const success =
-            correctCatch &&
-            inCatchRadius &&
-            rep.placementPoints >= 16 &&
-            rep.catchTimingPoints >= 8 &&
-            rep.movementPoints >= 5;
-
-        if (!correctCatch) {
-            rep.resultReason = `Wrong catch type—use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
-        } else if (!inCatchRadius) {
-            rep.resultReason = "Catch timing registered, but you were not close enough to the ball";
-        } else if (rep.catchTimingPoints >= 22) {
-            rep.resultReason = `Perfect ${rep.catchType.name} timing`;
-        } else if (rep.catchTimingPoints >= 15) {
-            rep.resultReason = `Good ${rep.catchType.name} timing`;
-        } else if (rep.catchTimingPoints >= 8) {
-            rep.resultReason = `${rep.catchType.name} catch—timing was marginal`;
+        if (!inGreen && !inBallSpot) {
+            rep.resultReason = "Missed: catch timing was outside green and receiver missed the ball spot";
+        } else if (!inGreen) {
+            rep.resultReason = "Missed: receiver reached the ball spot, but catch timing was outside green";
+        } else if (!inBallSpot) {
+            rep.resultReason = "Missed: catch timing was green, but receiver was outside the ball spot";
         } else {
-            const releaseProgress = currentCatchMeterProgress(rep);
-            rep.resultReason = releaseProgress < difficulty.catchSweetStart
-                ? "Released the catch button too early"
-                : "Released the catch button too late";
+            rep.resultReason = `${rep.catchType.name} catch: GREEN timing + receiver in BALL SPOT`;
         }
 
         finishRep(success);
@@ -1191,7 +1251,7 @@
 
         const rep = state.rep;
         const repScore = rep.kind === "offense"
-            ? rep.placementPoints + rep.catchTimingPoints + rep.movementPoints + rep.catchPoints
+            ? rep.catchTimingPoints + rep.movementPoints + rep.catchPoints
             : rep.switchPoints + rep.movementPoints + rep.catchPoints;
 
         state.totalScore += repScore;
@@ -1213,7 +1273,7 @@
 
         if (rep.kind === "offense") {
             setFeedback(
-                feedbackPlacement(rep.placementPoints),
+                `${rep.routeType.toUpperCase()} @ ${rep.routeCutYards}yd`,
                 feedbackCatchTiming(rep.catchTimingPoints),
                 feedbackMovement(rep.movementPoints),
                 feedbackCatch(rep.catchPoints)
@@ -1267,6 +1327,36 @@
         if (ratio >= 0.95) return defense ? "Interception" : "Correct catch";
         if (ratio >= 0.45) return "Wrong catch type";
         return "Missed";
+    }
+
+    function moveOffenseRoute(rep, dt) {
+        const receiver = rep.receiver;
+        const speed = currentDifficulty().routeSpeed;
+        const depthYards = (receiver.startY - receiver.y) / OFFENSE_PIXELS_PER_YARD;
+
+        if (!receiver.cutMade && receiver.routeType !== "go" && depthYards >= receiver.cutYards) {
+            receiver.cutMade = true;
+
+            const towardSideline = receiver.startX < canvas.width / 2 ? -1 : 1;
+            const towardMiddle = -towardSideline;
+
+            if (receiver.routeType === "out") {
+                receiver.vx = towardSideline * speed;
+                receiver.vy = 0;
+            } else if (receiver.routeType === "in" || receiver.routeType === "dig") {
+                receiver.vx = towardMiddle * speed;
+                receiver.vy = 0;
+            } else if (receiver.routeType === "post") {
+                receiver.vx = towardMiddle * speed * 0.72;
+                receiver.vy = -speed * 0.70;
+            } else if (receiver.routeType === "corner") {
+                receiver.vx = towardSideline * speed * 0.72;
+                receiver.vy = -speed * 0.70;
+            }
+        }
+
+        receiver.x = clamp(receiver.x + receiver.vx * dt, 38, 962);
+        receiver.y = clamp(receiver.y + receiver.vy * dt, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
     }
 
     function moveAutoRoute(player, dt) {
@@ -1386,7 +1476,7 @@
 
     function drawOffense(rep) {
         if (!rep.thrown) {
-            drawGuide(rep);
+            if (!rep.snapped) drawRoutePreview(rep);
             drawReticle(rep.reticle, "#ffd166");
         }
 
@@ -1409,13 +1499,15 @@
         }
 
         if (rep.thrown) {
-            drawCatchPrompt(rep.receiver, rep.catchType.button);
+            if (rep.catchMeterStarted && rep.catchType.button) {
+                drawCatchPrompt(rep.receiver, rep.catchType.button);
+            }
             if (rep.catchMeterStarted) {
                 drawCatchMeter(rep);
             }
         }
 
-        drawMiniLegend("M27: auto receiver control", `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name}`);
+        drawMiniLegend("M27: auto receiver control", rep.catchMeterStarted ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name}` : "Reach BALL SPOT + release in GREEN");
     }
 
     function drawDefense(rep) {
@@ -1441,28 +1533,51 @@
         drawMiniLegend("Circle = click on", "Triangle = intercept");
     }
 
-    function drawGuide(rep) {
-        const strength = currentDifficulty().guideStrength;
-        if (strength <= 0) return;
+    function drawRoutePreview(rep) {
+        const r = rep.receiver;
+        const cutY = r.startY - r.cutYards * OFFENSE_PIXELS_PER_YARD;
+        const towardSideline = r.startX < canvas.width / 2 ? -1 : 1;
+        const towardMiddle = -towardSideline;
 
         ctx.save();
-        ctx.globalAlpha = strength * 0.42;
-        ctx.fillStyle = "#26d07c";
+        ctx.strokeStyle = "rgba(92,168,255,.72)";
+        ctx.lineWidth = 4;
+        ctx.setLineDash([9, 8]);
         ctx.beginPath();
-        ctx.arc(rep.safePoint.x, rep.safePoint.y, 52, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(r.startX, r.startY);
 
-        ctx.globalAlpha = strength;
-        ctx.strokeStyle = "#7bf0b2";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(rep.safePoint.x, rep.safePoint.y, 52, 0, Math.PI * 2);
+        if (r.routeType === "go") {
+            ctx.lineTo(r.startX, OFFENSE_FIELD_TOP_Y + 10);
+        } else {
+            ctx.lineTo(r.startX, cutY);
+            let endX = r.startX;
+            let endY = cutY;
+            if (r.routeType === "out") {
+                endX += towardSideline * 180;
+            } else if (r.routeType === "in" || r.routeType === "dig") {
+                endX += towardMiddle * 180;
+            } else if (r.routeType === "post") {
+                endX += towardMiddle * 150;
+                endY -= 150;
+            } else if (r.routeType === "corner") {
+                endX += towardSideline * 150;
+                endY -= 150;
+            }
+            ctx.lineTo(clamp(endX, 45, 955), clamp(endY, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y));
+        }
         ctx.stroke();
+        ctx.setLineDash([]);
 
-        ctx.fillStyle = "#d9ffea";
-        ctx.font = "bold 17px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("SAFE LEAD", rep.safePoint.x, rep.safePoint.y - 62);
+        if (r.routeType !== "go") {
+            ctx.fillStyle = "#ffd166";
+            ctx.beginPath();
+            ctx.arc(r.startX, cutY, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#fff6cc";
+            ctx.font = "bold 13px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(`CUT ${r.cutYards} YDS`, r.startX, cutY - 13);
+        }
         ctx.restore();
     }
 
@@ -1540,15 +1655,15 @@
         ctx.fillStyle = "rgba(255, 209, 102, 0.18)";
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(point.x, point.y, 22, 0, Math.PI * 2);
+        ctx.arc(point.x, point.y, BALL_SPOT_RADIUS, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.moveTo(point.x - 28, point.y);
-        ctx.lineTo(point.x + 28, point.y);
-        ctx.moveTo(point.x, point.y - 28);
-        ctx.lineTo(point.x, point.y + 28);
+        ctx.moveTo(point.x - BALL_SPOT_RADIUS - 6, point.y);
+        ctx.lineTo(point.x + BALL_SPOT_RADIUS + 6, point.y);
+        ctx.moveTo(point.x, point.y - BALL_SPOT_RADIUS - 6);
+        ctx.lineTo(point.x, point.y + BALL_SPOT_RADIUS + 6);
         ctx.stroke();
 
         ctx.fillStyle = "#fff6cc";
@@ -1798,6 +1913,7 @@
         }
     }
 
+    ensureOffenseRouteControls();
     loadCatchMeterMinimumSetting();
     ui.catchMeterMin?.addEventListener("change", saveCatchMeterMinimumSetting);
 
