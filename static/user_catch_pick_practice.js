@@ -41,6 +41,7 @@
         TRIANGLE: 3,
         L1: 4,
         R1: 5,
+        L2: 6,
         DPAD_LEFT: 14,
         DPAD_RIGHT: 15
     };
@@ -81,7 +82,7 @@
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 42,
+            routeSpeed: 45,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 870,
@@ -96,7 +97,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 48,
+            routeSpeed: 52,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 675,
@@ -111,7 +112,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 60,
+            routeSpeed: 65,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 565,
@@ -126,7 +127,7 @@
         allMadden: {
             label: "All-Madden",
             ballSpeed: 585,
-            routeSpeed: 55,
+            routeSpeed: 59,
             steerSpeed: 248,
             catchRadius: 36,
             catchMeterDuration: 490,
@@ -427,6 +428,9 @@
             throwHolding: false,
             throwHeldAt: null,
             throwHoldMs: 0,
+            precisionLeadActive: false,
+            precisionLeadX: 0,
+            precisionLeadY: 0,
             passType: "lob",
             thrown: false,
             switched: false,
@@ -736,31 +740,48 @@
             moveOffenseRoute(rep, dt);
             moveCoverageDefender(rep);
 
-            // Left stick controls QB movement only.
-            rep.qb.x = clamp(
-                rep.qb.x + input.axisX * difficulty.steerSpeed * dt,
-                55,
-                945
-            );
-            rep.qb.y = clamp(
-                rep.qb.y + input.axisY * difficulty.steerSpeed * dt,
-                OFFENSE_LOS_Y + 10,
-                canvas.height - 18
-            );
+            const l2Held = input.down.has(BUTTONS.L2);
+
+            // Normally the left stick moves the QB. While L2 is held during the
+            // throw, the same stick becomes precision lead input instead.
+            if (!(rep.throwHolding && l2Held)) {
+                rep.qb.x = clamp(
+                    rep.qb.x + input.axisX * difficulty.steerSpeed * dt,
+                    55,
+                    945
+                );
+                rep.qb.y = clamp(
+                    rep.qb.y + input.axisY * difficulty.steerSpeed * dt,
+                    OFFENSE_LOS_Y + 10,
+                    canvas.height - 18
+                );
+            }
 
             // Manual throw meter: press/hold the receiver button, then release.
             if (pressed(input, rep.throwButton)) {
                 rep.throwHolding = true;
                 rep.throwHeldAt = now;
                 rep.throwHoldMs = 0;
+                rep.precisionLeadActive = l2Held;
+                rep.precisionLeadX = l2Held ? input.axisX : 0;
+                rep.precisionLeadY = l2Held ? input.axisY : 0;
+
                 setTiming(
-                    `Hold ${BUTTON_LABELS[rep.throwButton]} for throw power, then release.`,
+                    l2Held
+                        ? `L2 precision lead: use left stick while holding ${BUTTON_LABELS[rep.throwButton]}, then release to throw.`
+                        : `Hold ${BUTTON_LABELS[rep.throwButton]} for throw power, then release.`,
                     "good"
                 );
             }
 
             if (rep.throwHolding && rep.throwHeldAt !== null) {
                 rep.throwHoldMs = Math.max(0, now - rep.throwHeldAt);
+
+                if (l2Held) {
+                    rep.precisionLeadActive = true;
+                    rep.precisionLeadX = input.axisX;
+                    rep.precisionLeadY = input.axisY;
+                }
             }
 
             if (rep.throwHolding && released(input, rep.throwButton)) {
@@ -949,11 +970,22 @@
         );
         projectedCatchPoint = projectReceiverAtArrival(rep, passDuration);
 
+        // L2 precision lead: while the throw meter is being held, left-stick
+        // input offsets the otherwise automatic receiver target.
+        const LEAD_PIXELS = 48;
+        const leadX = rep.precisionLeadActive ? rep.precisionLeadX * LEAD_PIXELS : 0;
+        const leadY = rep.precisionLeadActive ? rep.precisionLeadY * LEAD_PIXELS : 0;
+
+        const passTarget = {
+            x: clamp(projectedCatchPoint.x + leadX, 38, 962),
+            y: clamp(projectedCatchPoint.y + leadY, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y)
+        };
+
         rep.placementPoints = 40;
 
         rep.ball = {
             start: { ...rep.qb },
-            target: { ...projectedCatchPoint },
+            target: { ...passTarget },
             x: rep.qb.x,
             y: rep.qb.y,
             progress: 0,
@@ -986,7 +1018,12 @@
             );
         }
 
-        setTiming(`${profile.timingText} Pass aimed automatically at receiver.`, "good");
+        setTiming(
+            rep.precisionLeadActive
+                ? `${profile.timingText} L2 precision lead applied.`
+                : `${profile.timingText} Pass aimed automatically at receiver.`,
+            "good"
+        );
         beep(520, 0.05);
     }
 
@@ -1556,7 +1593,7 @@
             "Receiver runs automatically",
             rep.thrown
                 ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • release in GREEN`
-                : "Left stick = QB movement • throw meter controls pass • aim is automatic"
+                : "Left stick = QB movement • L2 + stick while throwing = precision lead"
         );
     }
 
