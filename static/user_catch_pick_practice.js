@@ -73,6 +73,8 @@
     const LOB_MAX_HOLD_MS = 165;
     const TOUCH_MAX_HOLD_MS = 500;
     const CATCH_METER_MIN_STORAGE_KEY = "wurdCatchMeterMinYards";
+    const AUTO_THROW_MIN_MS = 900;
+    const AUTO_THROW_MAX_MS = 1800;
     const ROUTE_TYPE_STORAGE_KEY = "wurdCatchRouteType";
     const ROUTE_CUT_STORAGE_KEY = "wurdCatchRouteCutYards";
     const OFFENSE_ROUTE_TYPES = ["go", "out", "in", "dig", "post", "corner"];
@@ -418,7 +420,6 @@
             receiver,
             defender,
             ball: null,
-            reticle: { x: receiver.x, y: receiver.y - 12.5 * OFFENSE_PIXELS_PER_YARD },
             throwButton: randomChoice(THROW_BUTTONS),
             catchType: randomChoice([
                 { button: "X", name: "Possession" },
@@ -451,7 +452,9 @@
             catchAttemptAt: null,
             resultReason: "",
             startedAt: performance.now(),
-            snapped: false
+            snapped: false,
+            snappedAt: null,
+            autoThrowAt: null
         };
     }
 
@@ -702,14 +705,8 @@
         const difficulty = currentDifficulty();
 
         if (!rep.thrown) {
-            // Match Madden's flow: X hikes the ball and starts the route.
-            // Return on the hike frame so the same X press can never also
-            // count as a receiver throw input.
+            // Pre-snap route editor remains on the controller.
             if (!rep.snapped) {
-                // PS5 pre-snap route editor:
-                // L1 / R1 cycles routes.
-                // D-pad Left / Right changes the cut depth.
-                // X locks the shown route and hikes the ball.
                 if (pressed(input, "L1")) {
                     cyclePreSnapRoute(rep, -1);
                 }
@@ -728,8 +725,10 @@
 
                 if (pressed(input, "X")) {
                     rep.snapped = true;
+                    rep.snappedAt = now;
+                    rep.autoThrowAt = now + randomRange(AUTO_THROW_MIN_MS, AUTO_THROW_MAX_MS);
                     setInstruction(
-                        `${rep.routeType.toUpperCase()} route. Hold ${BUTTON_LABELS[rep.throwButton]} to throw. Receiver runs automatically.`
+                        `${rep.routeType.toUpperCase()} route. Move the QB with the left stick. The pass will be thrown automatically.`
                     );
                     setTiming("Ball hiked.", "good");
                     beep(420, 0.04);
@@ -737,64 +736,36 @@
                 return;
             }
 
+            // After the snap, the receiver and defender run automatically.
             moveOffenseRoute(rep, dt);
             moveCoverageDefender(rep);
 
-            const projectedReceiver = {
-                x: rep.receiver.x + rep.receiver.vx * 1.35,
-                y: rep.receiver.y + rep.receiver.vy * 1.35
-            };
-
-            rep.reticle.x = clamp(projectedReceiver.x + input.axisX * 150, 65, 935);
-
-            // Give the stick more range downward than upward. This lets the
-            // quarterback place the ball behind/below the receiver when the
-            // defender is playing over the top.
-            const verticalAimRange = input.axisY >= 0 ? 225 : 125;
-            rep.reticle.y = clamp(
-                projectedReceiver.y + input.axisY * verticalAimRange,
-                OFFENSE_FIELD_TOP_Y,
-                OFFENSE_LOS_Y
+            // Until the pass arrives/catch occurs, left stick controls only the QB.
+            rep.qb.x = clamp(
+                rep.qb.x + input.axisX * difficulty.steerSpeed * dt,
+                55,
+                945
+            );
+            rep.qb.y = clamp(
+                rep.qb.y + input.axisY * difficulty.steerSpeed * dt,
+                OFFENSE_LOS_Y + 10,
+                canvas.height - 18
             );
 
-            if (pressed(input, rep.throwButton)) {
-                rep.throwHolding = true;
-                rep.throwHeldAt = now;
-                rep.throwHoldMs = 0;
-                setTiming(
-                    `Keep aiming—release ${BUTTON_LABELS[rep.throwButton]} to throw.`,
-                    "good"
-                );
-            }
-
-            if (rep.throwHolding && rep.throwHeldAt !== null) {
-                rep.throwHoldMs = Math.max(0, now - rep.throwHeldAt);
-            }
-
-            if (rep.throwHolding && released(input, rep.throwButton)) {
-                rep.throwHoldMs = Math.max(
-                    0,
-                    now - (rep.throwHeldAt || now)
-                );
-                rep.throwHolding = false;
-                throwOffensePass(rep);
+            // Automatic throw: choose a catchable point based on where the
+            // auto-running receiver will be when the football arrives.
+            if (rep.autoThrowAt !== null && now >= rep.autoThrowAt) {
+                throwAutomaticOffensePass(rep);
                 return;
             }
 
-            for (const name of THROW_BUTTONS) {
-                if (name !== rep.throwButton && pressed(input, name)) {
-                    setTiming(`Wrong receiver button. Use ${BUTTON_LABELS[rep.throwButton]}.`, "bad");
-                    vibrate(80, 0.35);
-                }
-            }
             return;
         }
 
         updateBall(rep.ball, dt);
 
-        // The receiver is NOT user-controlled in this drill.
-        // Keep the selected route running automatically after the throw while
-        // the defender maintains the same leverage relationship.
+        // The receiver remains automatic after the throw.
+        // We intentionally do not practice receiver steering here.
         moveOffenseRoute(rep, dt);
         moveCoverageDefender(rep);
 
@@ -936,23 +907,43 @@
         return { x: sim.x, y: sim.y };
     }
 
-    function throwOffensePass(rep) {
-        rep.thrown = true;
-        const dist = distance(rep.qb, rep.reticle);
-        const profile = getPassProfile(rep.throwHoldMs, currentDifficulty());
-        rep.passType = profile.type;
-        const passDuration = (dist / currentDifficulty().ballSpeed) * profile.durationFactor;
+    function throwAutomaticOffensePass(rep) {
+        if (rep.thrown) return;
 
-        // Grade throw placement against where the auto-running receiver is
-        // projected to be when the pass arrives. There is no visible target
-        // and the receiver does not need to be steered by the user.
-        const projectedCatchPoint = projectReceiverAtArrival(rep, passDuration);
-        const placementDistance = distance(rep.reticle, projectedCatchPoint);
-        rep.placementPoints = Math.round(clamp(1 - placementDistance / 120, 0, 1) * 40);
+        rep.thrown = true;
+
+        // Use a touch-style trajectory for consistent catch practice.
+        const profile = {
+            type: "touch",
+            durationFactor: 1.0,
+            arcHeight: 78,
+            timingText: "Automatic pass — get ready to catch."
+        };
+        rep.passType = profile.type;
+
+        // First estimate the travel time from QB to the receiver's current area.
+        const roughDist = distance(rep.qb, rep.receiver);
+        let passDuration = Math.max(
+            0.35,
+            (roughDist / currentDifficulty().ballSpeed) * profile.durationFactor
+        );
+
+        // Then project the receiver to where he should be when the pass arrives.
+        let projectedCatchPoint = projectReceiverAtArrival(rep, passDuration);
+        const refinedDist = distance(rep.qb, projectedCatchPoint);
+        passDuration = Math.max(
+            0.35,
+            (refinedDist / currentDifficulty().ballSpeed) * profile.durationFactor
+        );
+        projectedCatchPoint = projectReceiverAtArrival(rep, passDuration);
+
+        // No aiming reticle and no visible marker. The pass itself is aimed
+        // automatically at the receiver's projected catch point.
+        rep.placementPoints = 40;
 
         rep.ball = {
             start: { ...rep.qb },
-            target: { ...rep.reticle },
+            target: { ...projectedCatchPoint },
             x: rep.qb.x,
             y: rep.qb.y,
             progress: 0,
@@ -961,33 +952,19 @@
             arcHeight: profile.arcHeight
         };
 
-        // Madden 27 catch timing is keyed to the catch point's depth past the
-        // line of scrimmage, not QB-to-receiver air distance or pass trajectory.
-        // The offense field now displays exactly 30 yards from LOS to the top.
         rep.catchDepthYards = clamp(
             (OFFENSE_LOS_Y - rep.ball.target.y) / OFFENSE_PIXELS_PER_YARD,
             0,
             OFFENSE_FIELD_YARDS
         );
-        // Respect the user's selected Madden minimum-distance setting.
-        // Default is 5 yards. A 0-yard setting enables timing-based catching
-        // even on catches inside 5 yards.
+
         rep.catchMeterEnabled = rep.catchDepthYards >= state.catchMeterMinYards;
         rep.catchMeterStartProgress = getCatchMeterStartProgress(
             rep.catchDepthYards,
             currentDifficulty()
         );
 
-        // Receiver remains automatic after the throw.
         rep.switched = false;
-
-        const placementText = rep.placementPoints >= 28
-            ? "Good throw placement."
-            : rep.placementPoints >= 16
-                ? "Catchable throw."
-                : "Throw placement is off target.";
-
-        setTiming(`${profile.timingText} ${placementText}`, rep.placementPoints >= 16 ? "good" : "bad");
 
         if (!rep.catchMeterEnabled) {
             setInstruction(
@@ -995,9 +972,11 @@
             );
         } else {
             setInstruction(
-                `${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Press, hold, and release in GREEN. Receiver runs automatically.`
+                `${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Press, hold, and release in GREEN.`
             );
         }
+
+        setTiming(profile.timingText, "good");
         beep(520, 0.05);
     }
 
@@ -1167,16 +1146,14 @@
         );
 
         // Offense now has three requirements:
-        // 1) throw placement must be catchable,
+        // 1) automatic pass must be catchable,
         // 2) use the requested catch type, and
         // 3) if the meter is enabled, release inside GREEN.
         rep.movementPoints = 0;
         rep.catchPoints = correctCatch ? 20 : 0;
-        const success = placementGood && correctCatch && inGreen;
+        const success = correctCatch && inGreen;
 
-        if (!placementGood) {
-            rep.resultReason = "Missed: throw placement was off target";
-        } else if (!correctCatch) {
+        if (!correctCatch) {
             rep.resultReason = `Wrong catch type—use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
         } else if (!inGreen) {
             rep.resultReason = "Missed: catch meter was outside GREEN";
@@ -1311,7 +1288,7 @@
 
         const rep = state.rep;
         const repScore = rep.kind === "offense"
-            ? rep.placementPoints + rep.catchTimingPoints + rep.catchPoints
+            ? rep.catchTimingPoints + rep.catchPoints
             : rep.switchPoints + rep.movementPoints + rep.catchPoints;
 
         state.totalScore += repScore;
@@ -1333,7 +1310,7 @@
 
         if (rep.kind === "offense") {
             setFeedback(
-                feedbackPlacement(rep.placementPoints),
+                "Auto pass",
                 feedbackCatchTiming(rep.catchTimingPoints),
                 "Auto route",
                 feedbackCatch(rep.catchPoints)
@@ -1540,7 +1517,6 @@
                 drawRoutePreview(rep);
                 drawPreSnapRoutePanel(rep);
             }
-            drawReticle(rep.reticle, "#ffd166");
         }
 
         drawPlayer(rep.defender, "#f55c69", "D", false);
@@ -1570,7 +1546,7 @@
             "Receiver runs automatically",
             rep.thrown
                 ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • release in GREEN`
-                : "Aim throw with left stick"
+                : "Left stick = QB movement • pass throws automatically"
         );
     }
 
@@ -1742,22 +1718,6 @@
         ctx.restore();
     }
 
-    function drawReticle(point, color) {
-        ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 24, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(point.x - 34, point.y);
-        ctx.lineTo(point.x + 34, point.y);
-        ctx.moveTo(point.x, point.y - 34);
-        ctx.lineTo(point.x, point.y + 34);
-        ctx.stroke();
-        ctx.restore();
-    }
 
 
     function drawThrowMeter(rep) {
