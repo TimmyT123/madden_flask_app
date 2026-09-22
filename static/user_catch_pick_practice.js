@@ -82,7 +82,7 @@
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 45,
+            routeSpeed: 49,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 870,
@@ -97,7 +97,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 52,
+            routeSpeed: 56,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 675,
@@ -112,7 +112,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 65,
+            routeSpeed: 70,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 565,
@@ -127,7 +127,7 @@
         allMadden: {
             label: "All-Madden",
             ballSpeed: 585,
-            routeSpeed: 59,
+            routeSpeed: 64,
             steerSpeed: 248,
             catchRadius: 36,
             catchMeterDuration: 490,
@@ -431,6 +431,8 @@
             precisionLeadActive: false,
             precisionLeadX: 0,
             precisionLeadY: 0,
+            defenderSidePick: false,
+            defenderSidePickReason: "",
             passType: "lob",
             thrown: false,
             switched: false,
@@ -803,6 +805,18 @@
 
         updateBall(rep.ball, dt);
 
+        // A precision throw led to the defender's leverage side is intercepted
+        // as soon as the pass reaches the catch point.
+        if (rep.defenderSidePick && rep.ball.progress >= 1.0 && !rep.catchAttempted) {
+            rep.catchAttempted = true;
+            rep.catchPoints = 0;
+            rep.catchTimingPoints = 0;
+            rep.movementPoints = 0;
+            rep.resultReason = rep.defenderSidePickReason || "Picked off";
+            finishRep(false);
+            return;
+        }
+
         // The receiver remains automatic after the throw.
         // We intentionally do not practice receiver steering here.
         moveOffenseRoute(rep, dt);
@@ -972,7 +986,9 @@
 
         // L2 precision lead: while the throw meter is being held, left-stick
         // input offsets the otherwise automatic receiver target.
-        const LEAD_PIXELS = 48;
+        // Keep precision placement tight to the receiver. This is a small
+        // adjustment, not free-aiming.
+        const LEAD_PIXELS = 24;
         const leadX = rep.precisionLeadActive ? rep.precisionLeadX * LEAD_PIXELS : 0;
         const leadY = rep.precisionLeadActive ? rep.precisionLeadY * LEAD_PIXELS : 0;
 
@@ -980,6 +996,20 @@
             x: clamp(projectedCatchPoint.x + leadX, 38, 962),
             y: clamp(projectedCatchPoint.y + leadY, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y)
         };
+
+        // Defender leverage is locked to one side of the receiver.
+        // If an L2 precision throw is deliberately led toward that side,
+        // treat it as a defensive interception.
+        const defenderSide = rep.leverage === "left" ? -1 : 1;
+        const leadSide = Math.abs(leadX) >= 5 ? Math.sign(leadX) : 0;
+        rep.defenderSidePick =
+            rep.precisionLeadActive &&
+            leadSide !== 0 &&
+            leadSide === defenderSide;
+
+        rep.defenderSidePickReason = rep.defenderSidePick
+            ? `Picked off — L2 lead was thrown toward the defender on the ${rep.leverage}`
+            : "";
 
         rep.placementPoints = 40;
 
@@ -1019,10 +1049,12 @@
         }
 
         setTiming(
-            rep.precisionLeadActive
-                ? `${profile.timingText} L2 precision lead applied.`
-                : `${profile.timingText} Pass aimed automatically at receiver.`,
-            "good"
+            rep.defenderSidePick
+                ? `${profile.timingText} Dangerous lead — defender has inside position.`
+                : rep.precisionLeadActive
+                    ? `${profile.timingText} L2 precision lead applied.`
+                    : `${profile.timingText} Pass aimed automatically at receiver.`,
+            rep.defenderSidePick ? "bad" : "good"
         );
         beep(520, 0.05);
     }
@@ -1593,7 +1625,7 @@
             "Receiver runs automatically",
             rep.thrown
                 ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • release in GREEN`
-                : "Left stick = QB movement • L2 + stick while throwing = precision lead"
+                : "Left stick = QB movement • L2 + stick = tight lead • defender side = PICK"
         );
     }
 
