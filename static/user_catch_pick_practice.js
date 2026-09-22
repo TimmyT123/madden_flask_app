@@ -1,5 +1,5 @@
 // VERSION 14: selectable pre-snap routes + adjustable cut depth + ball-spot catch grading
-// Catch success now requires BOTH: release in the green timing zone AND receiver inside the ball spot.
+// Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
     "use strict";
@@ -76,7 +76,6 @@
     const ROUTE_TYPE_STORAGE_KEY = "wurdCatchRouteType";
     const ROUTE_CUT_STORAGE_KEY = "wurdCatchRouteCutYards";
     const OFFENSE_ROUTE_TYPES = ["go", "out", "in", "dig", "post", "corner"];
-    const BALL_SPOT_RADIUS = 30;
 
     const DIFFICULTIES = {
         rookie: {
@@ -421,7 +420,11 @@
             ball: null,
             reticle: { x: receiver.x, y: receiver.y - 12.5 * OFFENSE_PIXELS_PER_YARD },
             throwButton: randomChoice(THROW_BUTTONS),
-            catchType: { button: null, name: "User Catch" },
+            catchType: randomChoice([
+                { button: "X", name: "Possession" },
+                { button: "SQUARE", name: "RAC" },
+                { button: "TRIANGLE", name: "Aggressive" }
+            ]),
             throwHolding: false,
             throwHeldAt: null,
             throwHoldMs: 0,
@@ -726,7 +729,7 @@
                 if (pressed(input, "X")) {
                     rep.snapped = true;
                     setInstruction(
-                        `${rep.routeType.toUpperCase()} route. Hold ${BUTTON_LABELS[rep.throwButton]} to throw, then steer the receiver into the ball spot.`
+                        `${rep.routeType.toUpperCase()} route. Hold ${BUTTON_LABELS[rep.throwButton]} to throw. Receiver runs automatically.`
                     );
                     setTiming("Ball hiked.", "good");
                     beep(420, 0.04);
@@ -789,19 +792,11 @@
 
         updateBall(rep.ball, dt);
 
-        // Madden 27 offense: control transfers to the receiver automatically.
-        // Circle is no longer required before steering or making the catch.
-        moveAutoRoute(rep.defender, dt);
-        rep.receiver.x = clamp(
-            rep.receiver.x + input.axisX * difficulty.steerSpeed * dt,
-            35,
-            965
-        );
-        rep.receiver.y = clamp(
-            rep.receiver.y + input.axisY * difficulty.steerSpeed * dt,
-            OFFENSE_FIELD_TOP_Y,
-            OFFENSE_LOS_Y
-        );
+        // The receiver is NOT user-controlled in this drill.
+        // Keep the selected route running automatically after the throw while
+        // the defender maintains the same leverage relationship.
+        moveOffenseRoute(rep, dt);
+        moveCoverageDefender(rep);
 
         // Madden 27 catch meter behavior:
         // PRESS a catch button to START the meter.
@@ -891,15 +886,69 @@
         };
     }
 
+    function projectReceiverAtArrival(rep, durationSeconds) {
+        const sim = {
+            x: rep.receiver.x,
+            y: rep.receiver.y,
+            startX: rep.receiver.startX,
+            startY: rep.receiver.startY,
+            vx: rep.receiver.vx,
+            vy: rep.receiver.vy,
+            routeType: rep.receiver.routeType,
+            cutYards: rep.receiver.cutYards,
+            cutMade: rep.receiver.cutMade
+        };
+
+        const speed = currentDifficulty().routeSpeed;
+        let remaining = Math.max(0, durationSeconds);
+        const step = 1 / 120;
+
+        while (remaining > 0) {
+            const dt = Math.min(step, remaining);
+            const depthYards = (sim.startY - sim.y) / OFFENSE_PIXELS_PER_YARD;
+
+            if (!sim.cutMade && sim.routeType !== "go" && depthYards >= sim.cutYards) {
+                sim.cutMade = true;
+
+                const towardSideline = sim.startX < canvas.width / 2 ? -1 : 1;
+                const towardMiddle = -towardSideline;
+
+                if (sim.routeType === "out") {
+                    sim.vx = towardSideline * speed;
+                    sim.vy = 0;
+                } else if (sim.routeType === "in" || sim.routeType === "dig") {
+                    sim.vx = towardMiddle * speed;
+                    sim.vy = 0;
+                } else if (sim.routeType === "post") {
+                    sim.vx = towardMiddle * speed * 0.72;
+                    sim.vy = -speed * 0.70;
+                } else if (sim.routeType === "corner") {
+                    sim.vx = towardSideline * speed * 0.72;
+                    sim.vy = -speed * 0.70;
+                }
+            }
+
+            sim.x = clamp(sim.x + sim.vx * dt, 38, 962);
+            sim.y = clamp(sim.y + sim.vy * dt, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
+            remaining -= dt;
+        }
+
+        return { x: sim.x, y: sim.y };
+    }
+
     function throwOffensePass(rep) {
         rep.thrown = true;
-        // There is no separate safe-lead target anymore. The throw creates the
-        // ball spot, and the receiver must physically reach that spot to catch it.
-        rep.placementPoints = 0;
-
         const dist = distance(rep.qb, rep.reticle);
         const profile = getPassProfile(rep.throwHoldMs, currentDifficulty());
         rep.passType = profile.type;
+        const passDuration = (dist / currentDifficulty().ballSpeed) * profile.durationFactor;
+
+        // Grade throw placement against where the auto-running receiver is
+        // projected to be when the pass arrives. There is no visible target
+        // and the receiver does not need to be steered by the user.
+        const projectedCatchPoint = projectReceiverAtArrival(rep, passDuration);
+        const placementDistance = distance(rep.reticle, projectedCatchPoint);
+        rep.placementPoints = Math.round(clamp(1 - placementDistance / 120, 0, 1) * 40);
 
         rep.ball = {
             start: { ...rep.qb },
@@ -907,7 +956,7 @@
             x: rep.qb.x,
             y: rep.qb.y,
             progress: 0,
-            duration: (dist / currentDifficulty().ballSpeed) * profile.durationFactor,
+            duration: passDuration,
             elapsed: 0,
             arcHeight: profile.arcHeight
         };
@@ -929,21 +978,24 @@
             currentDifficulty()
         );
 
-        // Madden 27 gives the user receiver control immediately after the throw.
-        rep.switched = true;
+        // Receiver remains automatic after the throw.
+        rep.switched = false;
 
-        setTiming(`${profile.timingText} Get the receiver into the BALL SPOT.`, "good");
+        const placementText = rep.placementPoints >= 28
+            ? "Good throw placement."
+            : rep.placementPoints >= 16
+                ? "Catchable throw."
+                : "Throw placement is off target.";
+
+        setTiming(`${profile.timingText} ${placementText}`, rep.placementPoints >= 16 ? "good" : "bad");
+
         if (!rep.catchMeterEnabled) {
             setInstruction(
-                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Steer into the BALL SPOT and use X, Square, or Triangle to catch.`
-            );
-        } else if (rep.catchDepthYards < 10) {
-            setInstruction(
-                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Get inside the BALL SPOT. Press a catch button and release it in green.`
+                `${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. No catch meter at ${rep.catchDepthYards.toFixed(1)} yds.`
             );
         } else {
             setInstruction(
-                `Target ${rep.catchDepthYards.toFixed(1)} yds past LOS. Get inside the BALL SPOT and release your catch button when the meter reaches green.`
+                `${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Press, hold, and release in GREEN. Receiver runs automatically.`
             );
         }
         beep(520, 0.05);
@@ -1017,18 +1069,18 @@
         rep.catchHeldAt = now;
         rep.catchHoldMs = 0;
         rep.catchButtonHeld = buttonName;
-        rep.catchType = {
-            button: buttonName,
-            name: buttonName === "X" ? "Possession" : buttonName === "SQUARE" ? "RAC" : "Aggressive"
-        };
-
         // Below the selected minimum distance, Madden does not display
         // timing-based catching. The catch type still matters, but there is no meter.
         if (!rep.catchMeterEnabled) {
             rep.catchMeterLocked = true;
             rep.catchHolding = false;
             rep.catchTimingPoints = 25;
-            setTiming(`No catch meter at this depth — ${BUTTON_LABELS[buttonName]} registered. Reach the BALL SPOT.`, "good");
+            setTiming(
+                buttonName === rep.catchType.button
+                    ? `No catch meter at this depth — ${BUTTON_LABELS[buttonName]} registered.`
+                    : `Wrong catch type — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}.`,
+                buttonName === rep.catchType.button ? "good" : "bad"
+            );
             return;
         }
 
@@ -1105,30 +1157,31 @@
         rep.catchAttemptAt = rep.ball.progress;
 
         const difficulty = currentDifficulty();
-        const ballSpotDistance = distance(rep.receiver, rep.ball.target);
-        const inBallSpot = ballSpotDistance <= BALL_SPOT_RADIUS;
         const releaseProgress = currentCatchMeterProgress(rep);
+        const correctCatch = buttonName === rep.catchType.button;
+        const placementGood = rep.placementPoints >= 16;
 
-        // The two offensive catch requirements are intentionally simple:
-        // 1) catch-button release must be inside the green timing window, and
-        // 2) the receiver must be physically inside the visible ball-spot circle.
         const inGreen = !rep.catchMeterEnabled || (
             releaseProgress >= difficulty.catchSweetStart &&
             releaseProgress <= difficulty.catchSweetEnd
         );
 
-        rep.movementPoints = Math.round(clamp(1 - ballSpotDistance / BALL_SPOT_RADIUS, 0, 1) * 35);
-        rep.catchPoints = inGreen && inBallSpot ? 40 : 0;
-        const success = inGreen && inBallSpot;
+        // Offense now has three requirements:
+        // 1) throw placement must be catchable,
+        // 2) use the requested catch type, and
+        // 3) if the meter is enabled, release inside GREEN.
+        rep.movementPoints = 0;
+        rep.catchPoints = correctCatch ? 20 : 0;
+        const success = placementGood && correctCatch && inGreen;
 
-        if (!inGreen && !inBallSpot) {
-            rep.resultReason = "Missed: catch timing was outside green and receiver missed the ball spot";
+        if (!placementGood) {
+            rep.resultReason = "Missed: throw placement was off target";
+        } else if (!correctCatch) {
+            rep.resultReason = `Wrong catch type—use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
         } else if (!inGreen) {
-            rep.resultReason = "Missed: receiver reached the ball spot, but catch timing was outside green";
-        } else if (!inBallSpot) {
-            rep.resultReason = "Missed: catch timing was green, but receiver was outside the ball spot";
+            rep.resultReason = "Missed: catch meter was outside GREEN";
         } else {
-            rep.resultReason = `${rep.catchType.name} catch: GREEN timing + receiver in BALL SPOT`;
+            rep.resultReason = `${rep.catchType.name} catch: catchable throw + GREEN timing`;
         }
 
         finishRep(success);
@@ -1258,7 +1311,7 @@
 
         const rep = state.rep;
         const repScore = rep.kind === "offense"
-            ? rep.catchTimingPoints + rep.movementPoints + rep.catchPoints
+            ? rep.placementPoints + rep.catchTimingPoints + rep.catchPoints
             : rep.switchPoints + rep.movementPoints + rep.catchPoints;
 
         state.totalScore += repScore;
@@ -1280,9 +1333,9 @@
 
         if (rep.kind === "offense") {
             setFeedback(
-                `${rep.routeType.toUpperCase()} @ ${rep.routeCutYards}yd`,
+                feedbackPlacement(rep.placementPoints),
                 feedbackCatchTiming(rep.catchTimingPoints),
-                feedbackMovement(rep.movementPoints),
+                "Auto route",
                 feedbackCatch(rep.catchPoints)
             );
         } else {
@@ -1490,10 +1543,6 @@
             drawReticle(rep.reticle, "#ffd166");
         }
 
-        if (rep.ball) {
-            drawBallSpot(rep.ball.target);
-        }
-
         drawPlayer(rep.defender, "#f55c69", "D", false);
         drawPlayer(
             rep.receiver,
@@ -1509,7 +1558,7 @@
         }
 
         if (rep.thrown) {
-            if (rep.catchMeterStarted && rep.catchType.button) {
+            if (rep.catchType.button) {
                 drawCatchPrompt(rep.receiver, rep.catchType.button);
             }
             if (rep.catchMeterStarted) {
@@ -1517,7 +1566,12 @@
             }
         }
 
-        drawMiniLegend("M27: auto receiver control", rep.catchMeterStarted ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name}` : "Reach BALL SPOT + release in GREEN");
+        drawMiniLegend(
+            "Receiver runs automatically",
+            rep.thrown
+                ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • release in GREEN`
+                : "Aim throw with left stick"
+        );
     }
 
     function drawDefense(rep) {
@@ -1705,34 +1759,6 @@
         ctx.restore();
     }
 
-    function drawBallSpot(point) {
-        ctx.save();
-        ctx.strokeStyle = "#ffd166";
-        ctx.fillStyle = "rgba(255, 209, 102, 0.18)";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, BALL_SPOT_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(point.x - BALL_SPOT_RADIUS - 6, point.y);
-        ctx.lineTo(point.x + BALL_SPOT_RADIUS + 6, point.y);
-        ctx.moveTo(point.x, point.y - BALL_SPOT_RADIUS - 6);
-        ctx.lineTo(point.x, point.y + BALL_SPOT_RADIUS + 6);
-        ctx.stroke();
-
-        ctx.fillStyle = "#fff6cc";
-        ctx.font = "bold 13px Arial";
-        ctx.textAlign = "center";
-        const targetDepth = clamp(
-            (OFFENSE_LOS_Y - point.y) / OFFENSE_PIXELS_PER_YARD,
-            0,
-            OFFENSE_FIELD_YARDS
-        );
-        ctx.fillText(`BALL SPOT • ${targetDepth.toFixed(1)} YDS`, point.x, point.y - 32);
-        ctx.restore();
-    }
 
     function drawThrowMeter(rep) {
         const isVisible = !rep.thrown || rep.throwHoldMs > 0;
