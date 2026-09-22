@@ -4,11 +4,11 @@
 (() => {
     "use strict";
 
-    // Offense field geometry: show exactly 0-30 yards past the line of scrimmage
+    // Offense field geometry: show exactly 0-40 yards past the line of scrimmage
     // across the full practice canvas so catch depth is easy to judge.
     const OFFENSE_LOS_Y = 540;
     const OFFENSE_FIELD_TOP_Y = 40;
-    const OFFENSE_FIELD_YARDS = 30;
+    const OFFENSE_FIELD_YARDS = 40;
     const OFFENSE_PIXELS_PER_YARD = (OFFENSE_LOS_Y - OFFENSE_FIELD_TOP_Y) / OFFENSE_FIELD_YARDS;
 
     const canvas = document.getElementById("practiceCanvas");
@@ -82,7 +82,7 @@
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 49,
+            routeSpeed: 53,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 870,
@@ -97,7 +97,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 56,
+            routeSpeed: 60,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 675,
@@ -112,7 +112,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 70,
+            routeSpeed: 75,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 565,
@@ -127,7 +127,7 @@
         allMadden: {
             label: "All-Madden",
             ballSpeed: 585,
-            routeSpeed: 64,
+            routeSpeed: 69,
             steerSpeed: 248,
             catchRadius: 36,
             catchMeterDuration: 490,
@@ -1067,8 +1067,8 @@
         // Empirical Madden 27 behavior from practice testing:
         // 5-10 yd catches open inside the green near its late edge (quick tap).
         // 10-15 yd catches open just before green (very short hold).
-        // From 15 to about 30 yd, the starting point moves progressively
-        // backward until a ~30+ yd catch can show the full meter.
+        // From 15 to about 40 yd, the starting point moves progressively
+        // backward until a ~40 yd catch can show the full meter.
         if (effectiveDepthYards < 10) {
             const t = clamp((effectiveDepthYards - 5) / 5, 0, 1);
             // Still starts in/near green on very short catches, but slightly
@@ -1087,8 +1087,8 @@
             );
         }
 
-        if (effectiveDepthYards < 30) {
-            const t = clamp((effectiveDepthYards - 15) / 15, 0, 1);
+        if (effectiveDepthYards < 40) {
+            const t = clamp((effectiveDepthYards - 15) / 25, 0, 1);
             return lerp(Math.max(0, difficulty.catchSweetStart - 0.15), 0, t);
         }
 
@@ -1534,7 +1534,7 @@
         ctx.font = "bold 16px Arial";
         ctx.textAlign = "left";
 
-        // 0-30 yards stretched over the full vertical practice area.
+        // 0-40 yards stretched over the full vertical practice area.
         // Madden's catch-meter starting behavior changes in roughly 5-yard
         // bands, so show every 5 yards. Ten-yard lines are slightly stronger.
         for (let yards = 0; yards <= OFFENSE_FIELD_YARDS; yards += 5) {
