@@ -1073,23 +1073,23 @@
             const t = clamp((effectiveDepthYards - 5) / 5, 0, 1);
             // Still starts in/near green on very short catches, but slightly
             // farther left than before to give the user a touch more reaction time.
-            const lateGreen = difficulty.catchSweetEnd - 0.095;
-            const earlyGreen = difficulty.catchSweetStart - 0.02;
+            const lateGreen = difficulty.catchSweetEnd - 0.125;
+            const earlyGreen = difficulty.catchSweetStart - 0.05;
             return lerp(lateGreen, earlyGreen, t);
         }
 
         if (effectiveDepthYards < 15) {
             const t = clamp((effectiveDepthYards - 10) / 5, 0, 1);
             return lerp(
-                difficulty.catchSweetStart - 0.065,
-                Math.max(0, difficulty.catchSweetStart - 0.15),
+                difficulty.catchSweetStart - 0.095,
+                Math.max(0, difficulty.catchSweetStart - 0.18),
                 t
             );
         }
 
         if (effectiveDepthYards < 40) {
             const t = clamp((effectiveDepthYards - 15) / 25, 0, 1);
-            return lerp(Math.max(0, difficulty.catchSweetStart - 0.15), 0, t);
+            return lerp(Math.max(0, difficulty.catchSweetStart - 0.18), 0, t);
         }
 
         return 0;
