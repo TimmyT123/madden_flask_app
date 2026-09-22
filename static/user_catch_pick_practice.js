@@ -40,7 +40,9 @@
         SQUARE: 2,
         TRIANGLE: 3,
         L1: 4,
-        R1: 5
+        R1: 5,
+        DPAD_LEFT: 14,
+        DPAD_RIGHT: 15
     };
 
     const BUTTON_LABELS = {
@@ -73,6 +75,7 @@
     const CATCH_METER_MIN_STORAGE_KEY = "wurdCatchMeterMinYards";
     const ROUTE_TYPE_STORAGE_KEY = "wurdCatchRouteType";
     const ROUTE_CUT_STORAGE_KEY = "wurdCatchRouteCutYards";
+    const OFFENSE_ROUTE_TYPES = ["go", "out", "in", "dig", "post", "corner"];
     const BALL_SPOT_RADIUS = 30;
 
     const DIFFICULTIES = {
@@ -181,101 +184,85 @@
         return DIFFICULTIES[state.difficultyKey];
     }
 
-    function ensureOffenseRouteControls() {
-        if (document.getElementById("wurdRouteControls")) return;
-
-        const host = ui.start?.parentElement || canvas?.parentElement;
-        if (!host) return;
-
-        const wrapper = document.createElement("div");
-        wrapper.id = "wurdRouteControls";
-        wrapper.style.cssText = [
-            "display:flex",
-            "gap:12px",
-            "align-items:center",
-            "flex-wrap:wrap",
-            "margin:10px 0",
-            "padding:10px 12px",
-            "border:1px solid rgba(255,255,255,.18)",
-            "border-radius:10px",
-            "background:rgba(8,15,22,.72)",
-            "color:#fff"
-        ].join(";");
-
-        wrapper.innerHTML = `
-            <label style="font-weight:700">Route
-                <select id="wurdRouteType" style="margin-left:6px;padding:5px 8px">
-                    <option value="go">Go</option>
-                    <option value="out" selected>Out</option>
-                    <option value="in">In</option>
-                    <option value="dig">Dig</option>
-                    <option value="post">Post</option>
-                    <option value="corner">Corner</option>
-                </select>
-            </label>
-            <label style="font-weight:700">Cut at
-                <input id="wurdRouteCut" type="range" min="3" max="20" step="1" value="10" style="vertical-align:middle;margin:0 6px">
-                <span id="wurdRouteCutValue">10 yds</span>
-            </label>
-            <span id="wurdRouteHint" style="opacity:.8;font-size:13px">Choose before hiking.</span>
-        `;
-
-        host.insertBefore(wrapper, ui.start || host.firstChild);
-
-        const routeSelect = wrapper.querySelector("#wurdRouteType");
-        const cutSlider = wrapper.querySelector("#wurdRouteCut");
-        const cutValue = wrapper.querySelector("#wurdRouteCutValue");
-
+    function loadOffenseRouteSettings() {
         try {
             const savedRoute = localStorage.getItem(ROUTE_TYPE_STORAGE_KEY);
-            if (["go", "out", "in", "dig", "post", "corner"].includes(savedRoute)) {
-                routeSelect.value = savedRoute;
+            if (OFFENSE_ROUTE_TYPES.includes(savedRoute)) {
+                state.routeType = savedRoute;
             }
+
             const savedCut = Number(localStorage.getItem(ROUTE_CUT_STORAGE_KEY));
             if (Number.isFinite(savedCut) && savedCut >= 3 && savedCut <= 20) {
-                cutSlider.value = String(savedCut);
+                state.routeCutYards = Math.round(savedCut);
             }
-        } catch (error) {}
+        } catch (error) {
+            // Defaults still work if localStorage is unavailable.
+        }
+    }
 
-        const sync = () => {
-            state.routeType = routeSelect.value;
-            state.routeCutYards = Number(cutSlider.value);
-            cutValue.textContent = `${state.routeCutYards} yds`;
-            cutSlider.disabled = state.routeType === "go";
-            cutValue.style.opacity = state.routeType === "go" ? ".45" : "1";
-
-            // Route changes are live until the snap. Once X hikes the ball,
-            // that rep's route is locked so the play cannot change underneath it.
-            if (state.rep?.kind === "offense" && !state.rep.snapped && !state.rep.thrown) {
-                state.rep.routeType = state.routeType;
-                state.rep.routeCutYards = state.routeCutYards;
-                state.rep.receiver.routeType = state.routeType;
-                state.rep.receiver.cutYards = state.routeCutYards;
-                state.rep.receiver.cutMade = false;
-                state.rep.receiver.vx = 0;
-                state.rep.receiver.vy = -currentDifficulty().routeSpeed;
-                const cutText = state.routeType === "go" ? "" : ` • cut at ${state.routeCutYards} yds`;
-                setInstruction(`${state.routeType.toUpperCase()}${cutText}. Press X to hike the ball.`);
-            }
-
-            try {
-                localStorage.setItem(ROUTE_TYPE_STORAGE_KEY, state.routeType);
-                localStorage.setItem(ROUTE_CUT_STORAGE_KEY, String(state.routeCutYards));
-            } catch (error) {}
-        };
-
-        routeSelect.addEventListener("change", sync);
-        cutSlider.addEventListener("input", sync);
-        sync();
+    function saveOffenseRouteSettings() {
+        try {
+            localStorage.setItem(ROUTE_TYPE_STORAGE_KEY, state.routeType);
+            localStorage.setItem(ROUTE_CUT_STORAGE_KEY, String(state.routeCutYards));
+        } catch (error) {
+            // Settings still work for the current session.
+        }
     }
 
     function selectedRouteSettings() {
-        const routeSelect = document.getElementById("wurdRouteType");
-        const cutSlider = document.getElementById("wurdRouteCut");
         return {
-            type: routeSelect?.value || state.routeType || "out",
-            cutYards: Number(cutSlider?.value || state.routeCutYards || 10)
+            type: OFFENSE_ROUTE_TYPES.includes(state.routeType) ? state.routeType : "out",
+            cutYards: clamp(Math.round(Number(state.routeCutYards) || 10), 3, 20)
         };
+    }
+
+    function applyPreSnapRouteSettings(rep) {
+        if (!rep || rep.kind !== "offense" || rep.snapped) return;
+
+        rep.routeType = state.routeType;
+        rep.routeCutYards = state.routeCutYards;
+        rep.receiver.routeType = state.routeType;
+        rep.receiver.cutYards = state.routeCutYards;
+        rep.receiver.cutMade = false;
+        rep.receiver.x = rep.receiver.startX;
+        rep.receiver.y = rep.receiver.startY;
+        rep.receiver.vx = 0;
+        rep.receiver.vy = -currentDifficulty().routeSpeed;
+
+        const cutText = state.routeType === "go"
+            ? ""
+            : ` • cut at ${state.routeCutYards} yds`;
+
+        setInstruction(
+            `${state.routeType.toUpperCase()}${cutText}. L1/R1 changes route • D-pad Left/Right changes cut • X hikes.`
+        );
+    }
+
+    function cyclePreSnapRoute(rep, direction) {
+        const currentIndex = Math.max(0, OFFENSE_ROUTE_TYPES.indexOf(state.routeType));
+        const nextIndex =
+            (currentIndex + direction + OFFENSE_ROUTE_TYPES.length) % OFFENSE_ROUTE_TYPES.length;
+
+        state.routeType = OFFENSE_ROUTE_TYPES[nextIndex];
+        applyPreSnapRouteSettings(rep);
+        saveOffenseRouteSettings();
+        beep(360 + nextIndex * 35, 0.025);
+    }
+
+    function changePreSnapCut(rep, delta) {
+        if (state.routeType === "go") {
+            setTiming("GO route has no cut point.", "warn");
+            return;
+        }
+
+        const nextCut = clamp(state.routeCutYards + delta, 3, 20);
+        if (nextCut === state.routeCutYards) return;
+
+        state.routeCutYards = nextCut;
+        applyPreSnapRouteSettings(rep);
+        saveOffenseRouteSettings();
+        setTiming(`Cut set to ${state.routeCutYards} yards.`, "good");
+        beep(470, 0.025);
     }
 
     function setInstruction(text) {
@@ -374,7 +361,7 @@
             state.rep = createOffenseRep();
             const routeName = state.rep.routeType.toUpperCase();
             const cutText = state.rep.routeType === "go" ? "" : ` • cut at ${state.rep.routeCutYards} yds`;
-            setInstruction(`${routeName}${cutText}. Press X to hike the ball.`);
+            setInstruction(`${routeName}${cutText}. L1/R1 = route • D-pad Left/Right = cut • X = hike.`);
         } else {
             state.rep = createDefenseRep();
             setInstruction("Read the pass. Press Circle to click on at the right time.");
@@ -716,6 +703,26 @@
             // Return on the hike frame so the same X press can never also
             // count as a receiver throw input.
             if (!rep.snapped) {
+                // PS5 pre-snap route editor:
+                // L1 / R1 cycles routes.
+                // D-pad Left / Right changes the cut depth.
+                // X locks the shown route and hikes the ball.
+                if (pressed(input, "L1")) {
+                    cyclePreSnapRoute(rep, -1);
+                }
+
+                if (pressed(input, "R1")) {
+                    cyclePreSnapRoute(rep, 1);
+                }
+
+                if (pressed(input, "DPAD_LEFT")) {
+                    changePreSnapCut(rep, -1);
+                }
+
+                if (pressed(input, "DPAD_RIGHT")) {
+                    changePreSnapCut(rep, 1);
+                }
+
                 if (pressed(input, "X")) {
                     rep.snapped = true;
                     setInstruction(
@@ -1476,7 +1483,10 @@
 
     function drawOffense(rep) {
         if (!rep.thrown) {
-            if (!rep.snapped) drawRoutePreview(rep);
+            if (!rep.snapped) {
+                drawRoutePreview(rep);
+                drawPreSnapRoutePanel(rep);
+            }
             drawReticle(rep.reticle, "#ffd166");
         }
 
@@ -1578,6 +1588,52 @@
             ctx.textAlign = "center";
             ctx.fillText(`CUT ${r.cutYards} YDS`, r.startX, cutY - 13);
         }
+        ctx.restore();
+    }
+
+
+    function drawPreSnapRoutePanel(rep) {
+        const routeLabel = rep.routeType.toUpperCase();
+        const cutLabel = rep.routeType === "go" ? "—" : `${rep.routeCutYards} YDS`;
+
+        ctx.save();
+
+        const panelX = 265;
+        const panelY = 52;
+        const panelW = 470;
+        const panelH = 102;
+
+        ctx.fillStyle = "rgba(4, 10, 16, 0.88)";
+        ctx.strokeStyle = "rgba(255,255,255,0.28)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(panelX, panelY, panelW, panelH, 14);
+        } else {
+            ctx.rect(panelX, panelY, panelW, panelH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 16px Arial";
+        ctx.fillText("PRE-SNAP ROUTE", 500, panelY + 18);
+
+        ctx.fillStyle = "#5ca8ff";
+        ctx.font = "bold 27px Arial";
+        ctx.fillText(routeLabel, 410, panelY + 50);
+
+        ctx.fillStyle = "#ffd166";
+        ctx.font = "bold 23px Arial";
+        ctx.fillText(`CUT ${cutLabel}`, 595, panelY + 50);
+
+        ctx.fillStyle = "rgba(255,255,255,.92)";
+        ctx.font = "bold 13px Arial";
+        ctx.fillText("L1 / R1 = ROUTE     D-PAD ← / → = CUT     X = HIKE", 500, panelY + 79);
+
         ctx.restore();
     }
 
@@ -1913,7 +1969,7 @@
         }
     }
 
-    ensureOffenseRouteControls();
+    loadOffenseRouteSettings();
     loadCatchMeterMinimumSetting();
     ui.catchMeterMin?.addEventListener("change", saveCatchMeterMinimumSetting);
 
