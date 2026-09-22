@@ -401,10 +401,30 @@
         };
 
         const leverage = randomChoice(["left", "right"]);
-        const coverageOffset = 46;
+        const coveragePosition = randomChoice(["front", "behind", "tight"]);
+
+        // Catch decision is based on where the defender is relative to the WR:
+        // front/underneath = secure it with X,
+        // trailing/behind = catch and run with Square,
+        // tight/contested = attack the ball with Triangle.
+        const catchType =
+            coveragePosition === "front"
+                ? { button: "X", name: "Possession" }
+                : coveragePosition === "behind"
+                    ? { button: "SQUARE", name: "RAC" }
+                    : { button: "TRIANGLE", name: "Aggressive" };
+
+        const coverageOffset = coveragePosition === "tight" ? 25 : 40;
+        const verticalOffset =
+            coveragePosition === "front"
+                ? -34
+                : coveragePosition === "behind"
+                    ? 34
+                    : 0;
+
         const defender = {
             x: receiver.x + (leverage === "left" ? -coverageOffset : coverageOffset),
-            y: receiver.y,
+            y: clamp(receiver.y + verticalOffset, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y),
             vx: receiver.vx,
             vy: receiver.vy,
             radius: 18
@@ -415,16 +435,13 @@
             routeType: route.type,
             routeCutYards: route.cutYards,
             leverage,
+            coveragePosition,
             qb: { x: 500, y: 578 },
             receiver,
             defender,
             ball: null,
             throwButton: randomChoice(THROW_BUTTONS),
-            catchType: randomChoice([
-                { button: "X", name: "Possession" },
-                { button: "SQUARE", name: "RAC" },
-                { button: "TRIANGLE", name: "Aggressive" }
-            ]),
+            catchType,
             throwHolding: false,
             throwHeldAt: null,
             throwHoldMs: 0,
@@ -1038,13 +1055,20 @@
 
         rep.switched = false;
 
+        const coverageRead =
+            rep.coveragePosition === "front"
+                ? "Defender in front"
+                : rep.coveragePosition === "behind"
+                    ? "Defender behind"
+                    : "Defender tight";
+
         if (!rep.catchMeterEnabled) {
             setInstruction(
-                `${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. No catch meter at ${rep.catchDepthYards.toFixed(1)} yds.`
+                `${coverageRead}: ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. No catch meter at ${rep.catchDepthYards.toFixed(1)} yds.`
             );
         } else {
             setInstruction(
-                `${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Press, hold, and release in GREEN.`
+                `${coverageRead}: ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. Release in GREEN.`
             );
         }
 
@@ -1480,14 +1504,31 @@
 
     function moveCoverageDefender(rep) {
         const side = rep.leverage === "left" ? -1 : 1;
-        const coverageOffset = 46;
 
-        // Lock the defender to the chosen hip while matching the receiver's
-        // route velocity exactly. This keeps the coverage picture consistent.
+        const coverageOffset = rep.coveragePosition === "tight" ? 25 : 40;
+        const verticalOffset =
+            rep.coveragePosition === "front"
+                ? -34
+                : rep.coveragePosition === "behind"
+                    ? 34
+                    : 0;
+
+        // Keep the chosen coverage relationship visible for the entire route.
+        // "Front" means the DB is downfield/underneath the catch point.
+        // "Behind" means the DB is trailing the WR.
+        // "Tight" means the DB is essentially on the WR's hip.
         rep.defender.vx = rep.receiver.vx;
         rep.defender.vy = rep.receiver.vy;
-        rep.defender.x = clamp(rep.receiver.x + side * coverageOffset, 38, 962);
-        rep.defender.y = clamp(rep.receiver.y, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
+        rep.defender.x = clamp(
+            rep.receiver.x + side * coverageOffset,
+            38,
+            962
+        );
+        rep.defender.y = clamp(
+            rep.receiver.y + verticalOffset,
+            OFFENSE_FIELD_TOP_Y,
+            OFFENSE_LOS_Y
+        );
     }
 
     function updateBall(ball, dt) {
@@ -1622,7 +1663,7 @@
         drawMiniLegend(
             "Receiver runs automatically",
             rep.thrown
-                ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • release in GREEN`
+                ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • front=X • behind=□ • tight=△`
                 : "Left stick = QB movement • L2 + stick = tight lead • defender side = PICK"
         );
     }
