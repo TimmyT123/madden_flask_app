@@ -279,7 +279,7 @@ function startPractice() {
 function runCountdown(sequenceId) {
     countdown.classList.remove("hidden");
     countdown.textContent = "3";
-    setFeedback("Get ready. Move with the left stick, aim with the right stick, and throw with R1.", "info");
+    setFeedback("Get ready. Move with the left stick, aim with the right stick, and hold/release R1 to throw.", "info");
 
     countdownTimers.push(setTimeout(() => {
         if (sequenceId !== startSequenceId) return;
@@ -354,7 +354,7 @@ function spawnNextTarget() {
         activeTarget.y = randomBetween(25, 60);
         activeTarget.vx = (fromLeft ? 1 : -1) * speed.moving;
         activeTarget.deadlineAt = Number.POSITIVE_INFINITY;
-        setFeedback("Moving target — track it, settle the aim, then press R1.", "info");
+        setFeedback("Moving target — track it, settle the aim, then release R1.", "info");
     } else if (actualDrill === "peek") {
         const cover = chooseRandom(PEEK_COVERS);
         const direction = cover.x < 40 ? 1 : cover.x > 60 ? -1 : (Math.random() > 0.5 ? 1 : -1);
@@ -372,7 +372,7 @@ function spawnNextTarget() {
         activeTarget.x = randomBetween(12, 88);
         activeTarget.y = randomBetween(23, 59);
         activeTarget.deadlineAt = now + speed.visible;
-        setFeedback("Target up — aim and press R1.", "info");
+        setFeedback("Target up — aim, hold R1, then release it to throw.", "info");
     }
 
     renderTarget();
@@ -461,11 +461,13 @@ function updateInput(deltaMs) {
         aimStatus.textContent = "Left stick: movement ready | Right stick: aim centered";
     }
 
-    const r1Pressed = Boolean(gamepad.buttons[R1_BUTTON_INDEX]?.pressed);
+    const r1Button = gamepad.buttons[R1_BUTTON_INDEX];
+    const r1Pressed = Boolean(r1Button?.pressed || (r1Button?.value ?? 0) > 0.5);
     r1Status.textContent = r1Pressed ? "R1: pressed" : (knifeIsReady ? "R1: ready" : "R1: recovering");
     r1Status.classList.toggle("active", r1Pressed);
 
-    if (r1Pressed && !lastR1Pressed) {
+    // Throw immediately on the R1 down-edge: the instant the button is depressed.
+    if (!lastR1Pressed && r1Pressed) {
         throwKnife();
     }
 
@@ -592,7 +594,7 @@ function throwKnife() {
             ? `Center hit — ${reactionMs} ms!`
             : `Hit — ${reactionMs} ms.`);
     } else {
-        handleThrowResult(false, false, reactionMs, "Miss. Settle the crosshair before pressing R1.");
+        handleThrowResult(false, false, reactionMs, "Miss. Settle the crosshair before releasing R1.");
     }
 }
 
@@ -731,7 +733,7 @@ function updateKnifeReady(isReady) {
     if (isReady) {
         knifeReady.classList.add("ready");
         knifeReady.classList.remove("recovering");
-        knifeReadyText.textContent = "Knife ready — press R1";
+        knifeReadyText.textContent = "Knife ready — hold R1, release to throw";
         return;
     }
 
@@ -749,7 +751,7 @@ function updateKnifeReady(isReady) {
         knifeIsReady = true;
         knifeReady.classList.add("ready");
         knifeReady.classList.remove("recovering");
-        knifeReadyText.textContent = "Knife ready — press R1";
+        knifeReadyText.textContent = "Knife ready — hold R1, release to throw";
     };
 
     knifeRecoveryTimer = setTimeout(finishKnifeRecovery, KNIFE_RECOVERY_MS);
