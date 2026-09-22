@@ -1060,26 +1060,24 @@
     }
 
     function getCatchMeterStartProgress(depthYards, difficulty) {
-        // With Madden's minimum set to 0, practice testing showed 0-5 yard
-        // catches use the same short-pass meter behavior as the 5-10 yard band.
-        const effectiveDepthYards = Math.max(depthYards, 5);
-
-        // Empirical Madden 27 behavior from practice testing:
-        // 5-10 yd catches open inside the green near its late edge (quick tap).
-        // 10-15 yd catches open just before green (very short hold).
-        // From 15 to about 40 yd, the starting point moves progressively
-        // backward until a ~40 yd catch can show the full meter.
-        if (effectiveDepthYards < 10) {
-            const t = clamp((effectiveDepthYards - 5) / 5, 0, 1);
-            // Still starts in/near green on very short catches, but slightly
-            // farther left than before to give the user a touch more reaction time.
-            const lateGreen = difficulty.catchSweetEnd - 0.125;
-            const earlyGreen = difficulty.catchSweetStart - 0.05;
-            return lerp(lateGreen, earlyGreen, t);
+        // 0-5 yards should NOT begin at the far/right side of the green.
+        // Start these very short catches just before the green so the user
+        // still has a small reaction window.
+        if (depthYards < 5) {
+            return Math.max(0, difficulty.catchSweetStart - 0.08);
         }
 
-        if (effectiveDepthYards < 15) {
-            const t = clamp((effectiveDepthYards - 10) / 5, 0, 1);
+        // 5-10 yd catches still begin in/near the green for a quick release,
+        // but no longer at the very end of the green zone.
+        if (depthYards < 10) {
+            const t = clamp((depthYards - 5) / 5, 0, 1);
+            const fiveYardStart = difficulty.catchSweetStart + 0.025;
+            const tenYardStart = difficulty.catchSweetStart - 0.095;
+            return lerp(fiveYardStart, tenYardStart, t);
+        }
+
+        if (depthYards < 15) {
+            const t = clamp((depthYards - 10) / 5, 0, 1);
             return lerp(
                 difficulty.catchSweetStart - 0.095,
                 Math.max(0, difficulty.catchSweetStart - 0.18),
@@ -1087,8 +1085,8 @@
             );
         }
 
-        if (effectiveDepthYards < 40) {
-            const t = clamp((effectiveDepthYards - 15) / 25, 0, 1);
+        if (depthYards < 40) {
+            const t = clamp((depthYards - 15) / 25, 0, 1);
             return lerp(Math.max(0, difficulty.catchSweetStart - 0.18), 0, t);
         }
 
