@@ -68,6 +68,13 @@ const WORLD_LIMIT_X = 18;
 const WORLD_LIMIT_Y = 9;
 const WORLD_VERTICAL_SPEED_FACTOR = 0.55;
 
+// FPS-style aiming: the crosshair stays centered while the right stick
+// moves the world behind it.
+const AIM_WORLD_LIMIT_X = 48;
+const AIM_WORLD_LIMIT_Y = 36;
+const AIM_WORLD_SPEED_RATIO = 1.0;
+const AIM_WORLD_VERTICAL_SPEED_FACTOR = 0.82;
+
 const TARGET_SCALE = {
     large: "target-large",
     normal: "",
@@ -99,6 +106,8 @@ let crosshairX = 50;
 let crosshairY = 50;
 let worldOffsetX = 0;
 let worldOffsetY = 0;
+let aimWorldOffsetX = 0;
+let aimWorldOffsetY = 0;
 let drillLength = "free";
 
 let hits = 0;
@@ -252,6 +261,11 @@ function startPractice() {
     crosshairY = 50;
     worldOffsetX = 0;
     worldOffsetY = 0;
+    aimWorldOffsetX = 0;
+    aimWorldOffsetY = 0;
+
+    crosshairX = 50;
+    crosshairY = 50;
     renderCrosshair();
     renderWorldOffset();
     updateScoreboard();
@@ -450,15 +464,21 @@ function updateInput(deltaMs) {
     const rawAimX = gamepad.axes[RIGHT_STICK_X_AXIS] || 0;
     const rawAimY = gamepad.axes[RIGHT_STICK_Y_AXIS] || 0;
     const aimVector = applyRadialDeadzone(rawAimX, rawAimY, STICK_DEADZONE);
-    moveCrosshair(aimVector.x, aimVector.y, deltaMs);
+
+    // Keep the cursor fixed in the center. Right-stick aiming moves the
+    // world quickly behind the crosshair.
+    crosshairX = 50;
+    crosshairY = 50;
+    renderCrosshair();
+    moveAimWorld(aimVector.x, aimVector.y, deltaMs);
 
     const moveMagnitude = Math.hypot(moveVector.x, moveVector.y);
     const aimMagnitude = Math.hypot(aimVector.x, aimVector.y);
 
     if (moveMagnitude > 0.05 || aimMagnitude > 0.05) {
-        aimStatus.textContent = `L move: ${moveVector.x.toFixed(2)}, ${moveVector.y.toFixed(2)} | R aim: ${aimVector.x.toFixed(2)}, ${aimVector.y.toFixed(2)}`;
+        aimStatus.textContent = `L move: ${moveVector.x.toFixed(2)}, ${moveVector.y.toFixed(2)} | R aim/world: ${aimVector.x.toFixed(2)}, ${aimVector.y.toFixed(2)}`;
     } else {
-        aimStatus.textContent = "Left stick: movement ready | Right stick: aim centered";
+        aimStatus.textContent = "Crosshair locked center | Right stick moves world";
     }
 
     const r1Button = gamepad.buttons[R1_BUTTON_INDEX];
@@ -507,12 +527,36 @@ function moveWorld(x, y, deltaMs) {
     renderWorldOffset();
 }
 
+function moveAimWorld(x, y, deltaMs) {
+    if (!gameRunning || drillComplete || deltaMs <= 0) return;
+
+    const speed = getAimSpeed() * AIM_WORLD_SPEED_RATIO;
+    const seconds = deltaMs / 1000;
+
+    aimWorldOffsetX = clamp(
+        aimWorldOffsetX - x * speed * seconds,
+        -AIM_WORLD_LIMIT_X,
+        AIM_WORLD_LIMIT_X
+    );
+
+    aimWorldOffsetY = clamp(
+        aimWorldOffsetY - y * speed * AIM_WORLD_VERTICAL_SPEED_FACTOR * seconds,
+        -AIM_WORLD_LIMIT_Y,
+        AIM_WORLD_LIMIT_Y
+    );
+
+    renderWorldOffset();
+}
+
 function renderWorldOffset() {
     const rect = arena.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
 
-    const x = (worldOffsetX / 100) * rect.width;
-    const y = (worldOffsetY / 100) * rect.height;
+    const combinedWorldX = worldOffsetX + aimWorldOffsetX;
+    const combinedWorldY = worldOffsetY + aimWorldOffsetY;
+
+    const x = (combinedWorldX / 100) * rect.width;
+    const y = (combinedWorldY / 100) * rect.height;
 
     // Near objects/targets move the full amount. Far scenery moves less,
     // creating a light parallax effect that feels more FPS-like.
