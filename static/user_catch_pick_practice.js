@@ -73,8 +73,6 @@
     const LOB_MAX_HOLD_MS = 165;
     const TOUCH_MAX_HOLD_MS = 500;
     const CATCH_METER_MIN_STORAGE_KEY = "wurdCatchMeterMinYards";
-    const AUTO_THROW_MIN_MS = 900;
-    const AUTO_THROW_MAX_MS = 1800;
     const ROUTE_TYPE_STORAGE_KEY = "wurdCatchRouteType";
     const ROUTE_CUT_STORAGE_KEY = "wurdCatchRouteCutYards";
     const OFFENSE_ROUTE_TYPES = ["go", "out", "in", "dig", "post", "corner"];
@@ -453,8 +451,7 @@
             resultReason: "",
             startedAt: performance.now(),
             snapped: false,
-            snappedAt: null,
-            autoThrowAt: null
+            snappedAt: null
         };
     }
 
@@ -726,9 +723,8 @@
                 if (pressed(input, "X")) {
                     rep.snapped = true;
                     rep.snappedAt = now;
-                    rep.autoThrowAt = now + randomRange(AUTO_THROW_MIN_MS, AUTO_THROW_MAX_MS);
                     setInstruction(
-                        `${rep.routeType.toUpperCase()} route. Move the QB with the left stick. The pass will be thrown automatically.`
+                        `${rep.routeType.toUpperCase()} route. Move QB with left stick. Hold ${BUTTON_LABELS[rep.throwButton]} for the throw meter, then release to throw.`
                     );
                     setTiming("Ball hiked.", "good");
                     beep(420, 0.04);
@@ -736,11 +732,11 @@
                 return;
             }
 
-            // After the snap, the receiver and defender run automatically.
+            // Receiver and defender run automatically after the snap.
             moveOffenseRoute(rep, dt);
             moveCoverageDefender(rep);
 
-            // Until the pass arrives/catch occurs, left stick controls only the QB.
+            // Left stick controls QB movement only.
             rep.qb.x = clamp(
                 rep.qb.x + input.axisX * difficulty.steerSpeed * dt,
                 55,
@@ -752,11 +748,33 @@
                 canvas.height - 18
             );
 
-            // Automatic throw: choose a catchable point based on where the
-            // auto-running receiver will be when the football arrives.
-            if (rep.autoThrowAt !== null && now >= rep.autoThrowAt) {
-                throwAutomaticOffensePass(rep);
+            // Manual throw meter: press/hold the receiver button, then release.
+            if (pressed(input, rep.throwButton)) {
+                rep.throwHolding = true;
+                rep.throwHeldAt = now;
+                rep.throwHoldMs = 0;
+                setTiming(
+                    `Hold ${BUTTON_LABELS[rep.throwButton]} for throw power, then release.`,
+                    "good"
+                );
+            }
+
+            if (rep.throwHolding && rep.throwHeldAt !== null) {
+                rep.throwHoldMs = Math.max(0, now - rep.throwHeldAt);
+            }
+
+            if (rep.throwHolding && released(input, rep.throwButton)) {
+                rep.throwHoldMs = Math.max(0, now - (rep.throwHeldAt || now));
+                rep.throwHolding = false;
+                throwOffensePassToReceiver(rep);
                 return;
+            }
+
+            for (const name of THROW_BUTTONS) {
+                if (name !== rep.throwButton && pressed(input, name)) {
+                    setTiming(`Wrong receiver button. Use ${BUTTON_LABELS[rep.throwButton]}.`, "bad");
+                    vibrate(80, 0.35);
+                }
             }
 
             return;
@@ -907,38 +925,30 @@
         return { x: sim.x, y: sim.y };
     }
 
-    function throwAutomaticOffensePass(rep) {
+    function throwOffensePassToReceiver(rep) {
         if (rep.thrown) return;
 
         rep.thrown = true;
 
-        // Use a touch-style trajectory for consistent catch practice.
-        const profile = {
-            type: "touch",
-            durationFactor: 1.0,
-            arcHeight: 78,
-            timingText: "Automatic pass — get ready to catch."
-        };
+        const profile = getPassProfile(rep.throwHoldMs, currentDifficulty());
         rep.passType = profile.type;
 
-        // First estimate the travel time from QB to the receiver's current area.
+        // The user controls throw power/type with the throw meter, but does not aim.
+        // The football automatically targets the projected receiver location.
         const roughDist = distance(rep.qb, rep.receiver);
         let passDuration = Math.max(
-            0.35,
+            0.30,
             (roughDist / currentDifficulty().ballSpeed) * profile.durationFactor
         );
 
-        // Then project the receiver to where he should be when the pass arrives.
         let projectedCatchPoint = projectReceiverAtArrival(rep, passDuration);
         const refinedDist = distance(rep.qb, projectedCatchPoint);
         passDuration = Math.max(
-            0.35,
+            0.30,
             (refinedDist / currentDifficulty().ballSpeed) * profile.durationFactor
         );
         projectedCatchPoint = projectReceiverAtArrival(rep, passDuration);
 
-        // No aiming reticle and no visible marker. The pass itself is aimed
-        // automatically at the receiver's projected catch point.
         rep.placementPoints = 40;
 
         rep.ball = {
@@ -976,7 +986,7 @@
             );
         }
 
-        setTiming(profile.timingText, "good");
+        setTiming(`${profile.timingText} Pass aimed automatically at receiver.`, "good");
         beep(520, 0.05);
     }
 
@@ -1546,7 +1556,7 @@
             "Receiver runs automatically",
             rep.thrown
                 ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • release in GREEN`
-                : "Left stick = QB movement • pass throws automatically"
+                : "Left stick = QB movement • throw meter controls pass • aim is automatic"
         );
     }
 
