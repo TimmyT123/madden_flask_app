@@ -82,7 +82,7 @@
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 53,
+            routeSpeed: 57,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 870,
@@ -97,7 +97,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 60,
+            routeSpeed: 65,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 675,
@@ -112,7 +112,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 75,
+            routeSpeed: 81,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 565,
@@ -127,7 +127,7 @@
         allMadden: {
             label: "All-Madden",
             ballSpeed: 585,
-            routeSpeed: 69,
+            routeSpeed: 74,
             steerSpeed: 248,
             catchRadius: 36,
             catchMeterDuration: 490,
@@ -192,7 +192,7 @@
             }
 
             const savedCut = Number(localStorage.getItem(ROUTE_CUT_STORAGE_KEY));
-            if (Number.isFinite(savedCut) && savedCut >= 3 && savedCut <= 20) {
+            if (Number.isFinite(savedCut) && savedCut >= 3 && savedCut <= 40) {
                 state.routeCutYards = Math.round(savedCut);
             }
         } catch (error) {
@@ -212,7 +212,7 @@
     function selectedRouteSettings() {
         return {
             type: OFFENSE_ROUTE_TYPES.includes(state.routeType) ? state.routeType : "out",
-            cutYards: clamp(Math.round(Number(state.routeCutYards) || 10), 3, 20)
+            cutYards: clamp(Math.round(Number(state.routeCutYards) || 10), 3, 40)
         };
     }
 
@@ -255,7 +255,7 @@
             return;
         }
 
-        const nextCut = clamp(state.routeCutYards + delta, 3, 20);
+        const nextCut = clamp(state.routeCutYards + delta, 3, 40);
         if (nextCut === state.routeCutYards) return;
 
         state.routeCutYards = nextCut;
