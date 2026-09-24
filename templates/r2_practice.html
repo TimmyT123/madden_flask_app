@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>WURD R2 Discipline Practice</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=8-los-defense">
+    <title>WURD Running Vision + R2 Practice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=9-running-vision">
 </head>
 <body>
 <div class="container">
     <header class="page-header">
         <a href="https://wurd-madden.com/" class="home-btn">Back to WURD</a>
         <div>
-            <h1>WURD R2 Discipline Practice</h1>
-            <p class="intro">Read the play, steer without R2, and accelerate at the burst point. A blue dashed LOS line now shows the line of scrimmage so you can see whether you are still behind it, at it, or through it. Offense attacks upward from the bottom; defense closes downward from the top, matching Madden.</p>
+            <h1>WURD Running Vision + R2 Practice</h1>
+            <p class="intro">Read the blocking, choose the lane yourself, steer without R2, and accelerate at the burst point. Offense now shows live blocker-versus-defender movement without highlighting the correct lane before you commit. The blue dashed line marks the LOS; offense attacks upward and defense closes downward, matching Madden.</p>
         </div>
     </header>
 
@@ -74,7 +74,8 @@
             <span>Early: <strong id="earlyCount">0</strong></span>
             <span>Late: <strong id="lateCount">0</strong></span>
             <span>Wrong Lane: <strong id="wrongDirectionCount">0</strong></span>
-            <span>Accuracy: <strong id="disciplinePercent">100%</strong></span>
+            <span>R2 Accuracy: <strong id="disciplinePercent">100%</strong></span>
+            <span>Vision: <strong id="visionPercent">100%</strong></span>
             <span>Avg Reaction: <strong id="averageReaction">--</strong></span>
             <span>Streak: <strong id="streak">0</strong></span>
             <span>Best: <strong id="bestStreak">0</strong></span>
@@ -103,6 +104,10 @@
                 <div id="blockerMiddle" class="player blocker blocker-middle">OL</div>
                 <div id="blockerRight" class="player blocker blocker-right">OL</div>
 
+                <div id="runDefenderLeft" class="player run-defender run-defender-left">DL</div>
+                <div id="runDefenderMiddle" class="player run-defender run-defender-middle">DL</div>
+                <div id="runDefenderRight" class="player run-defender run-defender-right">DL</div>
+
                 <div id="runner" class="player runner">RB</div>
                 <div id="defender" class="player defender">YOU</div>
                 <div id="ballCarrier" class="player ball-carrier">HB</div>
@@ -114,7 +119,7 @@
             <aside class="control-panel">
                 <div id="playBadge" class="play-badge">OFFENSE</div>
                 <h2 id="phaseTitle">Press Start Practice</h2>
-                <p id="phaseInstruction">Wait for the opening, steer toward it, cross the burst point, and then press R2.</p>
+                <p id="phaseInstruction">Read the block movement, choose the opening yourself, steer through it, then press R2 at the burst point.</p>
 
                 <div id="cueLight" class="cue-light wait">
                     <span id="cueText">WAIT</span>
@@ -126,18 +131,18 @@
                 <p id="reactionWindowText" class="small-text">Normal window: 850 ms</p>
 
                 <button id="r2TestButton" class="r2-button" type="button" aria-label="Simulate R2 press">R2</button>
-                <p class="small-text">Blue dashed LOS = line of scrimmage. Yellow STEER means choose the lane without sprinting. Green R2 NOW appears only after you reach the burst point.</p>
+                <p class="small-text">Blue dashed LOS = line of scrimmage. On offense, the correct lane is hidden until after your choice. Read blocker/defender leverage, steer without sprinting, then use R2 at the burst point.</p>
             </aside>
         </section>
 
         <section class="lesson-row">
             <div>
                 <strong>Inside:</strong>
-                <span>Read the blocks behind the LOS → enter the opening → R2 as you burst through.</span>
+                <span>Watch which defender is displaced → choose the crease or cutback yourself → R2 only after you enter the opening.</span>
             </div>
             <div>
                 <strong>Outside:</strong>
-                <span>A sealed edge creates an earlier burst point; a developing block requires more patience.</span>
+                <span>Read edge leverage. If the defender is sealed inside, get outside; if the edge stretches, stay patient and look for the cut.</span>
             </div>
             <div>
                 <strong>Defense:</strong>
@@ -150,6 +155,6 @@
 </div>
 
 <script src="{{ url_for('static', filename='practice_controls.js') }}"></script>
-<script src="{{ url_for('static', filename='r2_practice.js') }}?v=8-los-defense"></script>
+<script src="{{ url_for('static', filename='r2_practice.js') }}?v=9-running-vision"></script>
 </body>
 </html>

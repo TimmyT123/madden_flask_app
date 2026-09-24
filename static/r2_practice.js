@@ -1,4 +1,4 @@
-// WURD R2 Discipline Practice v7 — LOS reference moved above offensive line
+// WURD Running Vision + R2 Practice v8 — defensive fronts and user-read lanes
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -57,6 +57,61 @@ const STICK_MIDDLE_MAX_X = 0.38;
 const DIRECTIONS = ["left", "middle", "right"];
 const OUTSIDE_DIRECTIONS = ["left", "right"];
 
+// Each scenario describes what the runner should learn to SEE, not a lane that is shown to them.
+// blockerDx / defenderDx are percentage-point movements from each player's starting X position.
+const VISION_SCENARIOS = [
+    {
+        id: "inside-left-cutback",
+        concepts: ["inside"],
+        direction: "left",
+        label: "CUTBACK LEFT",
+        blockerDx: [-5, 4, 2],
+        defenderDx: [8, 6, 1],
+        defenderDy: [2, -1, 0],
+        coaching: "The front flowed right and the backside opened. Take the cutback before you sprint."
+    },
+    {
+        id: "inside-middle-wash",
+        concepts: ["inside"],
+        direction: "middle",
+        label: "MIDDLE CREASE",
+        blockerDx: [-2, -8, 7],
+        defenderDx: [-7, -12, 9],
+        defenderDy: [0, 2, 1],
+        coaching: "The interior defenders were displaced away from the crease. Get vertical through the middle."
+    },
+    {
+        id: "inside-right-cut",
+        concepts: ["inside"],
+        direction: "right",
+        label: "RIGHT B-GAP",
+        blockerDx: [-1, -5, 6],
+        defenderDx: [-1, -9, -8],
+        defenderDy: [1, 2, 2],
+        coaching: "The right-side defender was sealed inside. Press the run, then cut into the right gap."
+    },
+    {
+        id: "outside-left-seal",
+        concepts: ["outside"],
+        direction: "left",
+        label: "LEFT EDGE",
+        blockerDx: [-8, -2, 1],
+        defenderDx: [11, 4, 1],
+        defenderDy: [1, 0, 0],
+        coaching: "The left edge was sealed inside. Get outside the block and accelerate once the edge is won."
+    },
+    {
+        id: "outside-right-seal",
+        concepts: ["outside"],
+        direction: "right",
+        label: "RIGHT EDGE",
+        blockerDx: [-1, 2, 8],
+        defenderDx: [-1, -4, -11],
+        defenderDy: [0, 0, 1],
+        coaching: "The right edge was sealed inside. Stay patient behind the block, then get outside."
+    }
+];
+
 const els = {
     inputMode: document.getElementById("inputModeSelect"),
     drillType: document.getElementById("drillTypeSelect"),
@@ -74,6 +129,7 @@ const els = {
     lateCount: document.getElementById("lateCount"),
     wrongDirectionCount: document.getElementById("wrongDirectionCount"),
     disciplinePercent: document.getElementById("disciplinePercent"),
+    visionPercent: document.getElementById("visionPercent"),
     averageReaction: document.getElementById("averageReaction"),
     streak: document.getElementById("streak"),
     bestStreak: document.getElementById("bestStreak"),
@@ -84,6 +140,11 @@ const els = {
         document.getElementById("blockerLeft"),
         document.getElementById("blockerMiddle"),
         document.getElementById("blockerRight")
+    ],
+    runDefenders: [
+        document.getElementById("runDefenderLeft"),
+        document.getElementById("runDefenderMiddle"),
+        document.getElementById("runDefenderRight")
     ],
     lanes: {
         left: document.getElementById("laneLeft"),
@@ -114,6 +175,11 @@ const state = {
     runConcept: "inside",
     outsideTiming: null,
     direction: "middle",
+    visionScenario: null,
+    visionChoice: null,
+    visionAttempts: 0,
+    visionCorrect: 0,
+    wrongLaneHoldMs: 0,
     playsCompleted: 0,
     targetPlays: null,
     perfect: 0,
@@ -280,6 +346,10 @@ function updateScoreboard() {
     els.lateCount.textContent = String(state.late);
     els.wrongDirectionCount.textContent = String(state.wrongDirection);
     els.disciplinePercent.textContent = `${discipline}%`;
+    if (els.visionPercent) {
+        const vision = state.visionAttempts ? Math.round((state.visionCorrect / state.visionAttempts) * 100) : 100;
+        els.visionPercent.textContent = `${vision}%`;
+    }
     els.averageReaction.textContent = average === null ? "--" : `${average} ms`;
     els.streak.textContent = String(state.streak);
     els.bestStreak.textContent = String(state.bestStreak);
@@ -291,6 +361,10 @@ function resetStats() {
     state.early = 0;
     state.late = 0;
     state.wrongDirection = 0;
+    state.visionAttempts = 0;
+    state.visionCorrect = 0;
+    state.visionChoice = null;
+    state.wrongLaneHoldMs = 0;
     state.streak = 0;
     state.bestStreak = 0;
     state.reactions = [];
@@ -312,9 +386,17 @@ function chooseOffenseConcept() {
     return Math.random() < 0.55 ? "inside" : "outside";
 }
 
+function chooseVisionScenario(concept) {
+    const options = VISION_SCENARIOS.filter((scenario) => scenario.concepts.includes(concept));
+    return randomItem(options.length ? options : VISION_SCENARIOS);
+}
+
 function configurePlaySelection() {
     state.playType = choosePlayType();
     state.outsideTiming = null;
+    state.visionScenario = null;
+    state.visionChoice = null;
+    state.wrongLaneHoldMs = 0;
 
     if (state.playType === "defense") {
         state.runConcept = "defense";
@@ -323,11 +405,10 @@ function configurePlaySelection() {
     }
 
     state.runConcept = chooseOffenseConcept();
+    state.visionScenario = chooseVisionScenario(state.runConcept);
+    state.direction = state.visionScenario.direction;
     if (state.runConcept === "outside") {
-        state.direction = randomItem(OUTSIDE_DIRECTIONS);
         state.outsideTiming = Math.random() < 0.48 ? "open" : "developing";
-    } else {
-        state.direction = randomItem(DIRECTIONS);
     }
 }
 
@@ -419,6 +500,13 @@ function resetFieldVisuals() {
         blocker.style.opacity = "1";
         blocker.style.transform = "translate(-50%, -50%) scale(1)";
     });
+
+    els.runDefenders.forEach((defender, index) => {
+        defender.style.left = `${28 + index * 22}%`;
+        defender.style.top = "39%";
+        defender.style.opacity = "1";
+        defender.style.transform = "translate(-50%, -50%) scale(1)";
+    });
 }
 
 function configureFieldForPlay() {
@@ -429,6 +517,7 @@ function configureFieldForPlay() {
         els.playBadge.className = "play-badge defense";
         els.runner.classList.add("hidden");
         els.blockers.forEach((blocker) => blocker.classList.add("hidden"));
+        els.runDefenders.forEach((defender) => defender.classList.add("hidden"));
         els.defender.classList.remove("hidden");
         els.ballCarrier.classList.remove("hidden");
         els.phaseTitle.textContent = "Stay square at the top and read";
@@ -438,6 +527,7 @@ function configureFieldForPlay() {
 
     els.runner.classList.remove("hidden");
     els.blockers.forEach((blocker) => blocker.classList.remove("hidden"));
+    els.runDefenders.forEach((defender) => defender.classList.remove("hidden"));
     els.defender.classList.add("hidden");
     els.ballCarrier.classList.add("hidden");
 
@@ -447,13 +537,13 @@ function configureFieldForPlay() {
         els.playBadge.className = state.outsideTiming === "open"
             ? "play-badge outside-open"
             : "play-badge outside-developing";
-        els.phaseTitle.textContent = "Read the outside block";
-        els.phaseInstruction.textContent = "Do not sprint merely because the play is outside. Read whether the edge is already sealed.";
+        els.phaseTitle.textContent = "Read the outside blocks";
+        els.phaseInstruction.textContent = "Watch the edge defender and blocker leverage. Choose the lane yourself; no lane will be highlighted.";
     } else {
         els.playBadge.textContent = "OFFENSE • INSIDE";
         els.playBadge.className = "play-badge inside";
-        els.phaseTitle.textContent = "Read the inside blocks";
-        els.phaseInstruction.textContent = "Stay patient behind the line and wait for a gap to declare itself.";
+        els.phaseTitle.textContent = "Read the defensive front";
+        els.phaseInstruction.textContent = "Stay patient behind the line. Watch which defender is displaced and choose the opening yourself.";
     }
 }
 
@@ -481,6 +571,10 @@ function animateReadPhase() {
         const base = 28 + index * 22;
         blocker.style.left = `${base + movement[index]}%`;
         blocker.style.transform = "translate(-50%, -50%) scale(1.04)";
+    });
+    els.runDefenders.forEach((defender, index) => {
+        const base = 28 + index * 22;
+        defender.style.left = `${base - movement[index] * 0.45}%`;
     });
 }
 
@@ -544,21 +638,35 @@ function configureApproachTiming() {
 }
 
 function moveBlockersForDecision() {
+    if (state.playType !== "offense" || !state.visionScenario) return;
+
+    const scenario = state.visionScenario;
+    els.blockers.forEach((blocker, index) => {
+        const base = 28 + index * 22;
+        blocker.style.left = `${base + scenario.blockerDx[index]}%`;
+        blocker.style.transform = "translate(-50%, -50%) scale(1.08)";
+    });
+
+    els.runDefenders.forEach((defender, index) => {
+        const base = 28 + index * 22;
+        defender.style.left = `${base + scenario.defenderDx[index]}%`;
+        defender.style.top = `${39 + scenario.defenderDy[index]}%`;
+        defender.style.transform = "translate(-50%, -50%) scale(1.05)";
+    });
+}
+
+function stickLaneChoice(x = state.leftX, y = state.leftY) {
+    const movingForward = y <= -STICK_FORWARD_MIN;
+    if (!movingForward) return null;
+    if (x <= -STICK_SIDE_MIN) return "left";
+    if (x >= STICK_SIDE_MIN) return "right";
+    if (Math.abs(x) <= STICK_MIDDLE_MAX_X) return "middle";
+    return null;
+}
+
+function revealCorrectRead() {
     if (state.playType !== "offense") return;
-
-    const blockerIndex = state.direction === "left" ? 0 : state.direction === "middle" ? 1 : 2;
-    const selectedBlocker = els.blockers[blockerIndex];
-
-    if (state.runConcept === "outside") {
-        const sealOffset = state.direction === "left" ? 10 : -10;
-        selectedBlocker.style.left = `${directionX(state.direction) + sealOffset}%`;
-        selectedBlocker.style.transform = "translate(-50%, -50%) scale(1.08)";
-        return;
-    }
-
-    const gapOffset = state.direction === "left" ? -9 : state.direction === "right" ? 9 : 8;
-    selectedBlocker.style.left = `${directionX(state.direction) + gapOffset}%`;
-    selectedBlocker.style.transform = "translate(-50%, -50%) scale(1.08)";
+    els.lanes[state.direction]?.classList.add("open");
 }
 
 function revealDecision() {
@@ -568,7 +676,7 @@ function revealDecision() {
     state.approachProgress = 0;
     state.approachLastAt = performance.now();
     configureApproachTiming();
-    setDirectionArrow();
+    if (state.playType === "defense") setDirectionArrow();
 
     els.lineOfScrimmage.style.top = `${state.lineOfScrimmageTop}%`;
     els.burstLine.style.top = `${state.burstLineTop}%`;
@@ -586,21 +694,13 @@ function revealDecision() {
         return;
     }
 
-    els.lanes[state.direction].classList.add("open");
     moveBlockersForDecision();
-
+    els.phaseTitle.textContent = "Read it—choose your lane";
+    els.phaseInstruction.textContent = "Watch the blockers and defenders. Push the left stick toward the opening without R2. The trainer will judge your first committed lane.";
     if (state.runConcept === "outside" && state.outsideTiming === "open") {
-        els.phaseTitle.textContent = "The edge is already sealed";
-        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)}. The blue dashed LOS is your reference; this clean edge gives you an earlier burst point.`;
-        setFeedback("The edge is clean. You may burst before or near the LOS here—but still steer first and do not mash R2 from the handoff.", "neutral");
-    } else if (state.runConcept === "outside") {
-        els.phaseTitle.textContent = "The outside block is developing";
-        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)} and follow the block. The blue dashed LOS helps show when you are still behind it. Keep R2 released until the later burst point.`;
-        setFeedback("Stay patient and follow the blocker before accelerating. Use the LOS as a guide, not an automatic sprint signal.", "neutral");
+        setFeedback("The edge picture is developing quickly. Read leverage first, then commit—do not sprint just because it is an outside run.", "neutral");
     } else {
-        els.phaseTitle.textContent = "The inside lane opened";
-        els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.direction)} and enter the gap without R2. The blue dashed LOS helps show when you are approaching the hole. Accelerate at the burst point.`;
-        setFeedback("Enter the opening under control. If you are still behind the LOS, R2 is usually still too early.", "neutral");
+        setFeedback("Find open grass from the block movement. Commit to the best lane first; R2 comes later at the burst point.", "neutral");
     }
 }
 
@@ -623,7 +723,37 @@ function advanceApproach(now) {
     const elapsed = clamp(now - state.approachLastAt, 0, 50);
     state.approachLastAt = now;
 
-    if (stickMatchesTarget(state.direction)) {
+    if (state.playType === "offense") {
+        const choice = stickLaneChoice();
+        if (!choice) {
+            state.wrongLaneHoldMs = 0;
+            return;
+        }
+
+        if (state.visionChoice === null) {
+            state.visionChoice = choice;
+            state.visionAttempts += 1;
+            if (choice === state.direction) state.visionCorrect += 1;
+            updateScoreboard();
+        }
+
+        if (choice !== state.direction) {
+            state.wrongLaneHoldMs += elapsed;
+            if (state.wrongLaneHoldMs >= 240) {
+                revealCorrectRead();
+                finishPlay("wrong_direction");
+            }
+            return;
+        }
+
+        state.wrongLaneHoldMs = 0;
+        state.approachProgress = clamp(
+            state.approachProgress + elapsed / state.approachDuration,
+            0,
+            1
+        );
+        updateApproachVisual();
+    } else if (stickMatchesTarget(state.direction)) {
         state.approachProgress = clamp(
             state.approachProgress + elapsed / state.approachDuration,
             0,
@@ -737,6 +867,10 @@ function runCountdown() {
 }
 
 function wrongDirectionMessage() {
+    if (state.playType === "offense" && state.visionScenario) {
+        const chosen = state.visionChoice || stickLaneChoice() || describeStickDirection();
+        return `Vision miss: you chose ${chosen}, but the open read was ${state.direction}. ${state.visionScenario.coaching}`;
+    }
     const actual = describeStickDirection();
     const required = requiredStickLabel(state.direction);
     return `Wrong lane/angle. Your timing was green, but the stick was ${actual}. Hold ${required} with R2.`;
@@ -766,7 +900,11 @@ function finishPlay(result, reactionMs = null) {
         state.bestStreak = Math.max(state.bestStreak, state.streak);
         state.reactions.push(reaction);
         setCue("go", "PERFECT");
-        setFeedback(`Perfect—steer first, then R2 at the burst point in ${reaction} ms.`, "perfect");
+        if (state.playType === "offense") revealCorrectRead();
+        const visionText = state.playType === "offense" && state.visionScenario
+            ? ` Correct read: ${state.visionScenario.label}.`
+            : "";
+        setFeedback(`Perfect—steer first, then R2 at the burst point in ${reaction} ms.${visionText}`, "perfect");
         playSound(perfectSound);
 
         const x = directionX(state.direction);
@@ -780,6 +918,7 @@ function finishPlay(result, reactionMs = null) {
     } else if (result === "early") {
         state.early += 1;
         state.streak = 0;
+        if (state.playType === "offense") revealCorrectRead();
         setCue("bad", "TOO EARLY");
         setFeedback(earlyMessage(phaseAtResult), "early");
         playSound(wrongSound);
@@ -792,6 +931,7 @@ function finishPlay(result, reactionMs = null) {
     } else {
         state.late += 1;
         state.streak = 0;
+        if (state.playType === "offense") revealCorrectRead();
         setCue("bad", "TOO LATE");
         setFeedback("Too late. You reached the burst point and the green window expired.", "late");
         playSound(wrongSound);
@@ -828,8 +968,9 @@ function finishSession() {
 
     els.phaseTitle.textContent = "Practice complete";
     els.phaseInstruction.textContent = "Take the same read → steer → burst sequence into Madden practice mode.";
+    const vision = state.visionAttempts ? Math.round((state.visionCorrect / state.visionAttempts) * 100) : 100;
     setFeedback(
-        `Finished: ${discipline}% complete reps, ${state.early} early, ${state.wrongDirection} wrong lane, best streak ${state.bestStreak}.`,
+        `Finished: ${discipline}% complete reps, ${vision}% vision, ${state.early} early, ${state.wrongDirection} wrong lane, best streak ${state.bestStreak}.`,
         discipline >= 80 ? "perfect" : "neutral"
     );
 
@@ -844,6 +985,9 @@ function finishSession() {
         early: state.early,
         late: state.late,
         wrongDirection: state.wrongDirection,
+        visionAttempts: state.visionAttempts,
+        visionCorrect: state.visionCorrect,
+        vision,
         discipline,
         averageReaction: average,
         bestStreak: state.bestStreak
@@ -869,7 +1013,7 @@ function startPractice() {
 
     els.gameArea.classList.remove("hidden");
     els.startBtn.textContent = "Restart Practice";
-    setFeedback("Starting burst-point practice...", "neutral");
+    setFeedback("Starting running-vision practice...", "neutral");
 
     void fetch("/api/r2-practice-start", {
         method: "POST",

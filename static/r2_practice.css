@@ -1,4 +1,4 @@
-/* WURD R2 Discipline Practice v7 — LOS moved above offensive line */
+/* WURD Running Vision + R2 Practice v8 — defensive fronts and user-read lanes */
 * {
     box-sizing: border-box;
 }
@@ -235,7 +235,7 @@ select,
     height: 58%;
     border: 3px dashed transparent;
     border-radius: 12px;
-    opacity: 0.18;
+    opacity: 0.08;
     transition: opacity 120ms ease, background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
@@ -286,6 +286,17 @@ select,
 .blocker-left { left: 28%; }
 .blocker-middle { left: 50%; }
 .blocker-right { left: 72%; }
+
+.run-defender {
+    top: 39%;
+    background: #b91c1c;
+    border-color: #fee2e2;
+    z-index: 5;
+}
+
+.run-defender-left { left: 28%; }
+.run-defender-middle { left: 50%; }
+.run-defender-right { left: 72%; }
 
 .runner {
     left: 50%;
