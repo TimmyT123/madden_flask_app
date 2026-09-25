@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v16 — defender-aware final path validation
+// WURD Running Vision + R2 Practice v17 — lane vs angle evaluation
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -55,6 +55,9 @@ const LEFT_STICK_DEADZONE = 0.18;
 const STICK_FORWARD_MIN = 0.28;
 const STICK_SIDE_MIN = 0.30;
 const STICK_MIDDLE_MAX_X = 0.38;
+const VERTICAL_FORWARD_MIN = 0.52;
+const STAY_SIDE_MIN_X = 0.12;
+const STAY_SIDE_MAX_X = 0.74;
 const DIRECTIONS = ["left", "middle", "right"];
 const OUTSIDE_DIRECTIONS = ["left", "right"];
 
@@ -206,6 +209,7 @@ const els = {
     earlyCount: document.getElementById("earlyCount"),
     lateCount: document.getElementById("lateCount"),
     wrongDirectionCount: document.getElementById("wrongDirectionCount"),
+    wrongAngleCount: document.getElementById("wrongAngleCount"),
     disciplinePercent: document.getElementById("disciplinePercent"),
     visionPercent: document.getElementById("visionPercent"),
     leveragePercent: document.getElementById("leveragePercent"),
@@ -278,6 +282,9 @@ const state = {
     initialChoice: null,
     finalChoice: null,
     mistakeChoice: null,
+    mistakeType: null,
+    mistakeAngleText: null,
+    wrongAngleHoldMs: 0,
     leverageAttemptRecorded: false,
     cutbackAttemptRecorded: false,
     readStage: "press",
@@ -290,6 +297,7 @@ const state = {
     early: 0,
     late: 0,
     wrongDirection: 0,
+    wrongAngle: 0,
     streak: 0,
     bestStreak: 0,
     reactions: [],
@@ -446,7 +454,7 @@ function updateRunReadAvailability() {
 }
 
 function updateScoreboard() {
-    const attempts = state.perfect + state.early + state.late + state.wrongDirection;
+    const attempts = state.perfect + state.early + state.late + state.wrongDirection + state.wrongAngle;
     const discipline = attempts ? Math.round((state.perfect / attempts) * 100) : 100;
     const average = state.reactions.length
         ? Math.round(state.reactions.reduce((sum, value) => sum + value, 0) / state.reactions.length)
@@ -459,6 +467,7 @@ function updateScoreboard() {
     els.earlyCount.textContent = String(state.early);
     els.lateCount.textContent = String(state.late);
     els.wrongDirectionCount.textContent = String(state.wrongDirection);
+    if (els.wrongAngleCount) els.wrongAngleCount.textContent = String(state.wrongAngle);
     els.disciplinePercent.textContent = `${discipline}%`;
     if (els.visionPercent) els.visionPercent.textContent = `${vision}%`;
     if (els.leveragePercent) els.leveragePercent.textContent = `${leverage}%`;
@@ -474,6 +483,7 @@ function resetStats() {
     state.early = 0;
     state.late = 0;
     state.wrongDirection = 0;
+    state.wrongAngle = 0;
     state.visionAttempts = 0;
     state.visionCorrect = 0;
     state.leverageAttempts = 0;
@@ -484,6 +494,9 @@ function resetStats() {
     state.initialChoice = null;
     state.finalChoice = null;
     state.mistakeChoice = null;
+    state.mistakeType = null;
+    state.mistakeAngleText = null;
+    state.wrongAngleHoldMs = 0;
     state.leverageAttemptRecorded = false;
     state.cutbackAttemptRecorded = false;
     state.readStage = "press";
@@ -531,6 +544,9 @@ function configurePlaySelection() {
     state.initialChoice = null;
     state.finalChoice = null;
     state.mistakeChoice = null;
+    state.mistakeType = null;
+    state.mistakeAngleText = null;
+    state.wrongAngleHoldMs = 0;
     state.leverageAttemptRecorded = false;
     state.cutbackAttemptRecorded = false;
     state.readStage = "press";
@@ -1034,6 +1050,57 @@ function secondLevelActionLabel() {
     return `CUT ${laneLabel(state.direction)}`;
 }
 
+function stayAngleAnalysis(x = state.leftX, y = state.leftY) {
+    const forward = -y;
+    const direction = state.direction;
+    const detectedLane = stickLaneChoice(x, y) || (x >= STAY_SIDE_MIN_X ? "right" : x <= -STAY_SIDE_MIN_X ? "left" : "middle");
+
+    if (direction === "right") {
+        const onCorrectSide = x >= STAY_SIDE_MIN_X;
+        const tooWide = x > STAY_SIDE_MAX_X || forward < VERTICAL_FORWARD_MIN;
+        return {
+            detectedLane,
+            onCorrectSide,
+            verticalEnough: onCorrectSide && !tooWide,
+            angleText: tooWide ? "TOO WIDE / TURN UPFIELD" : "GETTING VERTICAL"
+        };
+    }
+
+    if (direction === "left") {
+        const onCorrectSide = x <= -STAY_SIDE_MIN_X;
+        const tooWide = x < -STAY_SIDE_MAX_X || forward < VERTICAL_FORWARD_MIN;
+        return {
+            detectedLane,
+            onCorrectSide,
+            verticalEnough: onCorrectSide && !tooWide,
+            angleText: tooWide ? "TOO WIDE / TURN UPFIELD" : "GETTING VERTICAL"
+        };
+    }
+
+    const onCorrectSide = Math.abs(x) <= 0.45;
+    const verticalEnough = onCorrectSide && forward >= VERTICAL_FORWARD_MIN && Math.abs(x) <= STICK_MIDDLE_MAX_X;
+    return {
+        detectedLane,
+        onCorrectSide,
+        verticalEnough,
+        angleText: verticalEnough ? "GETTING VERTICAL" : "TURN UPFIELD"
+    };
+}
+
+function isStayRead() {
+    return state.playType === "offense" && state.direction === state.initialDirection;
+}
+
+function finalRunInputMatches() {
+    if (state.playType !== "offense") return stickMatchesTarget(state.direction);
+    if (isStayRead()) return stayAngleAnalysis().verticalEnough;
+    return stickMatchesTarget(state.direction);
+}
+
+function angleToleranceMs() {
+    return Math.max(300, Math.round(currentDifficulty().reactionWindow * 0.55));
+}
+
 function updateSecondLevelStatus(choice = null) {
     if (!els.secondLevelStatus) return;
 
@@ -1043,8 +1110,14 @@ function updateSecondLevelStatus(choice = null) {
         return;
     }
 
-    if (state.awaitingContinue && state.mistakeChoice) {
-        els.secondLevelStatus.textContent = `Mistake input: ${laneLabel(state.mistakeChoice)}`;
+    if (state.awaitingContinue) {
+        if (state.mistakeType === "angle") {
+            els.secondLevelStatus.textContent = `Lane: ${laneLabel(state.direction)} ✓ • ${state.mistakeAngleText || "WRONG ANGLE"} ✕`;
+        } else if (state.mistakeChoice) {
+            els.secondLevelStatus.textContent = `Mistake input: ${laneLabel(state.mistakeChoice)}`;
+        } else {
+            els.secondLevelStatus.textContent = "Mistake review";
+        }
         els.secondLevelStatus.classList.add("active");
         return;
     }
@@ -1052,6 +1125,18 @@ function updateSecondLevelStatus(choice = null) {
     if (state.readStage !== "cut") {
         els.secondLevelStatus.textContent = "2nd-level input: WAITING";
         els.secondLevelStatus.classList.remove("active");
+        return;
+    }
+
+    if (isStayRead()) {
+        const analysis = stayAngleAnalysis();
+        if (analysis.onCorrectSide) {
+            els.secondLevelStatus.textContent = `2nd-level: ${laneLabel(state.direction)} • ${analysis.angleText}`;
+            els.secondLevelStatus.classList.add("active");
+        } else {
+            els.secondLevelStatus.textContent = `2nd-level input: ${laneLabel(analysis.detectedLane)}`;
+            els.secondLevelStatus.classList.toggle("active", Boolean(analysis.detectedLane));
+        }
         return;
     }
 
@@ -1070,6 +1155,9 @@ function showSecondLevelFit() {
     state.wrongLaneHoldMs = 0;
     state.finalChoice = null;
     state.mistakeChoice = null;
+    state.mistakeType = null;
+    state.mistakeAngleText = null;
+    state.wrongAngleHoldMs = 0;
     state.cutbackAttemptRecorded = false;
     updateSecondLevelStatus();
 
@@ -1206,19 +1294,63 @@ function advanceApproach(now) {
             return;
         }
 
-        state.finalChoice = choice;
-        state.visionChoice = choice;
-
         if (!state.cutbackAttemptRecorded) {
             state.cutbackAttemptRecorded = true;
             state.cutbackAttempts += 1;
             updateScoreboard();
         }
 
+        if (isStayRead()) {
+            const analysis = stayAngleAnalysis();
+            state.finalChoice = analysis.detectedLane;
+            state.visionChoice = analysis.detectedLane;
+
+            if (!analysis.onCorrectSide) {
+                state.wrongAngleHoldMs = 0;
+                state.wrongLaneHoldMs += elapsed;
+                if (state.wrongLaneHoldMs >= 280) {
+                    state.missedStage = "cutback";
+                    state.mistakeType = "lane";
+                    state.mistakeChoice = analysis.detectedLane;
+                    revealCorrectRead();
+                    finishPlay("wrong_direction");
+                }
+                return;
+            }
+
+            state.wrongLaneHoldMs = 0;
+            if (!analysis.verticalEnough) {
+                state.wrongAngleHoldMs += elapsed;
+                updateSecondLevelStatus();
+                if (state.wrongAngleHoldMs >= angleToleranceMs()) {
+                    state.missedStage = "angle";
+                    state.mistakeType = "angle";
+                    state.mistakeChoice = state.direction;
+                    state.mistakeAngleText = analysis.angleText;
+                    revealCorrectRead();
+                    finishPlay("wrong_angle");
+                }
+                return;
+            }
+
+            state.wrongAngleHoldMs = 0;
+            state.stageProgress = clamp(state.stageProgress + elapsed / (state.approachDuration * 0.68), 0, 1);
+            updateApproachVisual();
+            if (state.stageProgress >= 1) {
+                state.cutbackCorrect += 1;
+                updateScoreboard();
+                showBurstCue();
+            }
+            return;
+        }
+
+        state.finalChoice = choice;
+        state.visionChoice = choice;
         if (choice !== state.direction) {
             state.wrongLaneHoldMs += elapsed;
             if (state.wrongLaneHoldMs >= 280) {
                 state.missedStage = "cutback";
+                state.mistakeType = "lane";
                 state.mistakeChoice = choice;
                 revealCorrectRead();
                 finishPlay("wrong_direction");
@@ -1364,6 +1496,12 @@ function wrongDirectionMessage() {
     return `Wrong lane/angle. Your timing was green, but the stick was ${actual}. Hold ${required} with R2.`;
 }
 
+function wrongAngleMessage() {
+    const lane = laneLabel(state.direction);
+    const side = state.direction === "right" ? "right" : state.direction === "left" ? "left" : "middle";
+    return `FIRST READ: ${laneLabel(state.initialDirection)} ✅ | SECOND READ: STAY ${lane} ✅ | ERROR: RIGHT LANE, WRONG ANGLE ❌. You stayed on the ${side} path, but you did not turn upfield enough. Reduce the sideways stick angle, keep moving forward, then use R2 after you are vertical through the crease.`;
+}
+
 function earlyMessage(phaseAtResult) {
     if (phaseAtResult === "approach") {
         return "Too early. You saw a lane, but you burst before you were through the traffic picture.";
@@ -1454,6 +1592,12 @@ function finishPlay(result, reactionMs = null) {
             }
         }
         waitForMistakeReview(detail, "TOO EARLY");
+    } else if (result === "wrong_angle") {
+        state.wrongAngle += 1;
+        state.streak = 0;
+        if (state.playType === "offense") revealCorrectRead();
+        playSound(wrongSound);
+        waitForMistakeReview(wrongAngleMessage(), "WRONG ANGLE");
     } else if (result === "wrong_direction") {
         state.wrongDirection += 1;
         state.streak = 0;
@@ -1497,7 +1641,7 @@ function finishSession() {
     els.startBtn.textContent = "Start Again";
     setCue("go", "FINISHED");
 
-    const attempts = state.perfect + state.early + state.late + state.wrongDirection;
+    const attempts = state.perfect + state.early + state.late + state.wrongDirection + state.wrongAngle;
     const discipline = attempts ? Math.round((state.perfect / attempts) * 100) : 100;
     const average = state.reactions.length
         ? Math.round(state.reactions.reduce((sum, value) => sum + value, 0) / state.reactions.length)
@@ -1524,6 +1668,7 @@ function finishSession() {
         early: state.early,
         late: state.late,
         wrongDirection: state.wrongDirection,
+        wrongAngle: state.wrongAngle,
         visionAttempts: state.visionAttempts,
         visionCorrect: state.visionCorrect,
         vision,
@@ -1592,7 +1737,7 @@ function onR2Pressed() {
         finishPlay("early");
     } else if (state.phase === "burst") {
         const reaction = performance.now() - state.cueAt;
-        if (stickMatchesTarget(state.direction)) {
+        if (finalRunInputMatches()) {
             finishPlay("perfect", reaction);
         } else {
             finishPlay("wrong_direction", reaction);
