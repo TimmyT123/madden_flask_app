@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v12 — mistake review waits for X
+// WURD Running Vision + R2 Practice v13 — exact detected input + live second-level readout
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -185,6 +185,7 @@ const els = {
     controllerStatus: document.getElementById("controllerStatus"),
     r2Status: document.getElementById("r2Status"),
     leftStickStatus: document.getElementById("leftStickStatus"),
+    secondLevelStatus: document.getElementById("secondLevelStatus"),
     keyboardHelp: document.getElementById("keyboardHelp"),
     gameArea: document.getElementById("gameArea"),
     perfectCount: document.getElementById("perfectCount"),
@@ -256,6 +257,9 @@ const state = {
     cutbackCorrect: 0,
     initialChoice: null,
     finalChoice: null,
+    mistakeChoice: null,
+    leverageAttemptRecorded: false,
+    cutbackAttemptRecorded: false,
     readStage: "press",
     stageProgress: 0,
     missedStage: null,
@@ -456,6 +460,9 @@ function resetStats() {
     state.visionChoice = null;
     state.initialChoice = null;
     state.finalChoice = null;
+    state.mistakeChoice = null;
+    state.leverageAttemptRecorded = false;
+    state.cutbackAttemptRecorded = false;
     state.readStage = "press";
     state.stageProgress = 0;
     state.missedStage = null;
@@ -497,6 +504,9 @@ function configurePlaySelection() {
     state.visionChoice = null;
     state.initialChoice = null;
     state.finalChoice = null;
+    state.mistakeChoice = null;
+    state.leverageAttemptRecorded = false;
+    state.cutbackAttemptRecorded = false;
     state.readStage = "press";
     state.stageProgress = 0;
     state.missedStage = null;
@@ -798,12 +808,60 @@ function moveBlockersForDecision() {
     });
 }
 
+function laneLabel(direction) {
+    if (direction === "left") return "LEFT";
+    if (direction === "right") return "RIGHT";
+    if (direction === "middle") return "MIDDLE / STRAIGHT";
+    return "CENTERED";
+}
+
+function secondLevelActionLabel() {
+    if (state.direction === state.initialDirection) {
+        return `STAY ${laneLabel(state.direction)}`;
+    }
+    const family = state.visionScenario?.family;
+    if (family === "bounce") return `BOUNCE ${laneLabel(state.direction)}`;
+    return `CUT ${laneLabel(state.direction)}`;
+}
+
+function updateSecondLevelStatus(choice = null) {
+    if (!els.secondLevelStatus) return;
+
+    if (state.playType !== "offense" || !state.running) {
+        els.secondLevelStatus.textContent = "2nd-level input: --";
+        els.secondLevelStatus.classList.remove("active");
+        return;
+    }
+
+    if (state.awaitingContinue && state.mistakeChoice) {
+        els.secondLevelStatus.textContent = `Mistake input: ${laneLabel(state.mistakeChoice)}`;
+        els.secondLevelStatus.classList.add("active");
+        return;
+    }
+
+    if (state.readStage !== "cut") {
+        els.secondLevelStatus.textContent = "2nd-level input: WAITING";
+        els.secondLevelStatus.classList.remove("active");
+        return;
+    }
+
+    const detected = choice || stickLaneChoice();
+    els.secondLevelStatus.textContent = detected
+        ? `2nd-level input: ${laneLabel(detected)}`
+        : "2nd-level input: CENTERED";
+    els.secondLevelStatus.classList.toggle("active", Boolean(detected));
+}
+
 function showSecondLevelFit() {
     if (state.playType !== "offense" || !state.visionScenario || state.readStage !== "press") return;
     const scenario = state.visionScenario;
     state.readStage = "cut";
     state.stageProgress = 0;
     state.wrongLaneHoldMs = 0;
+    state.finalChoice = null;
+    state.mistakeChoice = null;
+    state.cutbackAttemptRecorded = false;
+    updateSecondLevelStatus();
 
     els.runLinebackers.forEach((linebacker, index) => {
         const base = 28 + index * 22;
@@ -895,20 +953,20 @@ function advanceApproach(now) {
 
     if (state.playType === "offense") {
         const choice = stickLaneChoice();
+        updateSecondLevelStatus(choice);
+
         if (!choice) {
             state.wrongLaneHoldMs = 0;
             return;
         }
 
         if (state.readStage === "press") {
-            if (state.initialChoice === null) {
-                state.initialChoice = choice;
+            state.initialChoice = choice;
+
+            if (!state.leverageAttemptRecorded) {
+                state.leverageAttemptRecorded = true;
                 state.leverageAttempts += 1;
                 state.visionAttempts += 1;
-                if (choice === state.initialDirection) {
-                    state.leverageCorrect += 1;
-                    state.visionCorrect += 1;
-                }
                 updateScoreboard();
             }
 
@@ -916,6 +974,7 @@ function advanceApproach(now) {
                 state.wrongLaneHoldMs += elapsed;
                 if (state.wrongLaneHoldMs >= 280) {
                     state.missedStage = "leverage";
+                    state.mistakeChoice = choice;
                     finishPlay("wrong_direction");
                 }
                 return;
@@ -924,15 +983,21 @@ function advanceApproach(now) {
             state.wrongLaneHoldMs = 0;
             state.stageProgress = clamp(state.stageProgress + elapsed / (state.approachDuration * 0.58), 0, 1);
             updateApproachVisual();
-            if (state.stageProgress >= 1) showSecondLevelFit();
+            if (state.stageProgress >= 1) {
+                state.leverageCorrect += 1;
+                state.visionCorrect += 1;
+                updateScoreboard();
+                showSecondLevelFit();
+            }
             return;
         }
 
-        if (state.finalChoice === null) {
-            state.finalChoice = choice;
-            state.visionChoice = choice;
+        state.finalChoice = choice;
+        state.visionChoice = choice;
+
+        if (!state.cutbackAttemptRecorded) {
+            state.cutbackAttemptRecorded = true;
             state.cutbackAttempts += 1;
-            if (choice === state.direction) state.cutbackCorrect += 1;
             updateScoreboard();
         }
 
@@ -940,6 +1005,7 @@ function advanceApproach(now) {
             state.wrongLaneHoldMs += elapsed;
             if (state.wrongLaneHoldMs >= 280) {
                 state.missedStage = "cutback";
+                state.mistakeChoice = choice;
                 revealCorrectRead();
                 finishPlay("wrong_direction");
             }
@@ -949,7 +1015,11 @@ function advanceApproach(now) {
         state.wrongLaneHoldMs = 0;
         state.stageProgress = clamp(state.stageProgress + elapsed / (state.approachDuration * 0.68), 0, 1);
         updateApproachVisual();
-        if (state.stageProgress >= 1) showBurstCue();
+        if (state.stageProgress >= 1) {
+            state.cutbackCorrect += 1;
+            updateScoreboard();
+            showBurstCue();
+        }
         return;
     }
 
@@ -1067,10 +1137,12 @@ function runCountdown() {
 function wrongDirectionMessage() {
     if (state.playType === "offense" && state.visionScenario) {
         if (state.missedStage === "leverage") {
-            return `Leverage miss: you pressed ${state.initialChoice || stickLaneChoice() || "the wrong lane"}, but the first-level leverage called for ${state.initialDirection}. Press the block first, then make the linebackers commit.`;
+            const detected = state.mistakeChoice || state.initialChoice || stickLaneChoice();
+            return `FIRST READ: ${laneLabel(detected)} ❌ | CORRECT FIRST READ: ${laneLabel(state.initialDirection)}. You missed the blocker/defender leverage. Press ${laneLabel(state.initialDirection)} first without R2 so the linebackers have to declare.`;
         }
-        const chosen = state.finalChoice || state.visionChoice || stickLaneChoice() || describeStickDirection();
-        return `Second-level miss: you chose ${chosen}, but the linebacker fit made ${state.direction} the best answer. ${state.visionScenario.coaching}`;
+
+        const detected = state.mistakeChoice || state.finalChoice || stickLaneChoice();
+        return `FIRST READ: ${laneLabel(state.initialDirection)} ✅ | SECOND-LEVEL INPUT THAT CAUSED THE MISS: ${laneLabel(detected)} ❌ | CORRECT SECOND-LEVEL ACTION: ${secondLevelActionLabel()} ✅. ${state.visionScenario.coaching}`;
     }
     const actual = describeStickDirection();
     const required = requiredStickLabel(state.direction);
@@ -1089,6 +1161,7 @@ function waitForMistakeReview(message, cueText) {
     state.continueArmed = false;
     state.phase = "feedback_wait";
     setCue("bad", cueText);
+    updateSecondLevelStatus(state.mistakeChoice);
     els.phaseTitle.textContent = "Review the mistake";
     els.phaseInstruction.textContent = "Take as long as you need. Release X if it is held, then press X when you are ready for the next play.";
     setFeedback(`${message}  Press X when ready.`, "wrong-direction");
@@ -1156,7 +1229,7 @@ function finishPlay(result, reactionMs = null) {
         if (state.playType === "offense") {
             if (state.readStage === "press") {
                 detail += ` Your first job was to press ${state.initialDirection} without R2 and let the linebackers declare.`;
-            } else if (state.readStage === "fit") {
+            } else if (state.readStage === "cut") {
                 detail += ` You still needed to read the linebacker fit and finish toward ${state.direction} before bursting.`;
             } else {
                 detail += ` The correct final lane was ${state.direction}; wait until the R2 NOW cue.`;
@@ -1267,6 +1340,7 @@ function startPractice() {
 
     els.gameArea.classList.remove("hidden");
     els.startBtn.textContent = "Restart Practice";
+    updateSecondLevelStatus();
     setFeedback("Starting leverage + cutback practice...", "neutral");
 
     void fetch("/api/r2-practice-start", {
@@ -1339,6 +1413,10 @@ function applyLeftStick(x, y) {
     state.leftX = Math.abs(x) < LEFT_STICK_DEADZONE ? 0 : clamp(x, -1, 1);
     state.leftY = Math.abs(y) < LEFT_STICK_DEADZONE ? 0 : clamp(y, -1, 1);
     els.leftStickStatus.textContent = `Left stick: ${describeStickDirection()}`;
+
+    if (state.running && state.playType === "offense" && state.phase === "approach" && state.readStage === "cut") {
+        updateSecondLevelStatus(stickLaneChoice());
+    }
 
     if (!state.running || state.phase !== "read") return;
 

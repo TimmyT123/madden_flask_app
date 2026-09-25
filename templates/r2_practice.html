@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>WURD Running Vision + Leverage / Cutback Reads</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=13-locked-review">
+    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=14-input-detection">
 </head>
 <body>
 <div class="container">
@@ -62,6 +62,7 @@
         <div id="controllerStatus" class="status-pill">Waiting for controller...</div>
         <div id="r2Status" class="status-pill">R2: released</div>
         <div id="leftStickStatus" class="status-pill">Left stick: centered</div>
+        <div id="secondLevelStatus" class="status-pill">2nd-level input: --</div>
     </div>
 
     <div id="keyboardHelp" class="keyboard-help hidden">
@@ -161,6 +162,6 @@
 </div>
 
 <script src="{{ url_for('static', filename='practice_controls.js') }}"></script>
-<script src="{{ url_for('static', filename='r2_practice.js') }}?v=13-locked-review"></script>
+<script src="{{ url_for('static', filename='r2_practice.js') }}?v=14-input-detection"></script>
 </body>
 </html>
