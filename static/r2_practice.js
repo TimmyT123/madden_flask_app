@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v15 — gap-aware mistake routes
+// WURD Running Vision + R2 Practice v16 — defender-aware final path validation
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -315,6 +315,9 @@ const state = {
     continueArmed: false,
     awaitingContinue: false,
     pendingSessionFinish: false,
+    resolvedRouteFinalX: null,
+    resolvedRouteFinalText: null,
+    resolvedCoaching: null,
     paused: false,
     pauseStartedAt: 0,
     readAnimationTimer: null
@@ -487,6 +490,9 @@ function resetStats() {
     state.stageProgress = 0;
     state.missedStage = null;
     state.wrongLaneHoldMs = 0;
+    state.resolvedRouteFinalX = null;
+    state.resolvedRouteFinalText = null;
+    state.resolvedCoaching = null;
     state.awaitingContinue = false;
     state.continueArmed = false;
     state.pendingSessionFinish = false;
@@ -531,6 +537,9 @@ function configurePlaySelection() {
     state.stageProgress = 0;
     state.missedStage = null;
     state.wrongLaneHoldMs = 0;
+    state.resolvedRouteFinalX = null;
+    state.resolvedRouteFinalText = null;
+    state.resolvedCoaching = null;
 
     if (state.playType === "defense") {
         state.runConcept = "defense";
@@ -605,9 +614,116 @@ function stickMatchesTarget(direction, x = state.leftX, y = state.leftY) {
 }
 
 function routeLaneX(direction) {
-    if (direction === "left") return 22;
-    if (direction === "right") return 78;
+    // Review arrows represent realistic aiming points inside the tackle box,
+    // not the center of the full LEFT/MIDDLE/RIGHT teaching columns.
+    if (direction === "left") return 34;
+    if (direction === "right") return 66;
     return 50;
+}
+
+function laneFromX(x) {
+    if (x < 42) return "left";
+    if (x > 58) return "right";
+    return "middle";
+}
+
+function finalDefensePositions(scenario) {
+    const defenders = scenario.defenderDx.map((dx, index) => ({
+        kind: "DL",
+        x: 28 + index * 22 + dx,
+        y: 39 + scenario.defenderDy[index]
+    }));
+    const linebackers = scenario.linebackerDxFinal.map((dx, index) => ({
+        kind: "LB",
+        x: 28 + index * 22 + dx,
+        y: 28 + scenario.linebackerDyFinal[index]
+    }));
+    return [...defenders, ...linebackers];
+}
+
+function pathClearanceAtX(x, scenario) {
+    const defense = finalDefensePositions(scenario);
+    let clearance = 99;
+    for (const player of defense) {
+        // DLs at the line are the biggest immediate problem; linebackers matter too
+        // but have a little more reaction distance.
+        const weight = player.kind === "DL" ? 1.0 : 0.82;
+        const horizontal = Math.abs(x - player.x) / weight;
+        clearance = Math.min(clearance, horizontal);
+    }
+    return clearance;
+}
+
+function describeResolvedPath(direction, finalX, initialDirection) {
+    if (direction === initialDirection) {
+        if (direction === "middle") return "STAY MIDDLE — GET VERTICAL";
+        return `STAY ${laneLabel(direction)} — GET VERTICAL`;
+    }
+
+    if (direction === "middle") {
+        const side = finalX >= 50 ? "RIGHT" : "LEFT";
+        return `BEND INSIDE — ${side} SHOULDER OF THE MIDDLE`;
+    }
+    return `CUT ${laneLabel(direction)} — BEST CLEAR CREASE`;
+}
+
+function resolveFinalRunPath() {
+    if (state.playType !== "offense" || !state.visionScenario) return;
+
+    const scenario = state.visionScenario;
+    const initialX = routeLaneX(state.initialDirection);
+    const plannedX = Number.isFinite(scenario.routeFinalX)
+        ? scenario.routeFinalX
+        : routeLaneX(scenario.direction);
+    const plannedDirection = scenario.direction;
+    const plannedClearance = pathClearanceAtX(plannedX, scenario);
+
+    // Do not ask for a huge cross-formation cut after the runner has already pressed a side.
+    // Search only for a realistic redirect window around the press point.
+    const minX = clamp(initialX - 22, 20, 80);
+    const maxX = clamp(initialX + 22, 20, 80);
+    let bestX = initialX;
+    let bestScore = -Infinity;
+
+    for (let x = minX; x <= maxX; x += 2) {
+        const clearance = pathClearanceAtX(x, scenario);
+        const redirectCost = Math.abs(x - initialX) * 0.10;
+        const edgeCost = (x < 24 || x > 76) ? 1.5 : 0;
+        const score = clearance - redirectCost - edgeCost;
+        if (score > bestScore) {
+            bestScore = score;
+            bestX = x;
+        }
+    }
+
+    const stayClearance = pathClearanceAtX(initialX, scenario);
+    const bestClearance = pathClearanceAtX(bestX, scenario);
+    const plannedIsBlocked = plannedClearance < 10;
+    const plannedIsHugeCut = Math.abs(plannedX - initialX) > 24;
+    const plannedClearlyBetter = plannedClearance >= stayClearance + 3;
+
+    let resolvedX = plannedX;
+    let resolvedDirection = plannedDirection;
+    let explanation = scenario.coaching;
+
+    if (plannedIsBlocked || plannedIsHugeCut || !plannedClearlyBetter) {
+        // If the planned answer is not visibly safer, use the best actually open path.
+        // If nothing is meaningfully better than staying, teach STAY / damage control.
+        const bestMeaningfullyBetter = bestClearance >= stayClearance + 3 && bestClearance >= 9;
+        resolvedX = bestMeaningfullyBetter ? bestX : initialX;
+        resolvedDirection = laneFromX(resolvedX);
+
+        if (resolvedX === initialX) {
+            explanation = `The planned cut was not visibly cleaner. Stay on the ${laneLabel(state.initialDirection).toLowerCase()} press and take the available yards instead of cutting into traffic.`;
+        } else {
+            explanation = `The original planned cut was blocked. Redirect only to the clearest visible crease, then get vertical before using R2.`;
+        }
+    }
+
+    state.direction = resolvedDirection;
+    state.resolvedRouteFinalX = resolvedX;
+    state.resolvedRouteFinalText = describeResolvedPath(resolvedDirection, resolvedX, state.initialDirection);
+    state.resolvedCoaching = explanation;
 }
 
 function hideReviewRoute() {
@@ -629,9 +745,11 @@ function showReviewRoute() {
     const pressX = routeLaneX(state.initialDirection);
     // The final review target is scenario-specific so the arrow points THROUGH
     // an actual crease/shoulder instead of the center of a generic LEFT/MIDDLE/RIGHT lane.
-    const finalX = Number.isFinite(scenario.routeFinalX)
-        ? scenario.routeFinalX
-        : routeLaneX(state.direction);
+    const finalX = Number.isFinite(state.resolvedRouteFinalX)
+        ? state.resolvedRouteFinalX
+        : Number.isFinite(scenario.routeFinalX)
+            ? scenario.routeFinalX
+            : routeLaneX(state.direction);
     const decisionY = 52;
     const finishY = 22;
 
@@ -660,7 +778,7 @@ function showReviewRoute() {
     }
 
     if (els.routeFinalLabel) {
-        const action = scenario.routeFinalText || secondLevelActionLabel();
+        const action = state.resolvedRouteFinalText || scenario.routeFinalText || secondLevelActionLabel();
         // Keep long gap descriptions away from the edge and slightly below the arrow tip.
         const labelX = clamp(finalX, 24, 76);
         els.routeFinalLabel.setAttribute("x", String(labelX));
@@ -962,12 +1080,16 @@ function showSecondLevelFit() {
         linebacker.style.transform = "translate(-50%, -50%) scale(1.10)";
     });
 
+    // Validate the planned second-level answer against the defense that is actually on-screen.
+    // A cut is only taught if that visible crease is meaningfully cleaner than staying.
+    resolveFinalRunPath();
+
     setCue("aim", state.direction === state.initialDirection ? "STAY?" : "CUT?");
     els.phaseTitle.textContent = state.direction === state.initialDirection
         ? "Second level moved—do you stay?"
         : "Second level overfit—find the cutback";
     els.phaseInstruction.textContent = "Read the linebackers now. Stay on the leverage path if it remains clean, or redirect to the cutback/bounce lane without R2.";
-    setFeedback("The first-level read got you here. Now let the linebacker fit decide whether you stay or redirect.", "neutral");
+    setFeedback(state.resolvedCoaching || "The first-level read got you here. Now let the linebacker fit decide whether you stay or redirect.", "neutral");
 }
 
 function stickLaneChoice(x = state.leftX, y = state.leftY) {
@@ -1234,8 +1356,8 @@ function wrongDirectionMessage() {
         }
 
         const detected = state.mistakeChoice || state.finalChoice || stickLaneChoice();
-        const exactPath = state.visionScenario?.routeFinalText || secondLevelActionLabel();
-        return `FIRST READ: ${laneLabel(state.initialDirection)} ✅ | SECOND-LEVEL INPUT THAT CAUSED THE MISS: ${laneLabel(detected)} ❌ | CORRECT PATH: ${exactPath} ✅. ${state.visionScenario.coaching}`;
+        const exactPath = state.resolvedRouteFinalText || state.visionScenario?.routeFinalText || secondLevelActionLabel();
+        return `FIRST READ: ${laneLabel(state.initialDirection)} ✅ | SECOND-LEVEL INPUT THAT CAUSED THE MISS: ${laneLabel(detected)} ❌ | CORRECT PATH: ${exactPath} ✅. ${state.resolvedCoaching || state.visionScenario.coaching}`;
     }
     const actual = describeStickDirection();
     const required = requiredStickLabel(state.direction);

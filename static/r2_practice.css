@@ -789,7 +789,7 @@ select,
     stroke-width: 1px;
 }
 
-/* v15: long exact-gap labels used by mistake review */
+/* v16: long exact-gap labels used by mistake review */
 .route-label-final {
     font-size: 3.4px;
     paint-order: stroke fill;
