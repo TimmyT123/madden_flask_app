@@ -1,4 +1,4 @@
-/* WURD Running Vision + R2 Practice v8 — defensive fronts and user-read lanes */
+/* WURD Running Vision + R2 Practice v9 — penetration reads and linebacker flow */
 * {
     box-sizing: border-box;
 }
@@ -297,6 +297,20 @@ select,
 .run-defender-left { left: 28%; }
 .run-defender-middle { left: 50%; }
 .run-defender-right { left: 72%; }
+
+.run-linebacker {
+    top: 28%;
+    background: #f59e0b;
+    border-color: #fef3c7;
+    z-index: 4;
+    width: 42px;
+    height: 42px;
+    font-size: 11px;
+}
+
+.run-linebacker-left { left: 28%; }
+.run-linebacker-middle { left: 50%; }
+.run-linebacker-right { left: 72%; }
 
 .runner {
     left: 50%;
@@ -634,6 +648,31 @@ select,
 .play-badge.outside-developing {
     border-color: #f59e0b;
     color: #fde68a;
+}
+
+.play-badge.penetration {
+    border-color: #ef4444;
+    color: #fecaca;
+}
+
+.play-badge.bounce {
+    border-color: #f59e0b;
+    color: #fde68a;
+}
+
+.play-badge.crease {
+    border-color: #22c55e;
+    color: #bbf7d0;
+}
+
+.play-badge.damage-control {
+    border-color: #a855f7;
+    color: #e9d5ff;
+}
+
+.play-badge.clean {
+    border-color: #22c55e;
+    color: #bbf7d0;
 }
 
 @media (min-width: 821px) {

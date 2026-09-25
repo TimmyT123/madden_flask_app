@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v8 — defensive fronts and user-read lanes
+// WURD Running Vision + R2 Practice v9 — penetration reads and linebacker flow
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -61,54 +61,121 @@ const OUTSIDE_DIRECTIONS = ["left", "right"];
 // blockerDx / defenderDx are percentage-point movements from each player's starting X position.
 const VISION_SCENARIOS = [
     {
-        id: "inside-left-cutback",
+        id: "inside-left-cutback-penetration",
         concepts: ["inside"],
         direction: "left",
+        family: "penetration",
         label: "CUTBACK LEFT",
-        blockerDx: [-5, 4, 2],
-        defenderDx: [8, 6, 1],
-        defenderDy: [2, -1, 0],
-        coaching: "The front flowed right and the backside opened. Take the cutback before you sprint."
+        blockerDx: [-1, 5, 2],
+        defenderDx: [9, 5, -1],
+        defenderDy: [7, 1, 0],
+        linebackerDx: [-4, 7, 2],
+        linebackerDy: [1, 4, 0],
+        coaching: "A blocker lost and the linebackers flowed right. Press the frontside just long enough to see it, then cut back left without R2."
     },
     {
-        id: "inside-middle-wash",
-        concepts: ["inside"],
-        direction: "middle",
-        label: "MIDDLE CREASE",
-        blockerDx: [-2, -8, 7],
-        defenderDx: [-7, -12, 9],
-        defenderDy: [0, 2, 1],
-        coaching: "The interior defenders were displaced away from the crease. Get vertical through the middle."
-    },
-    {
-        id: "inside-right-cut",
+        id: "inside-right-cutback-penetration",
         concepts: ["inside"],
         direction: "right",
+        family: "penetration",
+        label: "CUTBACK RIGHT",
+        blockerDx: [-2, 5, 1],
+        defenderDx: [1, 5, -9],
+        defenderDy: [0, 1, 7],
+        linebackerDx: [-2, -7, 4],
+        linebackerDy: [0, 4, 1],
+        coaching: "The backside right B-gap became the answer when the line leaked and the second level flowed left. Cut back right before you sprint."
+    },
+    {
+        id: "inside-middle-crease-after-flow",
+        concepts: ["inside"],
+        direction: "middle",
+        family: "crease",
+        label: "MIDDLE CREASE",
+        blockerDx: [-5, -4, 6],
+        defenderDx: [6, 8, -8],
+        defenderDy: [2, 4, 2],
+        linebackerDx: [-7, 0, 7],
+        linebackerDy: [1, 4, 1],
+        coaching: "The linebackers widened with the flow and the middle crease stayed alive. Get vertical before closing speed arrives."
+    },
+    {
+        id: "outside-left-bounce-after-penetration",
+        concepts: ["outside"],
+        direction: "left",
+        family: "bounce",
+        label: "BOUNCE LEFT",
+        blockerDx: [-8, -1, 3],
+        defenderDx: [10, 9, -1],
+        defenderDy: [1, 5, 0],
+        linebackerDx: [6, 8, 0],
+        linebackerDy: [1, 4, 0],
+        coaching: "Interior penetration killed the inside lane. The left edge is the escape path, so bounce outside once the seal forms."
+    },
+    {
+        id: "outside-right-bounce-after-penetration",
+        concepts: ["outside"],
+        direction: "right",
+        family: "bounce",
+        label: "BOUNCE RIGHT",
+        blockerDx: [-3, -1, 8],
+        defenderDx: [1, 9, -10],
+        defenderDy: [0, 5, 1],
+        linebackerDx: [0, -8, -6],
+        linebackerDy: [0, 4, 1],
+        coaching: "The inside path collapsed. Stay patient behind the block, then bounce right once the force defender is sealed in."
+    },
+    {
+        id: "inside-limit-damage-left",
+        concepts: ["inside"],
+        direction: "left",
+        family: "damage-control",
+        label: "BEST AVAILABLE LEFT",
+        blockerDx: [-4, 1, 4],
+        defenderDx: [4, 10, -4],
+        defenderDy: [2, 6, 2],
+        linebackerDx: [-1, 5, 5],
+        linebackerDy: [1, 3, 1],
+        coaching: "This was a muddy run. There is no huge hole, so slide left for the best available yards and live for the next play."
+    },
+    {
+        id: "inside-limit-damage-right",
+        concepts: ["inside"],
+        direction: "right",
+        family: "damage-control",
+        label: "BEST AVAILABLE RIGHT",
+        blockerDx: [-4, 1, 4],
+        defenderDx: [4, 10, -4],
+        defenderDy: [2, 6, 2],
+        linebackerDx: [-5, -5, 1],
+        linebackerDy: [1, 3, 1],
+        coaching: "Nothing is clean here. Work to the right B-gap for the least-bad yardage instead of running straight into the loss."
+    },
+    {
+        id: "inside-clean-right",
+        concepts: ["inside"],
+        direction: "right",
+        family: "clean",
         label: "RIGHT B-GAP",
         blockerDx: [-1, -5, 6],
         defenderDx: [-1, -9, -8],
         defenderDy: [1, 2, 2],
-        coaching: "The right-side defender was sealed inside. Press the run, then cut into the right gap."
+        linebackerDx: [0, -3, 3],
+        linebackerDy: [0, 1, 1],
+        coaching: "This is one of the cleaner looks. Press the run and get vertical through the right B-gap."
     },
     {
-        id: "outside-left-seal",
+        id: "outside-clean-left",
         concepts: ["outside"],
         direction: "left",
+        family: "clean",
         label: "LEFT EDGE",
         blockerDx: [-8, -2, 1],
         defenderDx: [11, 4, 1],
         defenderDy: [1, 0, 0],
-        coaching: "The left edge was sealed inside. Get outside the block and accelerate once the edge is won."
-    },
-    {
-        id: "outside-right-seal",
-        concepts: ["outside"],
-        direction: "right",
-        label: "RIGHT EDGE",
-        blockerDx: [-1, 2, 8],
-        defenderDx: [-1, -4, -11],
-        defenderDy: [0, 0, 1],
-        coaching: "The right edge was sealed inside. Stay patient behind the block, then get outside."
+        linebackerDx: [4, 7, 2],
+        linebackerDy: [0, 2, 1],
+        coaching: "The edge is clean. Win the corner left, then burst once you are outside the traffic."
     }
 ];
 
@@ -145,6 +212,11 @@ const els = {
         document.getElementById("runDefenderLeft"),
         document.getElementById("runDefenderMiddle"),
         document.getElementById("runDefenderRight")
+    ],
+    runLinebackers: [
+        document.getElementById("runLinebackerLeft"),
+        document.getElementById("runLinebackerMiddle"),
+        document.getElementById("runLinebackerRight")
     ],
     lanes: {
         left: document.getElementById("laneLeft"),
@@ -507,6 +579,13 @@ function resetFieldVisuals() {
         defender.style.opacity = "1";
         defender.style.transform = "translate(-50%, -50%) scale(1)";
     });
+
+    els.runLinebackers.forEach((linebacker, index) => {
+        linebacker.style.left = `${28 + index * 22}%`;
+        linebacker.style.top = "28%";
+        linebacker.style.opacity = "1";
+        linebacker.style.transform = "translate(-50%, -50%) scale(1)";
+    });
 }
 
 function configureFieldForPlay() {
@@ -518,6 +597,7 @@ function configureFieldForPlay() {
         els.runner.classList.add("hidden");
         els.blockers.forEach((blocker) => blocker.classList.add("hidden"));
         els.runDefenders.forEach((defender) => defender.classList.add("hidden"));
+        els.runLinebackers.forEach((linebacker) => linebacker.classList.add("hidden"));
         els.defender.classList.remove("hidden");
         els.ballCarrier.classList.remove("hidden");
         els.phaseTitle.textContent = "Stay square at the top and read";
@@ -528,22 +608,39 @@ function configureFieldForPlay() {
     els.runner.classList.remove("hidden");
     els.blockers.forEach((blocker) => blocker.classList.remove("hidden"));
     els.runDefenders.forEach((defender) => defender.classList.remove("hidden"));
+    els.runLinebackers.forEach((linebacker) => linebacker.classList.remove("hidden"));
     els.defender.classList.add("hidden");
     els.ballCarrier.classList.add("hidden");
 
-    if (state.runConcept === "outside") {
-        const timingText = state.outsideTiming === "open" ? "EDGE SEALED" : "EDGE DEVELOPING";
-        els.playBadge.textContent = `OUTSIDE • ${timingText}`;
-        els.playBadge.className = state.outsideTiming === "open"
-            ? "play-badge outside-open"
-            : "play-badge outside-developing";
-        els.phaseTitle.textContent = "Read the outside blocks";
-        els.phaseInstruction.textContent = "Watch the edge defender and blocker leverage. Choose the lane yourself; no lane will be highlighted.";
+    const family = state.visionScenario?.family || "clean";
+    const badgeFamilyText = family === "penetration"
+        ? "PENETRATION"
+        : family === "damage-control"
+            ? "DAMAGE CONTROL"
+            : family === "bounce"
+                ? "BOUNCE READ"
+                : family === "crease"
+                    ? "CREASE READ"
+                    : "CLEAN READ";
+
+    els.playBadge.textContent = `${state.runConcept.toUpperCase()} • ${badgeFamilyText}`;
+    els.playBadge.className = `play-badge ${state.runConcept} ${family}`;
+
+    if (family === "penetration" || family === "damage-control") {
+        els.phaseTitle.textContent = "Read the leakage, then escape it";
+        els.phaseInstruction.textContent = "A blocker may lose. Watch the penetration first, then the linebacker flow behind it, and choose the best lane yourself.";
+    } else if (family === "bounce") {
+        els.phaseTitle.textContent = "Read inside-out to the edge";
+        els.phaseInstruction.textContent = "Interior clutter may force the ball outside. Confirm the edge is sealed, then bounce it.";
+    } else if (family === "crease") {
+        els.phaseTitle.textContent = "Read the linebackers after the front shifts";
+        els.phaseInstruction.textContent = "The line picture changes quickly. See where the linebackers widen, then hit the crease they leave behind.";
+    } else if (state.runConcept === "outside") {
+        els.phaseTitle.textContent = "Read the edge blocks";
+        els.phaseInstruction.textContent = "Watch the edge defender and linebacker leverage. Choose the lane yourself; no lane is highlighted before you commit.";
     } else {
-        els.playBadge.textContent = "OFFENSE • INSIDE";
-        els.playBadge.className = "play-badge inside";
         els.phaseTitle.textContent = "Read the defensive front";
-        els.phaseInstruction.textContent = "Stay patient behind the line. Watch which defender is displaced and choose the opening yourself.";
+        els.phaseInstruction.textContent = "Stay patient behind the line. Watch which defender is displaced and how the linebackers fit behind it.";
     }
 }
 
@@ -575,6 +672,11 @@ function animateReadPhase() {
     els.runDefenders.forEach((defender, index) => {
         const base = 28 + index * 22;
         defender.style.left = `${base - movement[index] * 0.45}%`;
+    });
+    els.runLinebackers.forEach((linebacker, index) => {
+        const base = 28 + index * 22;
+        const lbShift = index === 1 ? 0 : (index === 0 ? 1.5 : -1.5);
+        linebacker.style.left = `${base + lbShift}%`;
     });
 }
 
@@ -651,7 +753,14 @@ function moveBlockersForDecision() {
         const base = 28 + index * 22;
         defender.style.left = `${base + scenario.defenderDx[index]}%`;
         defender.style.top = `${39 + scenario.defenderDy[index]}%`;
-        defender.style.transform = "translate(-50%, -50%) scale(1.05)";
+        defender.style.transform = "translate(-50%, -50%) scale(1.07)";
+    });
+
+    els.runLinebackers.forEach((linebacker, index) => {
+        const base = 28 + index * 22;
+        linebacker.style.left = `${base + scenario.linebackerDx[index]}%`;
+        linebacker.style.top = `${28 + scenario.linebackerDy[index]}%`;
+        linebacker.style.transform = "translate(-50%, -50%) scale(1.05)";
     });
 }
 
@@ -695,13 +804,9 @@ function revealDecision() {
     }
 
     moveBlockersForDecision();
-    els.phaseTitle.textContent = "Read it—choose your lane";
-    els.phaseInstruction.textContent = "Watch the blockers and defenders. Push the left stick toward the opening without R2. The trainer will judge your first committed lane.";
-    if (state.runConcept === "outside" && state.outsideTiming === "open") {
-        setFeedback("The edge picture is developing quickly. Read leverage first, then commit—do not sprint just because it is an outside run.", "neutral");
-    } else {
-        setFeedback("Find open grass from the block movement. Commit to the best lane first; R2 comes later at the burst point.", "neutral");
-    }
+    els.phaseTitle.textContent = "Read the penetration, then the fit";
+    els.phaseInstruction.textContent = "First see whether a blocker lost. Then read where the linebackers are flowing. Commit to the best lane without R2.";
+    setFeedback(state.visionScenario?.coaching || "Find open grass from the block movement. Commit to the best lane first; R2 comes later at the burst point.", "neutral");
 }
 
 function updateApproachVisual() {
@@ -869,7 +974,7 @@ function runCountdown() {
 function wrongDirectionMessage() {
     if (state.playType === "offense" && state.visionScenario) {
         const chosen = state.visionChoice || stickLaneChoice() || describeStickDirection();
-        return `Vision miss: you chose ${chosen}, but the open read was ${state.direction}. ${state.visionScenario.coaching}`;
+        return `Vision miss: you chose ${chosen}, but the best read was ${state.direction}. ${state.visionScenario.coaching}`;
     }
     const actual = describeStickDirection();
     const required = requiredStickLabel(state.direction);
@@ -878,7 +983,7 @@ function wrongDirectionMessage() {
 
 function earlyMessage(phaseAtResult) {
     if (phaseAtResult === "approach") {
-        return "Too early. The lane was chosen, but you had not reached the burst point yet.";
+        return "Too early. You saw a lane, but you burst before you were through the traffic picture.";
     }
     return "Too early. You pressed R2 before the play declared the lane or pursuit angle.";
 }
@@ -904,7 +1009,7 @@ function finishPlay(result, reactionMs = null) {
         const visionText = state.playType === "offense" && state.visionScenario
             ? ` Correct read: ${state.visionScenario.label}.`
             : "";
-        setFeedback(`Perfect—steer first, then R2 at the burst point in ${reaction} ms.${visionText}`, "perfect");
+        setFeedback(`Perfect—steer first, then R2 at the burst point in ${reaction} ms.${visionText} ${state.playType === "offense" && state.visionScenario ? state.visionScenario.coaching : ""}`.trim(), "perfect");
         playSound(perfectSound);
 
         const x = directionX(state.direction);
@@ -967,7 +1072,7 @@ function finishSession() {
         : null;
 
     els.phaseTitle.textContent = "Practice complete";
-    els.phaseInstruction.textContent = "Take the same read → steer → burst sequence into Madden practice mode.";
+    els.phaseInstruction.textContent = "Take the same read → escape penetration → follow linebacker flow → burst sequence into Madden.";
     const vision = state.visionAttempts ? Math.round((state.visionCorrect / state.visionAttempts) * 100) : 100;
     setFeedback(
         `Finished: ${discipline}% complete reps, ${vision}% vision, ${state.early} early, ${state.wrongDirection} wrong lane, best streak ${state.bestStreak}.`,
@@ -1013,7 +1118,7 @@ function startPractice() {
 
     els.gameArea.classList.remove("hidden");
     els.startBtn.textContent = "Restart Practice";
-    setFeedback("Starting running-vision practice...", "neutral");
+    setFeedback("Starting penetration-read practice...", "neutral");
 
     void fetch("/api/r2-practice-start", {
         method: "POST",

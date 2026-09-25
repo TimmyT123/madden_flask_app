@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>WURD Running Vision + R2 Practice</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=9-running-vision">
+    <title>WURD Running Vision + Penetration Reads</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=10-penetration-reads">
 </head>
 <body>
 <div class="container">
     <header class="page-header">
         <a href="https://wurd-madden.com/" class="home-btn">Back to WURD</a>
         <div>
-            <h1>WURD Running Vision + R2 Practice</h1>
-            <p class="intro">Read the blocking, choose the lane yourself, steer without R2, and accelerate at the burst point. Offense now shows live blocker-versus-defender movement without highlighting the correct lane before you commit. The blue dashed line marks the LOS; offense attacks upward and defense closes downward, matching Madden.</p>
+            <h1>WURD Running Vision + Penetration Reads</h1>
+            <p class="intro">Read the blocking, react to penetration, watch the linebacker flow, choose the lane yourself, and accelerate only at the burst point. Offense now mixes cleaner looks with blocker failures, muddy runs, and bounce/cutback reads so you can practice escaping bad blocks instead of forcing the called path.</p>
         </div>
     </header>
 
@@ -108,6 +108,10 @@
                 <div id="runDefenderMiddle" class="player run-defender run-defender-middle">DL</div>
                 <div id="runDefenderRight" class="player run-defender run-defender-right">DL</div>
 
+                <div id="runLinebackerLeft" class="player run-linebacker run-linebacker-left">LB</div>
+                <div id="runLinebackerMiddle" class="player run-linebacker run-linebacker-middle">LB</div>
+                <div id="runLinebackerRight" class="player run-linebacker run-linebacker-right">LB</div>
+
                 <div id="runner" class="player runner">RB</div>
                 <div id="defender" class="player defender">YOU</div>
                 <div id="ballCarrier" class="player ball-carrier">HB</div>
@@ -119,7 +123,7 @@
             <aside class="control-panel">
                 <div id="playBadge" class="play-badge">OFFENSE</div>
                 <h2 id="phaseTitle">Press Start Practice</h2>
-                <p id="phaseInstruction">Read the block movement, choose the opening yourself, steer through it, then press R2 at the burst point.</p>
+                <p id="phaseInstruction">Read the block movement, identify penetration, confirm the linebacker flow, choose the opening yourself, then press R2 at the burst point.</p>
 
                 <div id="cueLight" class="cue-light wait">
                     <span id="cueText">WAIT</span>
@@ -131,22 +135,22 @@
                 <p id="reactionWindowText" class="small-text">Normal window: 850 ms</p>
 
                 <button id="r2TestButton" class="r2-button" type="button" aria-label="Simulate R2 press">R2</button>
-                <p class="small-text">Blue dashed LOS = line of scrimmage. On offense, the correct lane is hidden until after your choice. Read blocker/defender leverage, steer without sprinting, then use R2 at the burst point.</p>
+                <p class="small-text">Blue dashed LOS = line of scrimmage. On offense, the correct lane is hidden until after your choice. First read any blocker loss or penetration, then the linebacker flow, then steer without sprinting and use R2 only at the burst point.</p>
             </aside>
         </section>
 
         <section class="lesson-row">
             <div>
                 <strong>Inside:</strong>
-                <span>Watch which defender is displaced → choose the crease or cutback yourself → R2 only after you enter the opening.</span>
+                <span>See where penetration appears → find the crease or cutback away from it → burst only after you clear the traffic.</span>
             </div>
             <div>
                 <strong>Outside:</strong>
-                <span>Read edge leverage. If the defender is sealed inside, get outside; if the edge stretches, stay patient and look for the cut.</span>
+                <span>Use interior clutter as information. If the front caves inside, bounce to the edge once it is truly sealed.</span>
             </div>
             <div>
-                <strong>Defense:</strong>
-                <span>Start at the top, stay above the LOS, then pursue down-left/down/down-right after the runner commits → R2 to close.</span>
+                <strong>Second level:</strong>
+                <span>The linebackers tell you whether the first hole is real. If they overfit frontside, look for the cutback before you sprint.</span>
             </div>
         </section>
 
@@ -155,6 +159,6 @@
 </div>
 
 <script src="{{ url_for('static', filename='practice_controls.js') }}"></script>
-<script src="{{ url_for('static', filename='r2_practice.js') }}?v=9-running-vision"></script>
+<script src="{{ url_for('static', filename='r2_practice.js') }}?v=10-penetration-reads"></script>
 </body>
 </html>
