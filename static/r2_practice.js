@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v18 — linebacker decision grace window
+// WURD Running Vision + R2 Practice v19 — linebacker decision grace window
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -62,6 +62,10 @@ const STICK_MIDDLE_MAX_X = 0.38;
 const VERTICAL_FORWARD_MIN = 0.52;
 const STAY_SIDE_MIN_X = 0.12;
 const STAY_SIDE_MAX_X = 0.74;
+// Once a runner has established a left/right crease, turning the stick nearly
+// straight up should NOT count as changing lanes. Only a deliberate steer
+// across the opposite side exits the established corridor.
+const STAY_CORRIDOR_CROSSOVER_X = 0.24;
 const DIRECTIONS = ["left", "middle", "right"];
 const OUTSIDE_DIRECTIONS = ["left", "right"];
 
@@ -1062,35 +1066,53 @@ function stayAngleAnalysis(x = state.leftX, y = state.leftY) {
     const direction = state.direction;
     const detectedLane = stickLaneChoice(x, y) || (x >= STAY_SIDE_MIN_X ? "right" : x <= -STAY_SIDE_MIN_X ? "left" : "middle");
 
+    // Corridor logic: after the first read has established LEFT or RIGHT,
+    // the runner owns that crease. The user may straighten the stick toward
+    // 12 o'clock to get vertical without being reclassified as MIDDLE.
+    // We only call it a lane change when the user deliberately steers across
+    // the opposite side of the stick by more than the crossover threshold.
     if (direction === "right") {
-        const onCorrectSide = x >= STAY_SIDE_MIN_X;
-        const tooWide = x > STAY_SIDE_MAX_X || forward < VERTICAL_FORWARD_MIN;
+        const inCorridor = x >= -STAY_CORRIDOR_CROSSOVER_X;
+        const tooWide = x > STAY_SIDE_MAX_X;
+        const forwardEnough = forward >= VERTICAL_FORWARD_MIN;
         return {
             detectedLane,
-            onCorrectSide,
-            verticalEnough: onCorrectSide && !tooWide,
-            angleText: tooWide ? "TOO WIDE / TURN UPFIELD" : "GETTING VERTICAL"
+            inCorridor,
+            onCorrectSide: inCorridor,
+            verticalEnough: inCorridor && forwardEnough && !tooWide,
+            angleText: !forwardEnough
+                ? "TURN UPFIELD"
+                : tooWide
+                    ? "TOO WIDE / TURN UPFIELD"
+                    : "RIGHT CORRIDOR • GETTING VERTICAL"
         };
     }
 
     if (direction === "left") {
-        const onCorrectSide = x <= -STAY_SIDE_MIN_X;
-        const tooWide = x < -STAY_SIDE_MAX_X || forward < VERTICAL_FORWARD_MIN;
+        const inCorridor = x <= STAY_CORRIDOR_CROSSOVER_X;
+        const tooWide = x < -STAY_SIDE_MAX_X;
+        const forwardEnough = forward >= VERTICAL_FORWARD_MIN;
         return {
             detectedLane,
-            onCorrectSide,
-            verticalEnough: onCorrectSide && !tooWide,
-            angleText: tooWide ? "TOO WIDE / TURN UPFIELD" : "GETTING VERTICAL"
+            inCorridor,
+            onCorrectSide: inCorridor,
+            verticalEnough: inCorridor && forwardEnough && !tooWide,
+            angleText: !forwardEnough
+                ? "TURN UPFIELD"
+                : tooWide
+                    ? "TOO WIDE / TURN UPFIELD"
+                    : "LEFT CORRIDOR • GETTING VERTICAL"
         };
     }
 
-    const onCorrectSide = Math.abs(x) <= 0.45;
-    const verticalEnough = onCorrectSide && forward >= VERTICAL_FORWARD_MIN && Math.abs(x) <= STICK_MIDDLE_MAX_X;
+    const inCorridor = Math.abs(x) <= 0.45;
+    const forwardEnough = forward >= VERTICAL_FORWARD_MIN;
     return {
         detectedLane,
-        onCorrectSide,
-        verticalEnough,
-        angleText: verticalEnough ? "GETTING VERTICAL" : "TURN UPFIELD"
+        inCorridor,
+        onCorrectSide: inCorridor,
+        verticalEnough: inCorridor && forwardEnough,
+        angleText: inCorridor && forwardEnough ? "MIDDLE CORRIDOR • GETTING VERTICAL" : "TURN UPFIELD"
     };
 }
 
@@ -1144,7 +1166,7 @@ function updateSecondLevelStatus(choice = null) {
     if (isStayRead()) {
         const analysis = stayAngleAnalysis();
         if (analysis.onCorrectSide) {
-            els.secondLevelStatus.textContent = `2nd-level: ${laneLabel(state.direction)} • ${analysis.angleText}`;
+            els.secondLevelStatus.textContent = `2nd-level: STAY ${laneLabel(state.direction)} • ${analysis.angleText}`;
             els.secondLevelStatus.classList.add("active");
         } else {
             els.secondLevelStatus.textContent = `2nd-level input: ${laneLabel(analysis.detectedLane)}`;
@@ -1319,7 +1341,7 @@ function advanceApproach(now) {
             els.phaseTitle.textContent = state.direction === state.initialDirection
                 ? "DECIDE NOW — stay and get vertical?"
                 : "DECIDE NOW — take the cut?";
-            els.phaseInstruction.textContent = "The linebacker grace window is over. Your stick now counts as the second-level decision.";
+            els.phaseInstruction.textContent = "The linebacker grace window is over. On a STAY read, keep the RB in the established crease and turn upfield; straightening the stick does not change lanes.";
             setFeedback(state.resolvedCoaching || "Now make the second-level decision: stay, cut, or bounce without R2.", "neutral");
         }
 
@@ -1528,7 +1550,7 @@ function wrongDirectionMessage() {
 function wrongAngleMessage() {
     const lane = laneLabel(state.direction);
     const side = state.direction === "right" ? "right" : state.direction === "left" ? "left" : "middle";
-    return `FIRST READ: ${laneLabel(state.initialDirection)} ✅ | SECOND READ: STAY ${lane} ✅ | ERROR: RIGHT LANE, WRONG ANGLE ❌. You stayed on the ${side} path, but you did not turn upfield enough. Reduce the sideways stick angle, keep moving forward, then use R2 after you are vertical through the crease.`;
+    return `FIRST READ: ${laneLabel(state.initialDirection)} ✅ | SECOND READ: STAY ${lane} ✅ | ERROR: CORRECT CORRIDOR, WRONG ANGLE ❌. You stayed in the ${side} crease, but you did not get north/south enough. Once that crease is established, you may turn the stick almost straight up without leaving the lane. Get vertical through the corridor, then use R2.`;
 }
 
 function earlyMessage(phaseAtResult) {
