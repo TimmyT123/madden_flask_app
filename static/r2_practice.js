@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v9 — penetration reads and linebacker flow
+// WURD Running Vision + R2 Practice v10 — blocker leverage and cutback recognition
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -61,121 +61,116 @@ const OUTSIDE_DIRECTIONS = ["left", "right"];
 // blockerDx / defenderDx are percentage-point movements from each player's starting X position.
 const VISION_SCENARIOS = [
     {
-        id: "inside-left-cutback-penetration",
+        id: "inside-press-right-cut-left",
         concepts: ["inside"],
+        family: "cutback",
+        initialDirection: "right",
         direction: "left",
-        family: "penetration",
-        label: "CUTBACK LEFT",
-        blockerDx: [-1, 5, 2],
-        defenderDx: [9, 5, -1],
-        defenderDy: [7, 1, 0],
-        linebackerDx: [-4, 7, 2],
-        linebackerDy: [1, 4, 0],
-        coaching: "A blocker lost and the linebackers flowed right. Press the frontside just long enough to see it, then cut back left without R2."
-    },
-    {
-        id: "inside-right-cutback-penetration",
-        concepts: ["inside"],
-        direction: "right",
-        family: "penetration",
-        label: "CUTBACK RIGHT",
-        blockerDx: [-2, 5, 1],
-        defenderDx: [1, 5, -9],
-        defenderDy: [0, 1, 7],
-        linebackerDx: [-2, -7, 4],
-        linebackerDy: [0, 4, 1],
-        coaching: "The backside right B-gap became the answer when the line leaked and the second level flowed left. Cut back right before you sprint."
-    },
-    {
-        id: "inside-middle-crease-after-flow",
-        concepts: ["inside"],
-        direction: "middle",
-        family: "crease",
-        label: "MIDDLE CREASE",
-        blockerDx: [-5, -4, 6],
-        defenderDx: [6, 8, -8],
-        defenderDy: [2, 4, 2],
-        linebackerDx: [-7, 0, 7],
-        linebackerDy: [1, 4, 1],
-        coaching: "The linebackers widened with the flow and the middle crease stayed alive. Get vertical before closing speed arrives."
-    },
-    {
-        id: "outside-left-bounce-after-penetration",
-        concepts: ["outside"],
-        direction: "left",
-        family: "bounce",
-        label: "BOUNCE LEFT",
-        blockerDx: [-8, -1, 3],
-        defenderDx: [10, 9, -1],
-        defenderDy: [1, 5, 0],
-        linebackerDx: [6, 8, 0],
-        linebackerDy: [1, 4, 0],
-        coaching: "Interior penetration killed the inside lane. The left edge is the escape path, so bounce outside once the seal forms."
-    },
-    {
-        id: "outside-right-bounce-after-penetration",
-        concepts: ["outside"],
-        direction: "right",
-        family: "bounce",
-        label: "BOUNCE RIGHT",
-        blockerDx: [-3, -1, 8],
-        defenderDx: [1, 9, -10],
-        defenderDy: [0, 5, 1],
-        linebackerDx: [0, -8, -6],
-        linebackerDy: [0, 4, 1],
-        coaching: "The inside path collapsed. Stay patient behind the block, then bounce right once the force defender is sealed in."
-    },
-    {
-        id: "inside-limit-damage-left",
-        concepts: ["inside"],
-        direction: "left",
-        family: "damage-control",
-        label: "BEST AVAILABLE LEFT",
-        blockerDx: [-4, 1, 4],
-        defenderDx: [4, 10, -4],
-        defenderDy: [2, 6, 2],
-        linebackerDx: [-1, 5, 5],
-        linebackerDy: [1, 3, 1],
-        coaching: "This was a muddy run. There is no huge hole, so slide left for the best available yards and live for the next play."
-    },
-    {
-        id: "inside-limit-damage-right",
-        concepts: ["inside"],
-        direction: "right",
-        family: "damage-control",
-        label: "BEST AVAILABLE RIGHT",
-        blockerDx: [-4, 1, 4],
-        defenderDx: [4, 10, -4],
-        defenderDy: [2, 6, 2],
-        linebackerDx: [-5, -5, 1],
-        linebackerDy: [1, 3, 1],
-        coaching: "Nothing is clean here. Work to the right B-gap for the least-bad yardage instead of running straight into the loss."
-    },
-    {
-        id: "inside-clean-right",
-        concepts: ["inside"],
-        direction: "right",
-        family: "clean",
-        label: "RIGHT B-GAP",
-        blockerDx: [-1, -5, 6],
-        defenderDx: [-1, -9, -8],
+        label: "PRESS RIGHT → CUT LEFT",
+        blockerDx: [-2, 4, 7],
+        defenderDx: [1, -7, -10],
         defenderDy: [1, 2, 2],
-        linebackerDx: [0, -3, 3],
-        linebackerDy: [0, 1, 1],
-        coaching: "This is one of the cleaner looks. Press the run and get vertical through the right B-gap."
+        linebackerDxInitial: [0, 2, -2],
+        linebackerDyInitial: [0, 0, 0],
+        linebackerDxFinal: [4, 10, 8],
+        linebackerDyFinal: [1, 4, 2],
+        coaching: "Your right-side leverage invites you to press right, but the linebackers overfit it. Plant and cut back left before using R2."
     },
     {
-        id: "outside-clean-left",
+        id: "inside-press-left-cut-right",
+        concepts: ["inside"],
+        family: "cutback",
+        initialDirection: "left",
+        direction: "right",
+        label: "PRESS LEFT → CUT RIGHT",
+        blockerDx: [-7, -4, 2],
+        defenderDx: [10, 7, -1],
+        defenderDy: [2, 2, 1],
+        linebackerDxInitial: [2, -2, 0],
+        linebackerDyInitial: [0, 0, 0],
+        linebackerDxFinal: [-8, -10, -4],
+        linebackerDyFinal: [2, 4, 1],
+        coaching: "The first-level leverage says press left. When the second level flows left, cut behind it to the right."
+    },
+    {
+        id: "inside-press-middle-stay",
+        concepts: ["inside"],
+        family: "stay",
+        initialDirection: "middle",
+        direction: "middle",
+        label: "PRESS MIDDLE → STAY",
+        blockerDx: [-4, -7, 5],
+        defenderDx: [6, -10, -7],
+        defenderDy: [1, 2, 1],
+        linebackerDxInitial: [-1, 0, 1],
+        linebackerDyInitial: [0, 0, 0],
+        linebackerDxFinal: [-7, 0, 7],
+        linebackerDyFinal: [2, 2, 2],
+        coaching: "The blockers create a vertical crease and the linebackers widen. Do not invent a cutback—stay vertical through the middle."
+    },
+    {
+        id: "inside-press-right-stay",
+        concepts: ["inside"],
+        family: "stay",
+        initialDirection: "right",
+        direction: "right",
+        label: "PRESS RIGHT → STAY",
+        blockerDx: [-1, -5, 7],
+        defenderDx: [0, -8, -10],
+        defenderDy: [1, 2, 2],
+        linebackerDxInitial: [0, -2, 1],
+        linebackerDyInitial: [0, 0, 0],
+        linebackerDxFinal: [-2, -5, 5],
+        linebackerDyFinal: [1, 2, 2],
+        coaching: "The right-side blocker keeps leverage and the linebackers do not close the lane. Stay on the original path and get vertical."
+    },
+    {
+        id: "outside-press-left-bounce-left",
         concepts: ["outside"],
+        family: "bounce",
+        initialDirection: "left",
         direction: "left",
-        family: "clean",
-        label: "LEFT EDGE",
-        blockerDx: [-8, -2, 1],
-        defenderDx: [11, 4, 1],
-        defenderDy: [1, 0, 0],
-        linebackerDx: [4, 7, 2],
-        linebackerDy: [0, 2, 1],
-        coaching: "The edge is clean. Win the corner left, then burst once you are outside the traffic."
+        label: "PRESS LEFT → BOUNCE LEFT",
+        blockerDx: [-9, -2, 2],
+        defenderDx: [11, 5, 1],
+        defenderDy: [1, 2, 0],
+        linebackerDxInitial: [2, 1, 0],
+        linebackerDyInitial: [0, 0, 0],
+        linebackerDxFinal: [7, 6, 1],
+        linebackerDyFinal: [2, 3, 1],
+        coaching: "The edge defender is sealed inside and the linebackers get caught inside. Keep pressing left, then bounce outside and burst."
+    },
+    {
+        id: "outside-press-right-cut-middle",
+        concepts: ["outside"],
+        family: "cutback",
+        initialDirection: "right",
+        direction: "middle",
+        label: "PRESS RIGHT → CUT MIDDLE",
+        blockerDx: [-1, 3, 8],
+        defenderDx: [0, -3, -11],
+        defenderDy: [0, 1, 1],
+        linebackerDxInitial: [0, 1, -2],
+        linebackerDyInitial: [0, 0, 0],
+        linebackerDxFinal: [1, 8, 10],
+        linebackerDyFinal: [1, 4, 2],
+        coaching: "Press the outside run right to move the defense. When the linebackers widen, plant and cut underneath into the middle crease."
+    },
+    {
+        id: "muddy-press-left-minimize",
+        concepts: ["inside"],
+        family: "damage-control",
+        initialDirection: "middle",
+        direction: "left",
+        label: "PRESS MIDDLE → ESCAPE LEFT",
+        blockerDx: [-3, 1, 4],
+        defenderDx: [4, 8, -4],
+        defenderDy: [2, 6, 2],
+        linebackerDxInitial: [0, 0, 0],
+        linebackerDyInitial: [0, 0, 0],
+        linebackerDxFinal: [0, 5, 5],
+        linebackerDyFinal: [1, 3, 1],
+        coaching: "The called lane never becomes clean. Press it long enough to confirm the problem, then escape left for the best available yards."
     }
 ];
 
@@ -197,6 +192,8 @@ const els = {
     wrongDirectionCount: document.getElementById("wrongDirectionCount"),
     disciplinePercent: document.getElementById("disciplinePercent"),
     visionPercent: document.getElementById("visionPercent"),
+    leveragePercent: document.getElementById("leveragePercent"),
+    cutbackPercent: document.getElementById("cutbackPercent"),
     averageReaction: document.getElementById("averageReaction"),
     streak: document.getElementById("streak"),
     bestStreak: document.getElementById("bestStreak"),
@@ -247,10 +244,20 @@ const state = {
     runConcept: "inside",
     outsideTiming: null,
     direction: "middle",
+    initialDirection: "middle",
     visionScenario: null,
     visionChoice: null,
     visionAttempts: 0,
     visionCorrect: 0,
+    leverageAttempts: 0,
+    leverageCorrect: 0,
+    cutbackAttempts: 0,
+    cutbackCorrect: 0,
+    initialChoice: null,
+    finalChoice: null,
+    readStage: "press",
+    stageProgress: 0,
+    missedStage: null,
     wrongLaneHoldMs: 0,
     playsCompleted: 0,
     targetPlays: null,
@@ -412,16 +419,18 @@ function updateScoreboard() {
     const average = state.reactions.length
         ? Math.round(state.reactions.reduce((sum, value) => sum + value, 0) / state.reactions.length)
         : null;
+    const vision = state.visionAttempts ? Math.round((state.visionCorrect / state.visionAttempts) * 100) : 100;
+    const leverage = state.leverageAttempts ? Math.round((state.leverageCorrect / state.leverageAttempts) * 100) : 100;
+    const cutback = state.cutbackAttempts ? Math.round((state.cutbackCorrect / state.cutbackAttempts) * 100) : 100;
 
     els.perfectCount.textContent = String(state.perfect);
     els.earlyCount.textContent = String(state.early);
     els.lateCount.textContent = String(state.late);
     els.wrongDirectionCount.textContent = String(state.wrongDirection);
     els.disciplinePercent.textContent = `${discipline}%`;
-    if (els.visionPercent) {
-        const vision = state.visionAttempts ? Math.round((state.visionCorrect / state.visionAttempts) * 100) : 100;
-        els.visionPercent.textContent = `${vision}%`;
-    }
+    if (els.visionPercent) els.visionPercent.textContent = `${vision}%`;
+    if (els.leveragePercent) els.leveragePercent.textContent = `${leverage}%`;
+    if (els.cutbackPercent) els.cutbackPercent.textContent = `${cutback}%`;
     els.averageReaction.textContent = average === null ? "--" : `${average} ms`;
     els.streak.textContent = String(state.streak);
     els.bestStreak.textContent = String(state.bestStreak);
@@ -435,7 +444,16 @@ function resetStats() {
     state.wrongDirection = 0;
     state.visionAttempts = 0;
     state.visionCorrect = 0;
+    state.leverageAttempts = 0;
+    state.leverageCorrect = 0;
+    state.cutbackAttempts = 0;
+    state.cutbackCorrect = 0;
     state.visionChoice = null;
+    state.initialChoice = null;
+    state.finalChoice = null;
+    state.readStage = "press";
+    state.stageProgress = 0;
+    state.missedStage = null;
     state.wrongLaneHoldMs = 0;
     state.streak = 0;
     state.bestStreak = 0;
@@ -468,16 +486,23 @@ function configurePlaySelection() {
     state.outsideTiming = null;
     state.visionScenario = null;
     state.visionChoice = null;
+    state.initialChoice = null;
+    state.finalChoice = null;
+    state.readStage = "press";
+    state.stageProgress = 0;
+    state.missedStage = null;
     state.wrongLaneHoldMs = 0;
 
     if (state.playType === "defense") {
         state.runConcept = "defense";
         state.direction = randomItem(DIRECTIONS);
+        state.initialDirection = state.direction;
         return;
     }
 
     state.runConcept = chooseOffenseConcept();
     state.visionScenario = chooseVisionScenario(state.runConcept);
+    state.initialDirection = state.visionScenario.initialDirection || state.visionScenario.direction;
     state.direction = state.visionScenario.direction;
     if (state.runConcept === "outside") {
         state.outsideTiming = Math.random() < 0.48 ? "open" : "developing";
@@ -613,34 +638,34 @@ function configureFieldForPlay() {
     els.ballCarrier.classList.add("hidden");
 
     const family = state.visionScenario?.family || "clean";
-    const badgeFamilyText = family === "penetration"
-        ? "PENETRATION"
-        : family === "damage-control"
-            ? "DAMAGE CONTROL"
-            : family === "bounce"
-                ? "BOUNCE READ"
-                : family === "crease"
-                    ? "CREASE READ"
-                    : "CLEAN READ";
+    const badgeFamilyText = family === "cutback"
+        ? "CUTBACK READ"
+        : family === "stay"
+            ? "STAY READ"
+            : family === "damage-control"
+                ? "DAMAGE CONTROL"
+                : family === "bounce"
+                    ? "BOUNCE READ"
+                    : "LEVERAGE READ";
 
     els.playBadge.textContent = `${state.runConcept.toUpperCase()} • ${badgeFamilyText}`;
     els.playBadge.className = `play-badge ${state.runConcept} ${family}`;
 
-    if (family === "penetration" || family === "damage-control") {
-        els.phaseTitle.textContent = "Read the leakage, then escape it";
-        els.phaseInstruction.textContent = "A blocker may lose. Watch the penetration first, then the linebacker flow behind it, and choose the best lane yourself.";
+    if (family === "cutback") {
+        els.phaseTitle.textContent = "Press first—expect the fit to change";
+        els.phaseInstruction.textContent = "Use blocker leverage for your first path. The linebackers may over-pursue and create a cutback after you press it.";
+    } else if (family === "stay") {
+        els.phaseTitle.textContent = "Press the leverage and stay disciplined";
+        els.phaseInstruction.textContent = "Not every run needs a cut. If the second level does not close the lane, stay vertical instead of inventing a move.";
     } else if (family === "bounce") {
-        els.phaseTitle.textContent = "Read inside-out to the edge";
-        els.phaseInstruction.textContent = "Interior clutter may force the ball outside. Confirm the edge is sealed, then bounce it.";
-    } else if (family === "crease") {
-        els.phaseTitle.textContent = "Read the linebackers after the front shifts";
-        els.phaseInstruction.textContent = "The line picture changes quickly. See where the linebackers widen, then hit the crease they leave behind.";
-    } else if (state.runConcept === "outside") {
-        els.phaseTitle.textContent = "Read the edge blocks";
-        els.phaseInstruction.textContent = "Watch the edge defender and linebacker leverage. Choose the lane yourself; no lane is highlighted before you commit.";
+        els.phaseTitle.textContent = "Press the edge leverage";
+        els.phaseInstruction.textContent = "Use the outside block to move the defense, then decide whether the edge remains the best path.";
+    } else if (family === "damage-control") {
+        els.phaseTitle.textContent = "Press the called picture, then minimize damage";
+        els.phaseInstruction.textContent = "Confirm that the lane is muddy before escaping to the best available space. Do not sprint into the first red jersey.";
     } else {
-        els.phaseTitle.textContent = "Read the defensive front";
-        els.phaseInstruction.textContent = "Stay patient behind the line. Watch which defender is displaced and how the linebackers fit behind it.";
+        els.phaseTitle.textContent = "Read the first-level leverage";
+        els.phaseInstruction.textContent = "Press the blocker leverage first, then let the linebackers tell you whether to stay or redirect.";
     }
 }
 
@@ -758,10 +783,32 @@ function moveBlockersForDecision() {
 
     els.runLinebackers.forEach((linebacker, index) => {
         const base = 28 + index * 22;
-        linebacker.style.left = `${base + scenario.linebackerDx[index]}%`;
-        linebacker.style.top = `${28 + scenario.linebackerDy[index]}%`;
-        linebacker.style.transform = "translate(-50%, -50%) scale(1.05)";
+        linebacker.style.left = `${base + scenario.linebackerDxInitial[index]}%`;
+        linebacker.style.top = `${28 + scenario.linebackerDyInitial[index]}%`;
+        linebacker.style.transform = "translate(-50%, -50%) scale(1.04)";
     });
+}
+
+function showSecondLevelFit() {
+    if (state.playType !== "offense" || !state.visionScenario || state.readStage !== "press") return;
+    const scenario = state.visionScenario;
+    state.readStage = "cut";
+    state.stageProgress = 0;
+    state.wrongLaneHoldMs = 0;
+
+    els.runLinebackers.forEach((linebacker, index) => {
+        const base = 28 + index * 22;
+        linebacker.style.left = `${base + scenario.linebackerDxFinal[index]}%`;
+        linebacker.style.top = `${28 + scenario.linebackerDyFinal[index]}%`;
+        linebacker.style.transform = "translate(-50%, -50%) scale(1.10)";
+    });
+
+    setCue("aim", state.direction === state.initialDirection ? "STAY?" : "CUT?");
+    els.phaseTitle.textContent = state.direction === state.initialDirection
+        ? "Second level moved—do you stay?"
+        : "Second level overfit—find the cutback";
+    els.phaseInstruction.textContent = "Read the linebackers now. Stay on the leverage path if it remains clean, or redirect to the cutback/bounce lane without R2.";
+    setFeedback("The first-level read got you here. Now let the linebacker fit decide whether you stay or redirect.", "neutral");
 }
 
 function stickLaneChoice(x = state.leftX, y = state.leftY) {
@@ -804,21 +851,30 @@ function revealDecision() {
     }
 
     moveBlockersForDecision();
-    els.phaseTitle.textContent = "Read the penetration, then the fit";
-    els.phaseInstruction.textContent = "First see whether a blocker lost. Then read where the linebackers are flowing. Commit to the best lane without R2.";
-    setFeedback(state.visionScenario?.coaching || "Find open grass from the block movement. Commit to the best lane first; R2 comes later at the burst point.", "neutral");
+    els.phaseTitle.textContent = "PRESS the leverage—do not sprint";
+    els.phaseInstruction.textContent = "Read which shoulder your blocker owns and press that lane first. The linebackers have not made their final fit yet.";
+    setFeedback("First-level job: press the lane created by blocker leverage. Stay off R2 and make the linebackers declare themselves.", "neutral");
 }
 
 function updateApproachVisual() {
-    const progress = easeOut(state.approachProgress);
-    const targetX = directionX(state.direction);
-
     if (state.playType === "defense") {
+        const progress = easeOut(state.approachProgress);
+        const targetX = directionX(state.direction);
         els.defender.style.left = `${lerp(50, targetX, progress)}%`;
         els.defender.style.top = `${lerp(30, state.burstLineTop, progress)}%`;
+        return;
+    }
+
+    const target = state.readStage === "press" ? state.initialDirection : state.direction;
+    const targetX = directionX(target);
+    const t = easeOut(state.stageProgress);
+    if (state.readStage === "press") {
+        els.runner.style.left = `${lerp(50, targetX, t)}%`;
+        els.runner.style.top = `${lerp(72, 58, t)}%`;
     } else {
-        els.runner.style.left = `${lerp(50, targetX, progress)}%`;
-        els.runner.style.top = `${lerp(72, state.burstLineTop, progress)}%`;
+        const startX = directionX(state.initialDirection);
+        els.runner.style.left = `${lerp(startX, targetX, t)}%`;
+        els.runner.style.top = `${lerp(58, state.burstLineTop, t)}%`;
     }
 }
 
@@ -835,16 +891,46 @@ function advanceApproach(now) {
             return;
         }
 
-        if (state.visionChoice === null) {
+        if (state.readStage === "press") {
+            if (state.initialChoice === null) {
+                state.initialChoice = choice;
+                state.leverageAttempts += 1;
+                state.visionAttempts += 1;
+                if (choice === state.initialDirection) {
+                    state.leverageCorrect += 1;
+                    state.visionCorrect += 1;
+                }
+                updateScoreboard();
+            }
+
+            if (choice !== state.initialDirection) {
+                state.wrongLaneHoldMs += elapsed;
+                if (state.wrongLaneHoldMs >= 280) {
+                    state.missedStage = "leverage";
+                    finishPlay("wrong_direction");
+                }
+                return;
+            }
+
+            state.wrongLaneHoldMs = 0;
+            state.stageProgress = clamp(state.stageProgress + elapsed / (state.approachDuration * 0.58), 0, 1);
+            updateApproachVisual();
+            if (state.stageProgress >= 1) showSecondLevelFit();
+            return;
+        }
+
+        if (state.finalChoice === null) {
+            state.finalChoice = choice;
             state.visionChoice = choice;
-            state.visionAttempts += 1;
-            if (choice === state.direction) state.visionCorrect += 1;
+            state.cutbackAttempts += 1;
+            if (choice === state.direction) state.cutbackCorrect += 1;
             updateScoreboard();
         }
 
         if (choice !== state.direction) {
             state.wrongLaneHoldMs += elapsed;
-            if (state.wrongLaneHoldMs >= 240) {
+            if (state.wrongLaneHoldMs >= 280) {
+                state.missedStage = "cutback";
                 revealCorrectRead();
                 finishPlay("wrong_direction");
             }
@@ -852,13 +938,13 @@ function advanceApproach(now) {
         }
 
         state.wrongLaneHoldMs = 0;
-        state.approachProgress = clamp(
-            state.approachProgress + elapsed / state.approachDuration,
-            0,
-            1
-        );
+        state.stageProgress = clamp(state.stageProgress + elapsed / (state.approachDuration * 0.68), 0, 1);
         updateApproachVisual();
-    } else if (stickMatchesTarget(state.direction)) {
+        if (state.stageProgress >= 1) showBurstCue();
+        return;
+    }
+
+    if (stickMatchesTarget(state.direction)) {
         state.approachProgress = clamp(
             state.approachProgress + elapsed / state.approachDuration,
             0,
@@ -867,9 +953,7 @@ function advanceApproach(now) {
         updateApproachVisual();
     }
 
-    if (state.approachProgress >= 1) {
-        showBurstCue();
-    }
+    if (state.approachProgress >= 1) showBurstCue();
 }
 
 function startReactionMeter() {
@@ -973,8 +1057,11 @@ function runCountdown() {
 
 function wrongDirectionMessage() {
     if (state.playType === "offense" && state.visionScenario) {
-        const chosen = state.visionChoice || stickLaneChoice() || describeStickDirection();
-        return `Vision miss: you chose ${chosen}, but the best read was ${state.direction}. ${state.visionScenario.coaching}`;
+        if (state.missedStage === "leverage") {
+            return `Leverage miss: you pressed ${state.initialChoice || stickLaneChoice() || "the wrong lane"}, but the first-level leverage called for ${state.initialDirection}. Press the block first, then make the linebackers commit.`;
+        }
+        const chosen = state.finalChoice || state.visionChoice || stickLaneChoice() || describeStickDirection();
+        return `Second-level miss: you chose ${chosen}, but the linebacker fit made ${state.direction} the best answer. ${state.visionScenario.coaching}`;
     }
     const actual = describeStickDirection();
     const required = requiredStickLabel(state.direction);
@@ -1007,9 +1094,12 @@ function finishPlay(result, reactionMs = null) {
         setCue("go", "PERFECT");
         if (state.playType === "offense") revealCorrectRead();
         const visionText = state.playType === "offense" && state.visionScenario
-            ? ` Correct read: ${state.visionScenario.label}.`
+            ? ` ${state.visionScenario.label}.`
             : "";
-        setFeedback(`Perfect—steer first, then R2 at the burst point in ${reaction} ms.${visionText} ${state.playType === "offense" && state.visionScenario ? state.visionScenario.coaching : ""}`.trim(), "perfect");
+        const readText = state.playType === "offense"
+            ? ` Leverage: ${state.initialDirection}. Second level: ${state.direction}.`
+            : "";
+        setFeedback(`Perfect—read leverage, read the fit, then R2 in ${reaction} ms.${visionText}${readText}`.trim(), "perfect");
         playSound(perfectSound);
 
         const x = directionX(state.direction);
@@ -1070,12 +1160,14 @@ function finishSession() {
     const average = state.reactions.length
         ? Math.round(state.reactions.reduce((sum, value) => sum + value, 0) / state.reactions.length)
         : null;
+    const vision = state.visionAttempts ? Math.round((state.visionCorrect / state.visionAttempts) * 100) : 100;
+    const leverage = state.leverageAttempts ? Math.round((state.leverageCorrect / state.leverageAttempts) * 100) : 100;
+    const cutback = state.cutbackAttempts ? Math.round((state.cutbackCorrect / state.cutbackAttempts) * 100) : 100;
 
     els.phaseTitle.textContent = "Practice complete";
-    els.phaseInstruction.textContent = "Take the same read → escape penetration → follow linebacker flow → burst sequence into Madden.";
-    const vision = state.visionAttempts ? Math.round((state.visionCorrect / state.visionAttempts) * 100) : 100;
+    els.phaseInstruction.textContent = "Take the same press → leverage → linebacker fit → stay/cut → burst sequence into Madden.";
     setFeedback(
-        `Finished: ${discipline}% complete reps, ${vision}% vision, ${state.early} early, ${state.wrongDirection} wrong lane, best streak ${state.bestStreak}.`,
+        `Finished: ${leverage}% leverage, ${cutback}% second-level reads, ${discipline}% complete reps, best streak ${state.bestStreak}.`,
         discipline >= 80 ? "perfect" : "neutral"
     );
 
@@ -1093,6 +1185,12 @@ function finishSession() {
         visionAttempts: state.visionAttempts,
         visionCorrect: state.visionCorrect,
         vision,
+        leverageAttempts: state.leverageAttempts,
+        leverageCorrect: state.leverageCorrect,
+        leverage,
+        cutbackAttempts: state.cutbackAttempts,
+        cutbackCorrect: state.cutbackCorrect,
+        cutback,
         discipline,
         averageReaction: average,
         bestStreak: state.bestStreak
@@ -1118,7 +1216,7 @@ function startPractice() {
 
     els.gameArea.classList.remove("hidden");
     els.startBtn.textContent = "Restart Practice";
-    setFeedback("Starting penetration-read practice...", "neutral");
+    setFeedback("Starting leverage + cutback practice...", "neutral");
 
     void fetch("/api/r2-practice-start", {
         method: "POST",

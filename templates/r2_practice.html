@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>WURD Running Vision + Penetration Reads</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=10-penetration-reads">
+    <title>WURD Running Vision + Leverage / Cutback Reads</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='r2_practice.css') }}?v=11-leverage-cutback">
 </head>
 <body>
 <div class="container">
     <header class="page-header">
         <a href="https://wurd-madden.com/" class="home-btn">Back to WURD</a>
         <div>
-            <h1>WURD Running Vision + Penetration Reads</h1>
-            <p class="intro">Read the blocking, react to penetration, watch the linebacker flow, choose the lane yourself, and accelerate only at the burst point. Offense now mixes cleaner looks with blocker failures, muddy runs, and bounce/cutback reads so you can practice escaping bad blocks instead of forcing the called path.</p>
+            <h1>WURD Running Vision + Leverage / Cutback Reads</h1>
+            <p class="intro">Press the run using first-level blocker leverage, then read the linebacker fit and decide whether to stay, cut back, or bounce. The correct second-level answer stays hidden until you commit. R2 remains the final burst decision—not the first move.</p>
         </div>
     </header>
 
@@ -76,6 +76,8 @@
             <span>Wrong Lane: <strong id="wrongDirectionCount">0</strong></span>
             <span>R2 Accuracy: <strong id="disciplinePercent">100%</strong></span>
             <span>Vision: <strong id="visionPercent">100%</strong></span>
+            <span>Leverage: <strong id="leveragePercent">100%</strong></span>
+            <span>2nd Level: <strong id="cutbackPercent">100%</strong></span>
             <span>Avg Reaction: <strong id="averageReaction">--</strong></span>
             <span>Streak: <strong id="streak">0</strong></span>
             <span>Best: <strong id="bestStreak">0</strong></span>
@@ -123,7 +125,7 @@
             <aside class="control-panel">
                 <div id="playBadge" class="play-badge">OFFENSE</div>
                 <h2 id="phaseTitle">Press Start Practice</h2>
-                <p id="phaseInstruction">Read the block movement, identify penetration, confirm the linebacker flow, choose the opening yourself, then press R2 at the burst point.</p>
+                <p id="phaseInstruction">Press the leverage first, make the linebackers declare, then decide whether to stay or cut before you use R2.</p>
 
                 <div id="cueLight" class="cue-light wait">
                     <span id="cueText">WAIT</span>
@@ -135,22 +137,22 @@
                 <p id="reactionWindowText" class="small-text">Normal window: 850 ms</p>
 
                 <button id="r2TestButton" class="r2-button" type="button" aria-label="Simulate R2 press">R2</button>
-                <p class="small-text">Blue dashed LOS = line of scrimmage. On offense, the correct lane is hidden until after your choice. First read any blocker loss or penetration, then the linebacker flow, then steer without sprinting and use R2 only at the burst point.</p>
+                <p class="small-text">Blue dashed LOS = line of scrimmage. First read the blocker/defender leverage and PRESS that path without R2. Then read the linebacker movement and choose STAY, CUT, or BOUNCE. R2 comes only after the second-level decision.</p>
             </aside>
         </section>
 
         <section class="lesson-row">
             <div>
-                <strong>Inside:</strong>
-                <span>See where penetration appears → find the crease or cutback away from it → burst only after you clear the traffic.</span>
+                <strong>Leverage:</strong>
+                <span>Press the shoulder your blocker owns. Do not sprint yet—your first path is meant to influence the linebackers.</span>
             </div>
             <div>
-                <strong>Outside:</strong>
-                <span>Use interior clutter as information. If the front caves inside, bounce to the edge once it is truly sealed.</span>
+                <strong>Cutback:</strong>
+                <span>After the linebackers fit the run, stay if your lane survives; cut behind over-pursuit if they close it.</span>
             </div>
             <div>
-                <strong>Second level:</strong>
-                <span>The linebackers tell you whether the first hole is real. If they overfit frontside, look for the cutback before you sprint.</span>
+                <strong>Burst:</strong>
+                <span>Finish the read first. Use R2 only after you have chosen the final lane and are ready to accelerate through it.</span>
             </div>
         </section>
 
@@ -159,6 +161,6 @@
 </div>
 
 <script src="{{ url_for('static', filename='practice_controls.js') }}"></script>
-<script src="{{ url_for('static', filename='r2_practice.js') }}?v=10-penetration-reads"></script>
+<script src="{{ url_for('static', filename='r2_practice.js') }}?v=11-leverage-cutback"></script>
 </body>
 </html>

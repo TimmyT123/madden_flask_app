@@ -1,4 +1,4 @@
-/* WURD Running Vision + R2 Practice v9 — penetration reads and linebacker flow */
+/* WURD Running Vision + R2 Practice v10 — blocker leverage and cutback recognition */
 * {
     box-sizing: border-box;
 }
@@ -709,4 +709,19 @@ select,
     font-weight: bold;
     letter-spacing: 0.05em;
     white-space: nowrap;
+}
+
+
+.play-badge.cutback {
+    border-color: #a855f7;
+    color: #e9d5ff;
+}
+
+.play-badge.stay {
+    border-color: #22c55e;
+    color: #bbf7d0;
+}
+
+.run-linebacker {
+    transition: left 260ms ease, top 260ms ease, transform 180ms ease, opacity 150ms ease;
 }
