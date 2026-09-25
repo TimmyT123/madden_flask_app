@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v17 — lane vs angle evaluation
+// WURD Running Vision + R2 Practice v18 — linebacker decision grace window
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -9,6 +9,7 @@ const DIFFICULTIES = {
         readMin: 1700,
         readMax: 2800,
         reactionWindow: 1200,
+        secondLevelGrace: 500,
         insideApproach: 1100,
         outsideOpenApproach: 480,
         outsideDevelopingApproach: 1400,
@@ -19,6 +20,7 @@ const DIFFICULTIES = {
         readMin: 1250,
         readMax: 2250,
         reactionWindow: 850,
+        secondLevelGrace: 350,
         insideApproach: 850,
         outsideOpenApproach: 360,
         outsideDevelopingApproach: 1100,
@@ -29,6 +31,7 @@ const DIFFICULTIES = {
         readMin: 900,
         readMax: 1750,
         reactionWindow: 650,
+        secondLevelGrace: 250,
         insideApproach: 660,
         outsideOpenApproach: 285,
         outsideDevelopingApproach: 850,
@@ -39,6 +42,7 @@ const DIFFICULTIES = {
         readMin: 650,
         readMax: 1350,
         reactionWindow: 500,
+        secondLevelGrace: 190,
         insideApproach: 520,
         outsideOpenApproach: 225,
         outsideDevelopingApproach: 700,
@@ -288,6 +292,7 @@ const state = {
     leverageAttemptRecorded: false,
     cutbackAttemptRecorded: false,
     readStage: "press",
+    secondLevelGraceUntil: 0,
     stageProgress: 0,
     missedStage: null,
     wrongLaneHoldMs: 0,
@@ -500,6 +505,7 @@ function resetStats() {
     state.leverageAttemptRecorded = false;
     state.cutbackAttemptRecorded = false;
     state.readStage = "press";
+    state.secondLevelGraceUntil = 0;
     state.stageProgress = 0;
     state.missedStage = null;
     state.wrongLaneHoldMs = 0;
@@ -550,6 +556,7 @@ function configurePlaySelection() {
     state.leverageAttemptRecorded = false;
     state.cutbackAttemptRecorded = false;
     state.readStage = "press";
+    state.secondLevelGraceUntil = 0;
     state.stageProgress = 0;
     state.missedStage = null;
     state.wrongLaneHoldMs = 0;
@@ -1128,6 +1135,12 @@ function updateSecondLevelStatus(choice = null) {
         return;
     }
 
+    if (performance.now() < state.secondLevelGraceUntil) {
+        els.secondLevelStatus.textContent = "READ THE LBs…";
+        els.secondLevelStatus.classList.add("active");
+        return;
+    }
+
     if (isStayRead()) {
         const analysis = stayAngleAnalysis();
         if (analysis.onCorrectSide) {
@@ -1151,6 +1164,7 @@ function showSecondLevelFit() {
     if (state.playType !== "offense" || !state.visionScenario || state.readStage !== "press") return;
     const scenario = state.visionScenario;
     state.readStage = "cut";
+    state.secondLevelGraceUntil = performance.now() + currentDifficulty().secondLevelGrace;
     state.stageProgress = 0;
     state.wrongLaneHoldMs = 0;
     state.finalChoice = null;
@@ -1172,12 +1186,10 @@ function showSecondLevelFit() {
     // A cut is only taught if that visible crease is meaningfully cleaner than staying.
     resolveFinalRunPath();
 
-    setCue("aim", state.direction === state.initialDirection ? "STAY?" : "CUT?");
-    els.phaseTitle.textContent = state.direction === state.initialDirection
-        ? "Second level moved—do you stay?"
-        : "Second level overfit—find the cutback";
-    els.phaseInstruction.textContent = "Read the linebackers now. Stay on the leverage path if it remains clean, or redirect to the cutback/bounce lane without R2.";
-    setFeedback(state.resolvedCoaching || "The first-level read got you here. Now let the linebacker fit decide whether you stay or redirect.", "neutral");
+    setCue("aim", "READ LBs");
+    els.phaseTitle.textContent = "Linebackers moved—read them first";
+    els.phaseInstruction.textContent = `You have ${currentDifficulty().secondLevelGrace} ms to process the linebacker fit. Keep your current press; your second-level input is NOT graded yet.`;
+    setFeedback("READ THE LBs… Hold your initial path for a moment. When the grace window ends, DECIDE NOW and choose stay, cut, or bounce.", "neutral");
 }
 
 function stickLaneChoice(x = state.leftX, y = state.leftY) {
@@ -1292,6 +1304,23 @@ function advanceApproach(now) {
                 showSecondLevelFit();
             }
             return;
+        }
+
+        if (now < state.secondLevelGraceUntil) {
+            state.wrongLaneHoldMs = 0;
+            state.wrongAngleHoldMs = 0;
+            updateSecondLevelStatus();
+            return;
+        }
+
+        if (state.secondLevelGraceUntil > 0) {
+            state.secondLevelGraceUntil = 0;
+            setCue("aim", "DECIDE NOW");
+            els.phaseTitle.textContent = state.direction === state.initialDirection
+                ? "DECIDE NOW — stay and get vertical?"
+                : "DECIDE NOW — take the cut?";
+            els.phaseInstruction.textContent = "The linebacker grace window is over. Your stick now counts as the second-level decision.";
+            setFeedback(state.resolvedCoaching || "Now make the second-level decision: stay, cut, or bounce without R2.", "neutral");
         }
 
         if (!state.cutbackAttemptRecorded) {
