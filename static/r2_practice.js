@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v10 — blocker leverage and cutback recognition
+// WURD Running Vision + R2 Practice v11 — mistake review waits for X
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -46,6 +46,7 @@ const DIFFICULTIES = {
     }
 };
 
+const X_BUTTON_INDEX = 0;
 const R2_BUTTON_INDEX = 7;
 const PS_HOME_BUTTON_INDEX = 16;
 const WURD_HOME_URL = "/";
@@ -286,6 +287,9 @@ const state = {
     lastControllerIndex: null,
     animationFrame: null,
     psHomeDown: false,
+    xButtonDown: false,
+    awaitingContinue: false,
+    pendingSessionFinish: false,
     paused: false,
     pauseStartedAt: 0,
     readAnimationTimer: null
@@ -455,6 +459,9 @@ function resetStats() {
     state.stageProgress = 0;
     state.missedStage = null;
     state.wrongLaneHoldMs = 0;
+    state.awaitingContinue = false;
+    state.pendingSessionFinish = false;
+    state.xButtonDown = false;
     state.streak = 0;
     state.bestStreak = 0;
     state.reactions = [];
@@ -1075,12 +1082,37 @@ function earlyMessage(phaseAtResult) {
     return "Too early. You pressed R2 before the play declared the lane or pursuit angle.";
 }
 
+function waitForMistakeReview(message, cueText) {
+    state.awaitingContinue = true;
+    state.phase = "feedback_wait";
+    setCue("bad", cueText);
+    els.phaseTitle.textContent = "Review the mistake";
+    els.phaseInstruction.textContent = "Read the explanation and look at the highlighted correct lane. Press X on the controller to continue.";
+    setFeedback(`${message}  Press X to continue.`, "wrong-direction");
+}
+
+function continueAfterMistakeReview() {
+    if (!state.running || !state.awaitingContinue) return;
+
+    state.awaitingContinue = false;
+    state.xButtonDown = true;
+
+    if (state.pendingSessionFinish) {
+        state.pendingSessionFinish = false;
+        finishSession();
+        return;
+    }
+
+    waitForR2ReleaseThenBegin();
+}
+
 function finishPlay(result, reactionMs = null) {
     if (!state.running || state.paused || !["read", "approach", "burst"].includes(state.phase)) return;
 
     const phaseAtResult = state.phase;
     clearManagedTimer("cueTimer");
     clearManagedTimer("lateTimer");
+    clearManagedTimer("nextTimer");
     state.phase = "feedback";
     state.playsCompleted += 1;
     els.reactionMeterFill.className = "reaction-meter-fill";
@@ -1114,30 +1146,45 @@ function finishPlay(result, reactionMs = null) {
         state.early += 1;
         state.streak = 0;
         if (state.playType === "offense") revealCorrectRead();
-        setCue("bad", "TOO EARLY");
-        setFeedback(earlyMessage(phaseAtResult), "early");
         playSound(wrongSound);
+
+        let detail = earlyMessage(phaseAtResult);
+        if (state.playType === "offense") {
+            if (state.readStage === "press") {
+                detail += ` Your first job was to press ${state.initialDirection} without R2 and let the linebackers declare.`;
+            } else if (state.readStage === "fit") {
+                detail += ` You still needed to read the linebacker fit and finish toward ${state.direction} before bursting.`;
+            } else {
+                detail += ` The correct final lane was ${state.direction}; wait until the R2 NOW cue.`;
+            }
+        }
+        waitForMistakeReview(detail, "TOO EARLY");
     } else if (result === "wrong_direction") {
         state.wrongDirection += 1;
         state.streak = 0;
-        setCue("bad", "WRONG LANE");
-        setFeedback(wrongDirectionMessage(), "wrong-direction");
+        if (state.playType === "offense") revealCorrectRead();
         playSound(wrongSound);
+        waitForMistakeReview(wrongDirectionMessage(), "WRONG LANE");
     } else {
         state.late += 1;
         state.streak = 0;
         if (state.playType === "offense") revealCorrectRead();
-        setCue("bad", "TOO LATE");
-        setFeedback("Too late. You reached the burst point and the green window expired.", "late");
         playSound(wrongSound);
+        const laneText = state.playType === "offense" ? ` You had the correct final lane (${state.direction}), but waited too long after R2 NOW.` : " You reached the close point but waited too long after R2 NOW.";
+        waitForMistakeReview(`Too late.${laneText}`, "TOO LATE");
     }
 
     updateScoreboard();
 
-    if (state.targetPlays !== null && state.playsCompleted >= state.targetPlays) {
-        setManagedTimer("nextTimer", finishSession, 1150);
+    const sessionFinished = state.targetPlays !== null && state.playsCompleted >= state.targetPlays;
+    if (result === "perfect") {
+        if (sessionFinished) {
+            setManagedTimer("nextTimer", finishSession, 1150);
+        } else {
+            setManagedTimer("nextTimer", waitForR2ReleaseThenBegin, 1200);
+        }
     } else {
-        setManagedTimer("nextTimer", waitForR2ReleaseThenBegin, 1200);
+        state.pendingSessionFinish = sessionFinished;
     }
 }
 
@@ -1345,6 +1392,12 @@ function pollController(now) {
 
             state.psHomeDown = psHomePressed;
 
+            const xPressed = Boolean(pad.buttons[X_BUTTON_INDEX]?.pressed);
+            if (state.awaitingContinue && xPressed && !state.xButtonDown) {
+                continueAfterMistakeReview();
+            }
+            state.xButtonDown = xPressed;
+
             const x = Number.isFinite(pad.axes[0]) ? pad.axes[0] : 0;
             const y = Number.isFinite(pad.axes[1]) ? pad.axes[1] : 0;
             applyLeftStick(x, y);
@@ -1355,6 +1408,7 @@ function pollController(now) {
             updateR2State(triggerValue >= R2_THRESHOLD || state.pointerR2Down);
         } else {
             state.psHomeDown = false;
+            state.xButtonDown = false;
             els.controllerStatus.textContent = "Waiting for controller—press a controller button.";
             els.controllerStatus.classList.remove("connected");
             applyLeftStick(0, 0);
@@ -1394,6 +1448,12 @@ function isR2KeyboardCode(code) {
 window.addEventListener("keydown", (event) => {
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) {
         event.preventDefault();
+    }
+
+    if (state.awaitingContinue && event.code === "Enter") {
+        event.preventDefault();
+        continueAfterMistakeReview();
+        return;
     }
 
     if (state.paused) return;
