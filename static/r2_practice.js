@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v14 — mistake route overlay
+// WURD Running Vision + R2 Practice v15 — gap-aware mistake routes
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -68,6 +68,8 @@ const VISION_SCENARIOS = [
         initialDirection: "right",
         direction: "left",
         label: "PRESS RIGHT → CUT LEFT",
+        routeFinalX: 34,
+        routeFinalText: "CUT BACK LEFT — HIT THE CREASE",
         blockerDx: [-2, 4, 7],
         defenderDx: [1, -7, -10],
         defenderDy: [1, 2, 2],
@@ -84,6 +86,8 @@ const VISION_SCENARIOS = [
         initialDirection: "left",
         direction: "right",
         label: "PRESS LEFT → CUT RIGHT",
+        routeFinalX: 66,
+        routeFinalText: "CUT BACK RIGHT — HIT THE CREASE",
         blockerDx: [-7, -4, 2],
         defenderDx: [10, 7, -1],
         defenderDy: [2, 2, 1],
@@ -100,6 +104,8 @@ const VISION_SCENARIOS = [
         initialDirection: "middle",
         direction: "middle",
         label: "PRESS MIDDLE → STAY",
+        routeFinalX: 50,
+        routeFinalText: "STAY VERTICAL THROUGH THE CREASE",
         blockerDx: [-4, -7, 5],
         defenderDx: [6, -10, -7],
         defenderDy: [1, 2, 1],
@@ -116,6 +122,8 @@ const VISION_SCENARIOS = [
         initialDirection: "right",
         direction: "right",
         label: "PRESS RIGHT → STAY",
+        routeFinalX: 72,
+        routeFinalText: "STAY RIGHT — GET VERTICAL",
         blockerDx: [-1, -5, 7],
         defenderDx: [0, -8, -10],
         defenderDy: [1, 2, 2],
@@ -132,6 +140,8 @@ const VISION_SCENARIOS = [
         initialDirection: "left",
         direction: "left",
         label: "PRESS LEFT → BOUNCE LEFT",
+        routeFinalX: 16,
+        routeFinalText: "BOUNCE OUTSIDE LEFT",
         blockerDx: [-9, -2, 2],
         defenderDx: [11, 5, 1],
         defenderDy: [1, 2, 0],
@@ -147,15 +157,17 @@ const VISION_SCENARIOS = [
         family: "cutback",
         initialDirection: "right",
         direction: "middle",
-        label: "PRESS RIGHT → CUT MIDDLE",
-        blockerDx: [-1, 3, 8],
-        defenderDx: [0, -3, -11],
+        label: "PRESS RIGHT → CUT INSIDE",
+        routeFinalX: 55,
+        routeFinalText: "CUT INSIDE — RIGHT SHOULDER OF MIDDLE DL",
+        blockerDx: [-1, 2, 8],
+        defenderDx: [0, -7, -6],
         defenderDy: [0, 1, 1],
         linebackerDxInitial: [0, 1, -2],
         linebackerDyInitial: [0, 0, 0],
-        linebackerDxFinal: [1, 8, 10],
+        linebackerDxFinal: [1, 15, 11],
         linebackerDyFinal: [1, 4, 2],
-        coaching: "Press the outside run right to move the defense. When the linebackers widen, plant and cut underneath into the middle crease."
+        coaching: "Press right first. When the linebackers widen, cut underneath through the crease just to the RIGHT of the middle DL, then get vertical before using R2."
     },
     {
         id: "muddy-press-left-minimize",
@@ -164,6 +176,8 @@ const VISION_SCENARIOS = [
         initialDirection: "middle",
         direction: "left",
         label: "PRESS MIDDLE → ESCAPE LEFT",
+        routeFinalX: 35,
+        routeFinalText: "ESCAPE LEFT — BEST AVAILABLE GAP",
         blockerDx: [-3, 1, 4],
         defenderDx: [4, 8, -4],
         defenderDy: [2, 6, 2],
@@ -609,24 +623,31 @@ function hideReviewRoute() {
 function showReviewRoute() {
     if (!els.routeOverlay || state.playType !== "offense" || !state.visionScenario) return;
 
+    const scenario = state.visionScenario;
     const startX = 50;
     const startY = 72;
     const pressX = routeLaneX(state.initialDirection);
-    const finalX = routeLaneX(state.direction);
+    // The final review target is scenario-specific so the arrow points THROUGH
+    // an actual crease/shoulder instead of the center of a generic LEFT/MIDDLE/RIGHT lane.
+    const finalX = Number.isFinite(scenario.routeFinalX)
+        ? scenario.routeFinalX
+        : routeLaneX(state.direction);
     const decisionY = 52;
-    const finishY = 24;
+    const finishY = 22;
 
-    // Orange = the first leverage press. Green = what to do after the linebackers fit.
     const initialPath = `M ${startX} ${startY} Q ${startX} 63 ${pressX} ${decisionY}`;
     let finalPath;
 
-    if (state.direction === state.initialDirection) {
-        // A stay read is one continuous line with no sideways cut.
-        finalPath = `M ${pressX} ${decisionY} Q ${pressX} 38 ${finalX} ${finishY}`;
+    if (state.direction === state.initialDirection && Math.abs(finalX - pressX) < 8) {
+        // Stay/bounce on essentially the same track: continue through the actual gap.
+        finalPath = `M ${pressX} ${decisionY} Q ${finalX} 38 ${finalX} ${finishY}`;
     } else {
-        // Make the bend obvious without drawing an impossible instant 90-degree cut.
-        const bendY = 43;
-        finalPath = `M ${pressX} ${decisionY} Q ${pressX} ${bendY} ${finalX} 36 Q ${finalX} 30 ${finalX} ${finishY}`;
+        // Smooth plant-and-cut path. The bend begins before the LOS so the route
+        // demonstrates a realistic redirect instead of a last-second 90-degree turn.
+        const bend1Y = 46;
+        const bend2Y = 37;
+        const controlX = pressX + (finalX - pressX) * 0.45;
+        finalPath = `M ${pressX} ${decisionY} C ${pressX} ${bend1Y} ${controlX} ${bend2Y} ${finalX} 33 Q ${finalX} 27 ${finalX} ${finishY}`;
     }
 
     els.routeInitialPath?.setAttribute("d", initialPath);
@@ -639,20 +660,16 @@ function showReviewRoute() {
     }
 
     if (els.routeFinalLabel) {
-        const action = state.direction === state.initialDirection
-            ? `STAY ${laneLabel(state.direction)}`
-            : state.visionScenario.family === "bounce"
-                ? `BOUNCE ${laneLabel(state.direction)}`
-                : `CUT ${laneLabel(state.direction)}`;
-        els.routeFinalLabel.setAttribute("x", String(finalX));
-        els.routeFinalLabel.setAttribute("y", "20");
+        const action = scenario.routeFinalText || secondLevelActionLabel();
+        // Keep long gap descriptions away from the edge and slightly below the arrow tip.
+        const labelX = clamp(finalX, 24, 76);
+        els.routeFinalLabel.setAttribute("x", String(labelX));
+        els.routeFinalLabel.setAttribute("y", "17");
         els.routeFinalLabel.textContent = action;
     }
 
     if (els.routeLegend) {
-        els.routeLegend.textContent = state.direction === state.initialDirection
-            ? "ORANGE = FIRST PRESS  •  GREEN = STAY ON IT"
-            : "ORANGE = FIRST PRESS  •  GREEN = CUT / FINAL PATH";
+        els.routeLegend.textContent = "ORANGE = FIRST PRESS  •  GREEN = EXACT GAP / FINAL PATH";
     }
 
     els.routeOverlay.classList.add("visible");
@@ -1217,7 +1234,8 @@ function wrongDirectionMessage() {
         }
 
         const detected = state.mistakeChoice || state.finalChoice || stickLaneChoice();
-        return `FIRST READ: ${laneLabel(state.initialDirection)} ✅ | SECOND-LEVEL INPUT THAT CAUSED THE MISS: ${laneLabel(detected)} ❌ | CORRECT SECOND-LEVEL ACTION: ${secondLevelActionLabel()} ✅. ${state.visionScenario.coaching}`;
+        const exactPath = state.visionScenario?.routeFinalText || secondLevelActionLabel();
+        return `FIRST READ: ${laneLabel(state.initialDirection)} ✅ | SECOND-LEVEL INPUT THAT CAUSED THE MISS: ${laneLabel(detected)} ❌ | CORRECT PATH: ${exactPath} ✅. ${state.visionScenario.coaching}`;
     }
     const actual = describeStickDirection();
     const required = requiredStickLabel(state.direction);
