@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v13 — exact detected input + live second-level readout
+// WURD Running Vision + R2 Practice v14 — mistake route overlay
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -227,6 +227,12 @@ const els = {
     burstLine: document.getElementById("burstLine"),
     burstLineLabel: document.getElementById("burstLineLabel"),
     directionArrow: document.getElementById("directionArrow"),
+    routeOverlay: document.getElementById("routeOverlay"),
+    routeInitialPath: document.getElementById("routeInitialPath"),
+    routeFinalPath: document.getElementById("routeFinalPath"),
+    routeInitialLabel: document.getElementById("routeInitialLabel"),
+    routeFinalLabel: document.getElementById("routeFinalLabel"),
+    routeLegend: document.getElementById("routeLegend"),
     countdown: document.getElementById("countdown"),
     playBadge: document.getElementById("playBadge"),
     phaseTitle: document.getElementById("phaseTitle"),
@@ -584,7 +590,76 @@ function stickMatchesTarget(direction, x = state.leftX, y = state.leftY) {
     return Math.abs(x) <= STICK_MIDDLE_MAX_X;
 }
 
+function routeLaneX(direction) {
+    if (direction === "left") return 22;
+    if (direction === "right") return 78;
+    return 50;
+}
+
+function hideReviewRoute() {
+    if (!els.routeOverlay) return;
+    els.routeOverlay.classList.remove("visible");
+    els.routeInitialPath?.setAttribute("d", "");
+    els.routeFinalPath?.setAttribute("d", "");
+    if (els.routeInitialLabel) els.routeInitialLabel.textContent = "";
+    if (els.routeFinalLabel) els.routeFinalLabel.textContent = "";
+    if (els.routeLegend) els.routeLegend.textContent = "";
+}
+
+function showReviewRoute() {
+    if (!els.routeOverlay || state.playType !== "offense" || !state.visionScenario) return;
+
+    const startX = 50;
+    const startY = 72;
+    const pressX = routeLaneX(state.initialDirection);
+    const finalX = routeLaneX(state.direction);
+    const decisionY = 52;
+    const finishY = 24;
+
+    // Orange = the first leverage press. Green = what to do after the linebackers fit.
+    const initialPath = `M ${startX} ${startY} Q ${startX} 63 ${pressX} ${decisionY}`;
+    let finalPath;
+
+    if (state.direction === state.initialDirection) {
+        // A stay read is one continuous line with no sideways cut.
+        finalPath = `M ${pressX} ${decisionY} Q ${pressX} 38 ${finalX} ${finishY}`;
+    } else {
+        // Make the bend obvious without drawing an impossible instant 90-degree cut.
+        const bendY = 43;
+        finalPath = `M ${pressX} ${decisionY} Q ${pressX} ${bendY} ${finalX} 36 Q ${finalX} 30 ${finalX} ${finishY}`;
+    }
+
+    els.routeInitialPath?.setAttribute("d", initialPath);
+    els.routeFinalPath?.setAttribute("d", finalPath);
+
+    if (els.routeInitialLabel) {
+        els.routeInitialLabel.setAttribute("x", String((startX + pressX) / 2));
+        els.routeInitialLabel.setAttribute("y", "61");
+        els.routeInitialLabel.textContent = `PRESS ${laneLabel(state.initialDirection)}`;
+    }
+
+    if (els.routeFinalLabel) {
+        const action = state.direction === state.initialDirection
+            ? `STAY ${laneLabel(state.direction)}`
+            : state.visionScenario.family === "bounce"
+                ? `BOUNCE ${laneLabel(state.direction)}`
+                : `CUT ${laneLabel(state.direction)}`;
+        els.routeFinalLabel.setAttribute("x", String(finalX));
+        els.routeFinalLabel.setAttribute("y", "20");
+        els.routeFinalLabel.textContent = action;
+    }
+
+    if (els.routeLegend) {
+        els.routeLegend.textContent = state.direction === state.initialDirection
+            ? "ORANGE = FIRST PRESS  •  GREEN = STAY ON IT"
+            : "ORANGE = FIRST PRESS  •  GREEN = CUT / FINAL PATH";
+    }
+
+    els.routeOverlay.classList.add("visible");
+}
+
 function resetFieldVisuals() {
+    hideReviewRoute();
     Object.values(els.lanes).forEach((lane) => lane.classList.remove("open"));
     els.directionArrow.classList.remove("visible");
     els.directionArrow.style.left = "50%";
@@ -1160,10 +1235,13 @@ function waitForMistakeReview(message, cueText) {
     state.awaitingContinue = true;
     state.continueArmed = false;
     state.phase = "feedback_wait";
+    showReviewRoute();
     setCue("bad", cueText);
     updateSecondLevelStatus(state.mistakeChoice);
     els.phaseTitle.textContent = "Review the mistake";
-    els.phaseInstruction.textContent = "Take as long as you need. Release X if it is held, then press X when you are ready for the next play.";
+    els.phaseInstruction.textContent = state.playType === "offense"
+        ? "Take as long as you need. The field now shows the correct route: ORANGE = first press, GREEN = final stay/cut/bounce. Release X if it is held, then press X when ready."
+        : "Take as long as you need. Release X if it is held, then press X when you are ready for the next play.";
     setFeedback(`${message}  Press X when ready.`, "wrong-direction");
 }
 

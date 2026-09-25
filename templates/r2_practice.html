@@ -120,6 +120,21 @@
                 <div id="ballCarrier" class="player ball-carrier">HB</div>
 
                 <div id="directionArrow" class="direction-arrow">▲</div>
+                <svg id="routeOverlay" class="review-route-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                        <marker id="routeArrowOrange" markerWidth="4" markerHeight="4" refX="3.2" refY="2" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L4,2 L0,4 Z" class="route-marker-orange"></path>
+                        </marker>
+                        <marker id="routeArrowGreen" markerWidth="4" markerHeight="4" refX="3.2" refY="2" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L4,2 L0,4 Z" class="route-marker-green"></path>
+                        </marker>
+                    </defs>
+                    <path id="routeInitialPath" class="route-path route-initial" marker-end="url(#routeArrowOrange)"></path>
+                    <path id="routeFinalPath" class="route-path route-final" marker-end="url(#routeArrowGreen)"></path>
+                    <text id="routeInitialLabel" class="route-label route-label-initial" text-anchor="middle"></text>
+                    <text id="routeFinalLabel" class="route-label route-label-final" text-anchor="middle"></text>
+                    <text id="routeLegend" class="route-legend" x="50" y="95" text-anchor="middle"></text>
+                </svg>
                 <div id="countdown" class="countdown hidden">3</div>
             </div>
 
