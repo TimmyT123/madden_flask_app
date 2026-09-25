@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v11 — mistake review waits for X
+// WURD Running Vision + R2 Practice v12 — mistake review waits for X
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -288,6 +288,7 @@ const state = {
     animationFrame: null,
     psHomeDown: false,
     xButtonDown: false,
+    continueArmed: false,
     awaitingContinue: false,
     pendingSessionFinish: false,
     paused: false,
@@ -460,6 +461,7 @@ function resetStats() {
     state.missedStage = null;
     state.wrongLaneHoldMs = 0;
     state.awaitingContinue = false;
+    state.continueArmed = false;
     state.pendingSessionFinish = false;
     state.xButtonDown = false;
     state.streak = 0;
@@ -1084,17 +1086,19 @@ function earlyMessage(phaseAtResult) {
 
 function waitForMistakeReview(message, cueText) {
     state.awaitingContinue = true;
+    state.continueArmed = false;
     state.phase = "feedback_wait";
     setCue("bad", cueText);
     els.phaseTitle.textContent = "Review the mistake";
-    els.phaseInstruction.textContent = "Read the explanation and look at the highlighted correct lane. Press X on the controller to continue.";
-    setFeedback(`${message}  Press X to continue.`, "wrong-direction");
+    els.phaseInstruction.textContent = "Take as long as you need. Release X if it is held, then press X when you are ready for the next play.";
+    setFeedback(`${message}  Press X when ready.`, "wrong-direction");
 }
 
 function continueAfterMistakeReview() {
-    if (!state.running || !state.awaitingContinue) return;
+    if (!state.running || !state.awaitingContinue || !state.continueArmed) return;
 
     state.awaitingContinue = false;
+    state.continueArmed = false;
     state.xButtonDown = true;
 
     if (state.pendingSessionFinish) {
@@ -1393,9 +1397,20 @@ function pollController(now) {
             state.psHomeDown = psHomePressed;
 
             const xPressed = Boolean(pad.buttons[X_BUTTON_INDEX]?.pressed);
-            if (state.awaitingContinue && xPressed && !state.xButtonDown) {
-                continueAfterMistakeReview();
+
+            // Mistake Review is a locked teaching screen. Ignore stick and R2
+            // completely until X has been released once and then freshly pressed.
+            if (state.awaitingContinue) {
+                if (!xPressed) {
+                    state.continueArmed = true;
+                } else if (state.continueArmed && !state.xButtonDown) {
+                    continueAfterMistakeReview();
+                }
+                state.xButtonDown = xPressed;
+                state.animationFrame = requestAnimationFrame(pollController);
+                return;
             }
+
             state.xButtonDown = xPressed;
 
             const x = Number.isFinite(pad.axes[0]) ? pad.axes[0] : 0;
@@ -1452,6 +1467,7 @@ window.addEventListener("keydown", (event) => {
 
     if (state.awaitingContinue && event.code === "Enter") {
         event.preventDefault();
+        state.continueArmed = true;
         continueAfterMistakeReview();
         return;
     }
