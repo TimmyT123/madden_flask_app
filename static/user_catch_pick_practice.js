@@ -1,4 +1,4 @@
-// VERSION 15: Difficult Catch Training + catch-decision grading + variable small-green meters
+// VERSION 16: Difficult Catch Training — 60% Triangle / 20% X / 20% Square
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
@@ -430,7 +430,7 @@
         const leverage = randomChoice(["left", "right"]);
         const coverageRoll = Math.random();
         const coveragePosition = isDifficultCatchTraining()
-            ? (coverageRoll < 0.78 ? "tight" : coverageRoll < 0.90 ? "front" : "behind")
+            ? (coverageRoll < 0.60 ? "tight" : coverageRoll < 0.80 ? "front" : "behind")
             : randomChoice(["front", "behind", "tight"]);
         const difficultProfile = isDifficultCatchTraining() ? createDifficultCatchProfile() : null;
 
