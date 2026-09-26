@@ -2446,7 +2446,7 @@ def power_rankings_page():
         week_label = "Current Week"
 
     return render_template(
-        "power_rankings_v1.html",
+        "power_rankings.html",
         league=league,
         week_label=week_label,
         rankings=rankings[:10],
