@@ -1,4 +1,4 @@
-// VERSION 16: Difficult Catch Training — 60% Triangle / 20% X / 20% Square
+// VERSION 17: Difficult Catch Training — 60% Triangle + catch-input initiation timing
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
@@ -208,6 +208,47 @@
         const duration = randomRange(680, 1050);
         const startProgress = Math.max(0, sweetStart - randomRange(0.08, 0.19));
         return { sweetStart, sweetEnd, duration, startProgress };
+    }
+
+    function applyCatchInitiationTiming(rep) {
+        if (!isDifficultCatchTraining() || !rep?.ball) return;
+
+        const profile = catchMeterProfile(rep);
+        const ballProgress = clamp(rep.ball.progress || 0, 0, 1.08);
+        const baseStart = rep.difficultStartProgress ?? rep.catchMeterStartProgress ?? 0;
+        let penalty = 0;
+        let label = "EARLY / READY";
+
+        // Training approximation from the real-game clips: the later the catch
+        // button is first pressed, the farther right the meter begins.
+        if (ballProgress <= 0.58) {
+            penalty = 0;
+            label = "EARLY / READY";
+        } else if (ballProgress <= 0.72) {
+            penalty = lerp(0.00, 0.045, (ballProgress - 0.58) / 0.14);
+            label = "GOOD";
+        } else if (ballProgress <= 0.84) {
+            penalty = lerp(0.045, 0.11, (ballProgress - 0.72) / 0.12);
+            label = "GETTING LATE";
+        } else if (ballProgress <= 0.93) {
+            penalty = lerp(0.11, 0.22, (ballProgress - 0.84) / 0.09);
+            label = "LATE";
+        } else {
+            penalty = lerp(0.22, 0.38, (ballProgress - 0.93) / 0.15);
+            label = "VERY LATE";
+        }
+
+        let adjustedStart = baseStart + penalty;
+        if (ballProgress >= 0.90) {
+            adjustedStart = Math.max(adjustedStart, profile.sweetEnd - 0.015);
+        }
+        if (ballProgress >= 0.96) {
+            adjustedStart = Math.max(adjustedStart, profile.sweetEnd + 0.045);
+        }
+
+        rep.catchInitiationBallProgress = ballProgress;
+        rep.catchInitiationLabel = label;
+        rep.catchMeterStartProgress = clamp(adjustedStart, 0, 1.08);
     }
 
     function loadOffenseRouteSettings() {
@@ -478,6 +519,8 @@
             catchSweetStart: difficultProfile?.sweetStart ?? null,
             catchSweetEnd: difficultProfile?.sweetEnd ?? null,
             difficultStartProgress: difficultProfile?.startProgress ?? null,
+            catchInitiationBallProgress: null,
+            catchInitiationLabel: null,
             catchDecisionCorrect: null,
             throwHolding: false,
             throwHeldAt: null,
@@ -1183,6 +1226,10 @@
             return;
         }
 
+        // Grade WHEN the user commits to the catch. In Difficult mode, waiting
+        // until the ball is almost on the receiver pushes the meter start right.
+        applyCatchInitiationTiming(rep);
+
         rep.catchMeterStarted = true;
         rep.catchMeterStartedAt = now;
         rep.catchHolding = true;
@@ -1210,12 +1257,23 @@
             startProgress >= profile.sweetStart &&
             startProgress <= profile.sweetEnd;
 
-        setTiming(
-            startsGreen
-                ? `Catch meter opened GREEN — release ${BUTTON_LABELS[buttonName]} NOW.`
-                : `Catch meter started — release ${BUTTON_LABELS[buttonName]} in the green.`,
-            "good"
-        );
+        if (isDifficultCatchTraining()) {
+            const initiation = rep.catchInitiationLabel || "GOOD";
+            const alreadyRed = startProgress > profile.sweetEnd;
+            const message = alreadyRed
+                ? "VERY LATE catch input — meter started RED. Press the catch type earlier while the ball is approaching."
+                : startsGreen
+                    ? `${initiation} initiation — meter opened GREEN. Release ${BUTTON_LABELS[buttonName]} NOW.`
+                    : `${initiation} initiation — hold ${BUTTON_LABELS[buttonName]} and release in the small green.`;
+            setTiming(message, alreadyRed ? "bad" : (initiation === "LATE" || initiation === "VERY LATE" ? "warn" : "good"));
+        } else {
+            setTiming(
+                startsGreen
+                    ? `Catch meter opened GREEN — release ${BUTTON_LABELS[buttonName]} NOW.`
+                    : `Catch meter started — release ${BUTTON_LABELS[buttonName]} in the green.`,
+                "good"
+            );
+        }
 
         vibrate(28, 0.14);
     }
@@ -1300,14 +1358,18 @@
         rep.catchPoints = correctCatch ? 20 : 0;
         const success = correctCatch && inGreen;
 
+        const initiationText = isDifficultCatchTraining() && rep.catchInitiationLabel
+            ? ` • initiation: ${rep.catchInitiationLabel}`
+            : "";
+
         if (!correctCatch && inGreen) {
-            rep.resultReason = `GREEN timing, but wrong catch type — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
+            rep.resultReason = `GREEN timing, but wrong catch type — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}${initiationText}`;
         } else if (!correctCatch) {
-            rep.resultReason = `Wrong catch type AND missed timing — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
+            rep.resultReason = `Wrong catch type AND missed timing — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}${initiationText}`;
         } else if (!inGreen) {
-            rep.resultReason = `Correct ${rep.catchType.name} choice, but meter stopped outside GREEN`;
+            rep.resultReason = `Correct ${rep.catchType.name} choice, but meter stopped outside GREEN${initiationText}`;
         } else {
-            rep.resultReason = `${rep.catchType.name}: correct catch decision + GREEN timing`;
+            rep.resultReason = `${rep.catchType.name}: correct catch decision + GREEN timing${initiationText}`;
         }
 
         finishRep(success);
@@ -1993,7 +2055,7 @@
         ctx.textAlign = "center";
         ctx.fillText(
             isDifficultCatchTraining()
-                ? "CHOOSE THE CATCH TYPE • RELEASE IN SMALL GREEN"
+                ? "PRESS EARLY ENOUGH • CHOOSE TYPE • RELEASE IN SMALL GREEN"
                 : `${BUTTON_SYMBOLS[rep.catchType.button]} ${rep.catchType.name.toUpperCase()} — RELEASE IN GREEN`,
             x + width / 2,
             y - 8
