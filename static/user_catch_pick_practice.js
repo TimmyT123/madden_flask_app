@@ -1,4 +1,4 @@
-// VERSION 14: selectable pre-snap routes + adjustable cut depth + ball-spot catch grading
+// VERSION 15: Difficult Catch Training + catch-decision grading + variable small-green meters
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
@@ -74,6 +74,7 @@
     const LOB_MAX_HOLD_MS = 165;
     const TOUCH_MAX_HOLD_MS = 500;
     const CATCH_METER_MIN_STORAGE_KEY = "wurdCatchMeterMinYards";
+    const CATCH_TRAINING_STORAGE_KEY = "wurdCatchTrainingMode";
     const ROUTE_TYPE_STORAGE_KEY = "wurdCatchRouteType";
     const ROUTE_CUT_STORAGE_KEY = "wurdCatchRouteCutYards";
     const OFFENSE_ROUTE_TYPES = ["go", "out", "in", "dig", "post", "corner"];
@@ -146,6 +147,7 @@
         mode: "offense",
         difficultyKey: "pro",
         catchMeterMinYards: 5,
+        catchTrainingMode: "difficult",
         totalReps: 10,
         completedReps: 0,
         successCount: 0,
@@ -182,6 +184,30 @@
 
     function currentDifficulty() {
         return DIFFICULTIES[state.difficultyKey];
+    }
+
+    function isDifficultCatchTraining() {
+        return state.catchTrainingMode === "difficult";
+    }
+
+    function catchMeterProfile(rep) {
+        const difficulty = currentDifficulty();
+        return {
+            duration: rep?.catchMeterDuration ?? difficulty.catchMeterDuration,
+            sweetStart: rep?.catchSweetStart ?? difficulty.catchSweetStart,
+            sweetEnd: rep?.catchSweetEnd ?? difficulty.catchSweetEnd
+        };
+    }
+
+    function createDifficultCatchProfile() {
+        // Hard catches are not always simply faster. The game clip showed a
+        // relatively deliberate meter with a very small green release window.
+        const sweetStart = randomRange(0.55, 0.70);
+        const greenWidth = randomRange(0.045, 0.095);
+        const sweetEnd = Math.min(0.82, sweetStart + greenWidth);
+        const duration = randomRange(680, 1050);
+        const startProgress = Math.max(0, sweetStart - randomRange(0.08, 0.19));
+        return { sweetStart, sweetEnd, duration, startProgress };
     }
 
     function loadOffenseRouteSettings() {
@@ -327,6 +353,7 @@
         state.mode = ui.mode.value;
         state.difficultyKey = ui.difficulty.value;
         state.catchMeterMinYards = Number(ui.catchMeterMin?.value ?? 5);
+        state.catchTrainingMode = document.getElementById("catchTrainingSelect")?.value || state.catchTrainingMode || "difficult";
         state.totalReps =
             ui.reps.value === "infinite"
                 ? Infinity
@@ -401,7 +428,11 @@
         };
 
         const leverage = randomChoice(["left", "right"]);
-        const coveragePosition = randomChoice(["front", "behind", "tight"]);
+        const coverageRoll = Math.random();
+        const coveragePosition = isDifficultCatchTraining()
+            ? (coverageRoll < 0.78 ? "tight" : coverageRoll < 0.90 ? "front" : "behind")
+            : randomChoice(["front", "behind", "tight"]);
+        const difficultProfile = isDifficultCatchTraining() ? createDifficultCatchProfile() : null;
 
         // Catch decision is based on where the defender is relative to the WR:
         // front/underneath = secure it with X,
@@ -442,6 +473,12 @@
             ball: null,
             throwButton: randomChoice(THROW_BUTTONS),
             catchType,
+            catchTrainingMode: state.catchTrainingMode,
+            catchMeterDuration: difficultProfile?.duration ?? null,
+            catchSweetStart: difficultProfile?.sweetStart ?? null,
+            catchSweetEnd: difficultProfile?.sweetEnd ?? null,
+            difficultStartProgress: difficultProfile?.startProgress ?? null,
+            catchDecisionCorrect: null,
             throwHolding: false,
             throwHeldAt: null,
             throwHoldMs: 0,
@@ -1047,11 +1084,12 @@
             OFFENSE_FIELD_YARDS
         );
 
-        rep.catchMeterEnabled = rep.catchDepthYards >= state.catchMeterMinYards;
-        rep.catchMeterStartProgress = getCatchMeterStartProgress(
-            rep.catchDepthYards,
-            currentDifficulty()
-        );
+        rep.catchMeterEnabled = isDifficultCatchTraining()
+            ? true
+            : rep.catchDepthYards >= state.catchMeterMinYards;
+        rep.catchMeterStartProgress = isDifficultCatchTraining()
+            ? rep.difficultStartProgress
+            : getCatchMeterStartProgress(rep.catchDepthYards, currentDifficulty());
 
         rep.switched = false;
 
@@ -1062,7 +1100,9 @@
                     ? "Defender behind"
                     : "Defender tight";
 
-        if (!rep.catchMeterEnabled) {
+        if (isDifficultCatchTraining()) {
+            setInstruction(`${coverageRead}. READ THE DEFENDER, choose X / Square / Triangle, then release in the SMALL GREEN window.`);
+        } else if (!rep.catchMeterEnabled) {
             setInstruction(
                 `${coverageRead}: ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. No catch meter at ${rep.catchDepthYards.toFixed(1)} yds.`
             );
@@ -1120,14 +1160,14 @@
     function currentCatchMeterProgress(rep, now = performance.now()) {
         if (!rep.catchMeterStarted) return rep.catchMeterStartProgress || 0;
 
-        const difficulty = currentDifficulty();
+        const profile = catchMeterProfile(rep);
         const heldMs =
             !rep.catchMeterLocked && rep.catchMeterStartedAt !== null
                 ? Math.max(0, now - rep.catchMeterStartedAt)
                 : rep.catchHoldMs;
 
         return clamp(
-            (rep.catchMeterStartProgress || 0) + heldMs / difficulty.catchMeterDuration,
+            (rep.catchMeterStartProgress || 0) + heldMs / profile.duration,
             0,
             1.25
         );
@@ -1165,9 +1205,10 @@
         }
 
         const startProgress = rep.catchMeterStartProgress || 0;
+        const profile = catchMeterProfile(rep);
         const startsGreen =
-            startProgress >= currentDifficulty().catchSweetStart &&
-            startProgress <= currentDifficulty().catchSweetEnd;
+            startProgress >= profile.sweetStart &&
+            startProgress <= profile.sweetEnd;
 
         setTiming(
             startsGreen
@@ -1196,7 +1237,8 @@
 
         rep.catchTimingPoints = scoreCatchRelease(
             currentCatchMeterProgress(rep, now),
-            currentDifficulty()
+            currentDifficulty(),
+            rep
         );
 
         if (rep.catchTimingPoints >= 22) {
@@ -1210,23 +1252,27 @@
         vibrate(38, 0.20);
     }
 
-    function scoreCatchRelease(ratio, difficulty) {
+    function scoreCatchRelease(ratio, difficulty, rep = null) {
         ratio = clamp(ratio, 0, 1.25);
+        const profile = rep ? catchMeterProfile(rep) : {
+            sweetStart: difficulty.catchSweetStart,
+            sweetEnd: difficulty.catchSweetEnd
+        };
 
-        if (ratio >= difficulty.catchSweetStart && ratio <= difficulty.catchSweetEnd) {
-            const middle = (difficulty.catchSweetStart + difficulty.catchSweetEnd) / 2;
-            const half = (difficulty.catchSweetEnd - difficulty.catchSweetStart) / 2;
+        if (ratio >= profile.sweetStart && ratio <= profile.sweetEnd) {
+            const middle = (profile.sweetStart + profile.sweetEnd) / 2;
+            const half = (profile.sweetEnd - profile.sweetStart) / 2;
             const quality = 1 - Math.abs(ratio - middle) / Math.max(half, 0.01);
             return Math.round(22 + clamp(quality, 0, 1) * 3);
         }
 
-        if (ratio < difficulty.catchSweetStart) {
-            const quality = ratio / Math.max(difficulty.catchSweetStart, 0.01);
+        if (ratio < profile.sweetStart) {
+            const quality = ratio / Math.max(profile.sweetStart, 0.01);
             return Math.round(clamp(quality, 0, 1) * 18);
         }
 
-        const lateSpan = Math.max(1 - difficulty.catchSweetEnd, 0.01);
-        const quality = 1 - (ratio - difficulty.catchSweetEnd) / lateSpan;
+        const lateSpan = Math.max(1 - profile.sweetEnd, 0.01);
+        const quality = 1 - (ratio - profile.sweetEnd) / lateSpan;
         return Math.round(clamp(quality, 0, 1) * 18);
     }
 
@@ -1236,14 +1282,14 @@
         rep.catchAttempted = true;
         rep.catchAttemptAt = rep.ball.progress;
 
-        const difficulty = currentDifficulty();
         const releaseProgress = currentCatchMeterProgress(rep);
         const correctCatch = buttonName === rep.catchType.button;
-        const placementGood = rep.placementPoints >= 16;
+        rep.catchDecisionCorrect = correctCatch;
+        const profile = catchMeterProfile(rep);
 
         const inGreen = !rep.catchMeterEnabled || (
-            releaseProgress >= difficulty.catchSweetStart &&
-            releaseProgress <= difficulty.catchSweetEnd
+            releaseProgress >= profile.sweetStart &&
+            releaseProgress <= profile.sweetEnd
         );
 
         // Offense now has three requirements:
@@ -1254,12 +1300,14 @@
         rep.catchPoints = correctCatch ? 20 : 0;
         const success = correctCatch && inGreen;
 
-        if (!correctCatch) {
-            rep.resultReason = `Wrong catch type—use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
+        if (!correctCatch && inGreen) {
+            rep.resultReason = `GREEN timing, but wrong catch type — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
+        } else if (!correctCatch) {
+            rep.resultReason = `Wrong catch type AND missed timing — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}`;
         } else if (!inGreen) {
-            rep.resultReason = "Missed: catch meter was outside GREEN";
+            rep.resultReason = `Correct ${rep.catchType.name} choice, but meter stopped outside GREEN`;
         } else {
-            rep.resultReason = `${rep.catchType.name} catch: catchable throw + GREEN timing`;
+            rep.resultReason = `${rep.catchType.name}: correct catch decision + GREEN timing`;
         }
 
         finishRep(success);
@@ -1652,7 +1700,7 @@
         }
 
         if (rep.thrown) {
-            if (rep.catchType.button) {
+            if (rep.catchType.button && !isDifficultCatchTraining()) {
                 drawCatchPrompt(rep.receiver, rep.catchType.button);
             }
             if (rep.catchMeterStarted) {
@@ -1663,7 +1711,9 @@
         drawMiniLegend(
             "Receiver runs automatically",
             rep.thrown
-                ? `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • front=X • behind=□ • tight=△`
+                ? (isDifficultCatchTraining()
+                    ? "READ COVERAGE • X=possession • □=RAC • △=aggressive"
+                    : `${BUTTON_SYMBOLS[rep.catchType.button]} = ${rep.catchType.name} • front=X • behind=□ • tight=△`)
                 : "Left stick = QB movement • L2 + stick = tight lead • defender side = PICK"
         );
     }
@@ -1900,7 +1950,7 @@
     function drawCatchMeter(rep) {
         if (!rep.catchMeterEnabled) return;
 
-        const difficulty = currentDifficulty();
+        const profile = catchMeterProfile(rep);
         const progress = clamp(currentCatchMeterProgress(rep), 0, 1);
         const width = 150;
         const height = 12;
@@ -1919,16 +1969,16 @@
         // Madden-style timing zones: neutral before green, green release window,
         // then red for a late release. The marker itself shows current progress.
         ctx.fillStyle = "rgba(148, 163, 184, 0.38)";
-        ctx.fillRect(x, y, width * difficulty.catchSweetStart, height);
+        ctx.fillRect(x, y, width * profile.sweetStart, height);
 
-        const sweetX = x + width * difficulty.catchSweetStart;
-        const sweetWidth = width * (difficulty.catchSweetEnd - difficulty.catchSweetStart);
+        const sweetX = x + width * profile.sweetStart;
+        const sweetWidth = width * (profile.sweetEnd - profile.sweetStart);
         ctx.fillStyle = "rgba(34, 197, 94, 0.78)";
         ctx.fillRect(sweetX, y, sweetWidth, height);
 
-        const lateX = x + width * difficulty.catchSweetEnd;
+        const lateX = x + width * profile.sweetEnd;
         ctx.fillStyle = "rgba(239, 68, 68, 0.78)";
-        ctx.fillRect(lateX, y, width * (1 - difficulty.catchSweetEnd), height);
+        ctx.fillRect(lateX, y, width * (1 - profile.sweetEnd), height);
 
         const markerX = x + width * progress;
         ctx.strokeStyle = "#071015";
@@ -1942,7 +1992,9 @@
         ctx.font = "bold 10px Arial";
         ctx.textAlign = "center";
         ctx.fillText(
-            `${BUTTON_SYMBOLS[rep.catchType.button]} ${rep.catchType.name.toUpperCase()} — RELEASE IN GREEN`,
+            isDifficultCatchTraining()
+                ? "CHOOSE THE CATCH TYPE • RELEASE IN SMALL GREEN"
+                : `${BUTTON_SYMBOLS[rep.catchType.button]} ${rep.catchType.name.toUpperCase()} — RELEASE IN GREEN`,
             x + width / 2,
             y - 8
         );
@@ -2040,6 +2092,57 @@
         requestAnimationFrame(loop);
     }
 
+    function ensureCatchTrainingSelector() {
+        let select = document.getElementById("catchTrainingSelect");
+        if (select) return select;
+
+        select = document.createElement("select");
+        select.id = "catchTrainingSelect";
+        select.innerHTML = `
+            <option value="difficult">Difficult Catch Training</option>
+            <option value="normal">Normal Catch Training</option>
+        `;
+
+        const label = document.createElement("label");
+        label.textContent = "Catch training ";
+        label.style.display = "inline-flex";
+        label.style.alignItems = "center";
+        label.style.gap = "8px";
+        label.style.marginLeft = "10px";
+        label.appendChild(select);
+
+        const anchor = ui.catchMeterMin || ui.difficulty || ui.mode;
+        const host = anchor?.parentElement || ui.start?.parentElement;
+        if (host) host.appendChild(label);
+
+        return select;
+    }
+
+    function loadCatchTrainingSetting() {
+        const select = ensureCatchTrainingSelector();
+        let saved = "difficult";
+        try {
+            const stored = localStorage.getItem(CATCH_TRAINING_STORAGE_KEY);
+            if (stored === "normal" || stored === "difficult") saved = stored;
+        } catch (error) {}
+        state.catchTrainingMode = saved;
+        if (select) select.value = saved;
+    }
+
+    function saveCatchTrainingSetting() {
+        const select = document.getElementById("catchTrainingSelect");
+        if (!select) return;
+        state.catchTrainingMode = select.value === "normal" ? "normal" : "difficult";
+        try {
+            localStorage.setItem(CATCH_TRAINING_STORAGE_KEY, state.catchTrainingMode);
+        } catch (error) {}
+        if (!state.running && state.mode === "offense") {
+            setInstruction(state.catchTrainingMode === "difficult"
+                ? "Difficult Catch Training selected. Read coverage, choose the catch type, then hit the small green window."
+                : "Normal Catch Training selected. Press Start Drill.");
+        }
+    }
+
     function loadCatchMeterMinimumSetting() {
         const allowed = new Set(["0", "5", "10", "20"]);
         let saved = "5";
@@ -2075,7 +2178,9 @@
 
     loadOffenseRouteSettings();
     loadCatchMeterMinimumSetting();
+    loadCatchTrainingSetting();
     ui.catchMeterMin?.addEventListener("change", saveCatchMeterMinimumSetting);
+    document.getElementById("catchTrainingSelect")?.addEventListener("change", saveCatchTrainingSetting);
 
     window.addEventListener("gamepadconnected", event => {
         state.gamepadIndex = event.gamepad.index;
@@ -2203,7 +2308,9 @@
             state.mode = ui.mode.value;
             setInstruction(
                 state.mode === "offense"
-                    ? "Offense mode selected. Press Start Drill."
+                    ? (state.catchTrainingMode === "difficult"
+                        ? "Offense + Difficult Catch Training selected. Read coverage, choose the catch type, then time the small green window."
+                        : "Offense mode selected. Press Start Drill.")
                     : "Defense mode selected. Press Start Drill."
             );
         }
