@@ -1,6 +1,6 @@
-# madden_flask_app_v8.py
-# Version: 8.0
-# Modified section: League Schedule (~show_schedule) — format webhook completion timestamps for display.
+# madden_flask_app_v9.py
+# Version: 9.0
+# Modified sections: Added public /power-rankings page using the existing power_rankings.json source.
 
 from flask import Flask, request, jsonify, url_for, redirect, make_response
 from flask import send_from_directory
@@ -2410,6 +2410,49 @@ def upload_file():
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/power-rankings')
+def power_rankings_page():
+    """Public WURD Power Rankings page using the same JSON as !powerrankings."""
+    league = request.args.get("league") or league_data.get("latest_league") or DEFAULT_LEAGUE_ID
+
+    path = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        str(league),
+        "power_rankings.json"
+    )
+
+    data = None
+    error = None
+
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            error = f"Could not load the current Power Rankings: {e}"
+    else:
+        error = "Power Rankings are not available yet. Check back after more games are played."
+
+    rankings = (data or {}).get("rankings") or []
+    week = (data or {}).get("week") or league_data.get("latest_week") or ""
+
+    if week:
+        try:
+            week_label = period_display_name(week)
+        except Exception:
+            week_label = str(week).replace("week_", "Week ").replace("pre_", "Preseason Week ")
+    else:
+        week_label = "Current Week"
+
+    return render_template(
+        "power_rankings_v1.html",
+        league=league,
+        week_label=week_label,
+        rankings=rankings[:10],
+        error=error,
+    )
+
 
 @app.get("/api/power-rankings/build")
 def api_build_power_rankings():
