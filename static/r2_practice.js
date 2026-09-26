@@ -1,4 +1,4 @@
-// WURD Running Vision + R2 Practice v19 — linebacker decision grace window
+// WURD Running Vision + R2 Practice v20 — defensive lurk/cutback + R2 discipline
 // Offense begins at the bottom and moves upward.
 // Defense begins at the top and closes downward, matching Madden's standard camera orientation.
 "use strict";
@@ -200,6 +200,51 @@ const VISION_SCENARIOS = [
     }
 ];
 
+const DEFENSE_SCENARIOS = [
+    {
+        id: "downhill-pursuit",
+        family: "pursuit",
+        label: "DOWNHILL PURSUIT",
+        coaching: "Stay square, close under control, and save R2 for the final burst."
+    },
+    {
+        id: "far-bait-left-break-right",
+        family: "lurk-cutback",
+        label: "FAR BAIT LEFT → BREAK RIGHT",
+        initialDirection: "left",
+        direction: "right",
+        initialSprint: true,
+        coaching: "Use R2 to get out toward the far receiver, RELEASE R2 before reversing, then re-accelerate only after the throw/close cue."
+    },
+    {
+        id: "far-bait-right-break-left",
+        family: "lurk-cutback",
+        label: "FAR BAIT RIGHT → BREAK LEFT",
+        initialDirection: "right",
+        direction: "left",
+        initialSprint: true,
+        coaching: "Use R2 to get out toward the far receiver, RELEASE R2 before reversing, then re-accelerate only after the throw/close cue."
+    },
+    {
+        id: "controlled-lurk-left-break-right",
+        family: "lurk-cutback",
+        label: "CONTROLLED LURK LEFT → BREAK RIGHT",
+        initialDirection: "left",
+        direction: "right",
+        initialSprint: false,
+        coaching: "The bait is close enough to play under control. Stay off R2, show left, plant, break right, then sprint only after the throw/close cue."
+    },
+    {
+        id: "controlled-lurk-right-break-left",
+        family: "lurk-cutback",
+        label: "CONTROLLED LURK RIGHT → BREAK LEFT",
+        initialDirection: "right",
+        direction: "left",
+        initialSprint: false,
+        coaching: "The bait is close enough to play under control. Stay off R2, show right, plant, break left, then sprint only after the throw/close cue."
+    }
+];
+
 const els = {
     inputMode: document.getElementById("inputModeSelect"),
     drillType: document.getElementById("drillTypeSelect"),
@@ -276,6 +321,11 @@ const state = {
     phase: "idle",
     playType: "offense",
     runConcept: "inside",
+    defenseScenario: null,
+    defenseStage: "read",
+    defenseLurkProgress: 0,
+    defenseCutProgress: 0,
+    defenseBadR2HoldMs: 0,
     outsideTiming: null,
     direction: "middle",
     initialDirection: "middle",
@@ -516,6 +566,11 @@ function resetStats() {
     state.resolvedRouteFinalX = null;
     state.resolvedRouteFinalText = null;
     state.resolvedCoaching = null;
+    state.defenseScenario = null;
+    state.defenseStage = "read";
+    state.defenseLurkProgress = 0;
+    state.defenseCutProgress = 0;
+    state.defenseBadR2HoldMs = 0;
     state.awaitingContinue = false;
     state.continueArmed = false;
     state.pendingSessionFinish = false;
@@ -567,11 +622,26 @@ function configurePlaySelection() {
     state.resolvedRouteFinalX = null;
     state.resolvedRouteFinalText = null;
     state.resolvedCoaching = null;
+    state.defenseScenario = null;
+    state.defenseStage = "read";
+    state.defenseLurkProgress = 0;
+    state.defenseCutProgress = 0;
+    state.defenseBadR2HoldMs = 0;
 
     if (state.playType === "defense") {
         state.runConcept = "defense";
-        state.direction = randomItem(DIRECTIONS);
-        state.initialDirection = state.direction;
+        // Keep some classic downhill pursuit reps, but make lurk/cutback the majority
+        // so Defense mode directly trains when to use, release, and re-use R2.
+        const scenario = Math.random() < 0.35
+            ? DEFENSE_SCENARIOS[0]
+            : randomItem(DEFENSE_SCENARIOS.slice(1));
+        state.defenseScenario = scenario;
+        state.direction = scenario.family === "pursuit"
+            ? randomItem(DIRECTIONS)
+            : scenario.direction;
+        state.initialDirection = scenario.family === "pursuit"
+            ? state.direction
+            : scenario.initialDirection;
         return;
     }
 
@@ -873,7 +943,9 @@ function configureFieldForPlay() {
     resetFieldVisuals();
 
     if (state.playType === "defense") {
-        els.playBadge.textContent = "DEFENSE";
+        const scenario = state.defenseScenario;
+        const isLurk = scenario?.family === "lurk-cutback";
+        els.playBadge.textContent = isLurk ? "DEFENSE • LURK/CUTBACK" : "DEFENSE";
         els.playBadge.className = "play-badge defense";
         els.runner.classList.add("hidden");
         els.blockers.forEach((blocker) => blocker.classList.add("hidden"));
@@ -881,8 +953,18 @@ function configureFieldForPlay() {
         els.runLinebackers.forEach((linebacker) => linebacker.classList.add("hidden"));
         els.defender.classList.remove("hidden");
         els.ballCarrier.classList.remove("hidden");
-        els.phaseTitle.textContent = "Stay square at the top and read";
-        els.phaseInstruction.textContent = "The runner is below you. Stay above the LOS, keep R2 released, then close downward only after he commits.";
+
+        if (isLurk) {
+            els.phaseTitle.textContent = scenario.initialSprint
+                ? "Read the QB—be ready to sprint out, then plant"
+                : "Read the QB—lurk under control";
+            els.phaseInstruction.textContent = scenario.initialSprint
+                ? "A far bait may require R2 to get there. The key is releasing R2 BEFORE you reverse direction."
+                : "This bait is close. Stay off R2 so you can plant and reverse without a wide sprint turn.";
+        } else {
+            els.phaseTitle.textContent = "Stay square at the top and read";
+            els.phaseInstruction.textContent = "The runner is below you. Stay above the LOS, keep R2 released, then close downward only after he commits.";
+        }
         return;
     }
 
@@ -929,12 +1011,21 @@ function showWaitState() {
     setCue("wait", "WAIT");
     els.reactionMeterFill.className = "reaction-meter-fill";
     els.reactionMeterFill.style.animationDuration = "";
+
+    if (state.playType === "defense" && state.defenseScenario?.family === "lurk-cutback") {
+        setFeedback("Read the QB first. Do not guess the bait direction before the cue.", "neutral");
+        return;
+    }
+
     setFeedback(`Read first. Keep R2 completely released. ${losRelationshipText()}`, "neutral");
 }
 
 function animateReadPhase() {
     if (state.playType === "defense") {
-        const fakeDirection = Math.random() < 0.5 ? -1 : 1;
+        const scenario = state.defenseScenario;
+        const fakeDirection = scenario?.family === "lurk-cutback"
+            ? (scenario.initialDirection === "left" ? -1 : 1)
+            : (Math.random() < 0.5 ? -1 : 1);
         els.ballCarrier.style.left = `${50 + fakeDirection * 6}%`;
         setManagedTimer("readAnimationTimer", () => {
             if (state.running && state.phase === "read") {
@@ -990,14 +1081,46 @@ function setDirectionArrow() {
     }
 }
 
+function setDefenseArrowFor(direction, text = "▼") {
+    if (state.playType !== "defense") return;
+    const x = directionX(direction);
+    els.directionArrow.style.left = `${x}%`;
+    els.directionArrow.style.top = "43%";
+    els.directionArrow.textContent = text;
+    els.directionArrow.classList.add("visible");
+
+    if (direction === "left") {
+        els.directionArrow.style.transform = "translate(-50%, -50%) rotate(45deg)";
+    } else if (direction === "right") {
+        els.directionArrow.style.transform = "translate(-50%, -50%) rotate(-45deg)";
+    } else {
+        els.directionArrow.style.transform = "translate(-50%, -50%) rotate(0deg)";
+    }
+}
+
+function defenseLurkStickMatches(direction, x = state.leftX, y = state.leftY) {
+    // A lurk can be mostly lateral; do not require the same downhill angle used
+    // by the standard pursuit drill. Reject strong retreat/backpedal input.
+    if (y < -0.55) return false;
+    if (direction === "left") return x <= -STICK_SIDE_MIN;
+    if (direction === "right") return x >= STICK_SIDE_MIN;
+    return Math.abs(x) <= STICK_MIDDLE_MAX_X;
+}
+
 function configureApproachTiming() {
     const difficulty = currentDifficulty();
     state.lineOfScrimmageTop = 44;
 
     if (state.playType === "defense") {
-        state.approachDuration = difficulty.defenseApproach;
-        state.burstLineTop = 49;
-        els.burstLineLabel.textContent = "R2 CLOSE POINT";
+        if (state.defenseScenario?.family === "lurk-cutback") {
+            state.approachDuration = Math.max(420, difficulty.defenseApproach * 1.65);
+            state.burstLineTop = 46;
+            els.burstLineLabel.textContent = "THROW / R2 RE-CLOSE POINT";
+        } else {
+            state.approachDuration = difficulty.defenseApproach;
+            state.burstLineTop = 49;
+            els.burstLineLabel.textContent = "R2 CLOSE POINT";
+        }
         return;
     }
 
@@ -1121,6 +1244,9 @@ function isStayRead() {
 }
 
 function finalRunInputMatches() {
+    if (state.playType === "defense" && state.defenseScenario?.family === "lurk-cutback") {
+        return defenseLurkStickMatches(state.direction);
+    }
     if (state.playType !== "offense") return stickMatchesTarget(state.direction);
     if (isStayRead()) return stayAngleAnalysis().verticalEnough;
     return stickMatchesTarget(state.direction);
@@ -1245,6 +1371,34 @@ function revealDecision() {
 
     const x = directionX(state.direction);
     if (state.playType === "defense") {
+        const scenario = state.defenseScenario;
+
+        if (scenario?.family === "lurk-cutback") {
+            state.defenseStage = "lurk";
+            state.defenseLurkProgress = 0;
+            state.defenseCutProgress = 0;
+            state.defenseBadR2HoldMs = 0;
+
+            const initialX = directionX(state.initialDirection);
+            els.ballCarrier.style.left = `${initialX}%`;
+            els.ballCarrier.style.top = "45%";
+            setDefenseArrowFor(state.initialDirection);
+
+            if (scenario.initialSprint) {
+                setCue("aim", "R2 OUT");
+                els.phaseTitle.textContent = `Far receiver—show ${laneLabel(state.initialDirection)}`;
+                els.phaseInstruction.textContent = `Push ${requiredStickLabel(state.initialDirection)} and USE R2 to get out there. Be ready to RELEASE R2 before you reverse.`;
+                setFeedback("This is the time R2 helps: cover the extra space quickly. Do not carry sprint through the upcoming cutback.", "neutral");
+            } else {
+                setCue("aim", "LURK");
+                els.phaseTitle.textContent = `Controlled lurk—show ${laneLabel(state.initialDirection)}`;
+                els.phaseInstruction.textContent = `Push toward ${laneLabel(state.initialDirection)} WITHOUT R2. You are close enough to stay balanced for the cutback.`;
+                setFeedback("Stay under control. Holding R2 here would make the coming reversal wider and slower.", "neutral");
+            }
+            return;
+        }
+
+        state.defenseStage = "pursuit";
         els.ballCarrier.style.left = `${x}%`;
         els.ballCarrier.style.top = "58%";
         els.phaseTitle.textContent = "Runner committed below you—close under control";
@@ -1261,6 +1415,22 @@ function revealDecision() {
 
 function updateApproachVisual() {
     if (state.playType === "defense") {
+        if (state.defenseScenario?.family === "lurk-cutback") {
+            const initialX = directionX(state.initialDirection);
+            const finalX = directionX(state.direction);
+
+            if (state.defenseStage === "lurk") {
+                const t = easeOut(state.defenseLurkProgress);
+                els.defender.style.left = `${lerp(50, initialX, t)}%`;
+                els.defender.style.top = `${lerp(30, 38, t)}%`;
+            } else {
+                const t = easeOut(state.defenseCutProgress);
+                els.defender.style.left = `${lerp(initialX, finalX, t)}%`;
+                els.defender.style.top = `${lerp(38, state.burstLineTop, t)}%`;
+            }
+            return;
+        }
+
         const progress = easeOut(state.approachProgress);
         const targetX = directionX(state.direction);
         els.defender.style.left = `${lerp(50, targetX, progress)}%`;
@@ -1420,6 +1590,87 @@ function advanceApproach(now) {
         return;
     }
 
+    if (state.defenseScenario?.family === "lurk-cutback") {
+        const scenario = state.defenseScenario;
+
+        if (state.defenseStage === "lurk") {
+            const correctLurk = defenseLurkStickMatches(state.initialDirection);
+
+            if (scenario.initialSprint) {
+                // Far bait: R2 is appropriate while covering the initial space.
+                if (correctLurk && state.r2Down) {
+                    state.defenseLurkProgress = clamp(
+                        state.defenseLurkProgress + elapsed / (state.approachDuration * 0.62),
+                        0,
+                        1
+                    );
+                    updateApproachVisual();
+                }
+            } else {
+                // Close bait: holding R2 is the mistake. Stay balanced.
+                if (state.r2Down) {
+                    state.defenseBadR2HoldMs += elapsed;
+                    if (state.defenseBadR2HoldMs >= 180) {
+                        state.missedStage = "defense_lurk_r2";
+                        finishPlay("early");
+                    }
+                    return;
+                }
+
+                state.defenseBadR2HoldMs = 0;
+                if (correctLurk) {
+                    state.defenseLurkProgress = clamp(
+                        state.defenseLurkProgress + elapsed / (state.approachDuration * 0.62),
+                        0,
+                        1
+                    );
+                    updateApproachVisual();
+                }
+            }
+
+            if (state.defenseLurkProgress >= 1) {
+                state.defenseStage = "cut";
+                state.defenseCutProgress = 0;
+                state.defenseBadR2HoldMs = 0;
+                const finalX = directionX(state.direction);
+                els.ballCarrier.style.left = `${finalX}%`;
+                els.ballCarrier.style.top = "50%";
+                setDefenseArrowFor(state.direction);
+                setCue("aim", "RELEASE + CUT");
+                els.phaseTitle.textContent = `QB came back—plant and break ${laneLabel(state.direction)}`;
+                els.phaseInstruction.textContent = `RELEASE R2, reverse toward ${laneLabel(state.direction)}, and stay off sprint until you reach the throw/close point.`;
+                setFeedback("This is the key rep: release sprint BEFORE the reversal. Left stick first; R2 comes back only after the throw/close cue.", "neutral");
+            }
+            return;
+        }
+
+        if (state.defenseStage === "cut") {
+            if (state.r2Down) {
+                state.defenseBadR2HoldMs += elapsed;
+                if (state.defenseBadR2HoldMs >= 180) {
+                    state.missedStage = "defense_cut_r2";
+                    finishPlay("early");
+                }
+                return;
+            }
+
+            state.defenseBadR2HoldMs = 0;
+            if (defenseLurkStickMatches(state.direction)) {
+                state.defenseCutProgress = clamp(
+                    state.defenseCutProgress + elapsed / (state.approachDuration * 0.58),
+                    0,
+                    1
+                );
+                updateApproachVisual();
+            }
+
+            if (state.defenseCutProgress >= 1) {
+                showBurstCue();
+            }
+            return;
+        }
+    }
+
     if (stickMatchesTarget(state.direction)) {
         state.approachProgress = clamp(
             state.approachProgress + elapsed / state.approachDuration,
@@ -1451,9 +1702,16 @@ function showBurstCue() {
     startReactionMeter();
 
     if (state.playType === "defense") {
-        els.phaseTitle.textContent = "Close now!";
-        els.phaseInstruction.textContent = `Keep ${requiredStickLabel(state.direction)} and press R2 through the runner.`;
-        setFeedback("You reached the close point—accelerate now.", "neutral");
+        if (state.defenseScenario?.family === "lurk-cutback") {
+            state.defenseStage = "close";
+            els.phaseTitle.textContent = "Throw/close point—R2 NOW!";
+            els.phaseInstruction.textContent = `You planted and reversed under control. Keep breaking ${laneLabel(state.direction)} and press R2 now to close.`;
+            setFeedback("Correct sequence: get there if needed → release R2 → plant/cut → R2 again after the throw.", "neutral");
+        } else {
+            els.phaseTitle.textContent = "Close now!";
+            els.phaseInstruction.textContent = `Keep ${requiredStickLabel(state.direction)} and press R2 through the runner.`;
+            setFeedback("You reached the close point—accelerate now.", "neutral");
+        }
     } else if (state.runConcept === "outside" && state.outsideTiming === "open") {
         els.phaseTitle.textContent = "Edge won—accelerate!";
         els.phaseInstruction.textContent = `Keep ${requiredStickLabel(state.direction)} and press R2 now.`;
@@ -1554,6 +1812,19 @@ function wrongAngleMessage() {
 }
 
 function earlyMessage(phaseAtResult) {
+    if (state.playType === "defense" && state.defenseScenario?.family === "lurk-cutback") {
+        if (state.missedStage === "defense_cut_r2") {
+            return "Too much R2 through the reversal. Release sprint BEFORE you plant and cut back; otherwise Madden can carry your momentum out of the passing lane.";
+        }
+        if (state.missedStage === "defense_lurk_r2") {
+            return "R2 was unnecessary on this close lurk. Stay balanced with the left stick so you can reverse sharply when the QB comes back.";
+        }
+        if (phaseAtResult === "read") {
+            return "Too early. Read the QB before committing to sprint.";
+        }
+        return "Too early. This rep is testing R2 discipline: use it only when the situation calls for speed, release it for the reversal, then re-use it at the close cue.";
+    }
+
     if (phaseAtResult === "approach") {
         return "Too early. You saw a lane, but you burst before you were through the traffic picture.";
     }
@@ -1615,7 +1886,13 @@ function finishPlay(result, reactionMs = null) {
         const readText = state.playType === "offense"
             ? ` Leverage: ${state.initialDirection}. Second level: ${state.direction}.`
             : "";
-        setFeedback(`Perfect—read leverage, read the fit, then R2 in ${reaction} ms.${visionText}${readText}`.trim(), "perfect");
+        const defenseText = state.playType === "defense" && state.defenseScenario?.family === "lurk-cutback"
+            ? ` Perfect defensive R2 sequence—show ${state.initialDirection}, release sprint for the cutback, break ${state.direction}, then re-accelerate in ${reaction} ms.`
+            : "";
+        setFeedback(
+            defenseText || `Perfect—read leverage, read the fit, then R2 in ${reaction} ms.${visionText}${readText}`.trim(),
+            "perfect"
+        );
         playSound(perfectSound);
 
         const x = directionX(state.direction);
@@ -1702,7 +1979,9 @@ function finishSession() {
     const cutback = state.cutbackAttempts ? Math.round((state.cutbackCorrect / state.cutbackAttempts) * 100) : 100;
 
     els.phaseTitle.textContent = "Practice complete";
-    els.phaseInstruction.textContent = "Take the same press → leverage → linebacker fit → stay/cut → burst sequence into Madden.";
+    els.phaseInstruction.textContent = els.drillType.value === "defense"
+        ? "Take the same defensive rule into Madden: R2 for needed space, release before sharp reversals, then R2 again to close."
+        : "Take the same press → leverage → linebacker fit → stay/cut → burst sequence into Madden.";
     setFeedback(
         `Finished: ${leverage}% leverage, ${cutback}% second-level reads, ${discipline}% complete reps, best streak ${state.bestStreak}.`,
         discipline >= 80 ? "perfect" : "neutral"
@@ -1784,7 +2063,21 @@ function postResult(payload) {
 function onR2Pressed() {
     if (!state.running || state.paused) return;
 
+    if (state.phase === "approach" &&
+        state.playType === "defense" &&
+        state.defenseScenario?.family === "lurk-cutback" &&
+        state.defenseStage === "lurk" &&
+        state.defenseScenario.initialSprint) {
+        // Correct use: far-bait reps intentionally require R2 to cover the first space.
+        return;
+    }
+
     if (state.phase === "read" || state.phase === "approach") {
+        if (state.playType === "defense" &&
+            state.defenseScenario?.family === "lurk-cutback" &&
+            state.defenseStage === "cut") {
+            state.missedStage = "defense_cut_r2";
+        }
         finishPlay("early");
     } else if (state.phase === "burst") {
         const reaction = performance.now() - state.cueAt;
