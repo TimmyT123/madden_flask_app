@@ -1,4 +1,4 @@
-// VERSION 17: Difficult Catch Training — 60% Triangle + catch-input initiation timing
+// VERSION 18: faster receiver + yardage-based catch-meter starts + initiation timing
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
@@ -83,7 +83,7 @@
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 57,
+            routeSpeed: 66,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 870,
@@ -98,7 +98,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 65,
+            routeSpeed: 75,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 675,
@@ -113,7 +113,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 81,
+            routeSpeed: 93,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 565,
@@ -128,7 +128,7 @@
         allMadden: {
             label: "All-Madden",
             ballSpeed: 585,
-            routeSpeed: 74,
+            routeSpeed: 85,
             steerSpeed: 248,
             catchRadius: 36,
             catchMeterDuration: 490,
@@ -200,14 +200,13 @@
     }
 
     function createDifficultCatchProfile() {
-        // Hard catches are not always simply faster. The game clip showed a
-        // relatively deliberate meter with a very small green release window.
+        // Hard catches are not always simply faster. Keep a small green window
+        // and vary meter speed, but let catch DEPTH determine where the meter starts.
         const sweetStart = randomRange(0.55, 0.70);
         const greenWidth = randomRange(0.045, 0.095);
         const sweetEnd = Math.min(0.82, sweetStart + greenWidth);
         const duration = randomRange(680, 1050);
-        const startProgress = Math.max(0, sweetStart - randomRange(0.08, 0.19));
-        return { sweetStart, sweetEnd, duration, startProgress };
+        return { sweetStart, sweetEnd, duration };
     }
 
     function applyCatchInitiationTiming(rep) {
@@ -518,7 +517,7 @@
             catchMeterDuration: difficultProfile?.duration ?? null,
             catchSweetStart: difficultProfile?.sweetStart ?? null,
             catchSweetEnd: difficultProfile?.sweetEnd ?? null,
-            difficultStartProgress: difficultProfile?.startProgress ?? null,
+            difficultStartProgress: null,
             catchInitiationBallProgress: null,
             catchInitiationLabel: null,
             catchDecisionCorrect: null,
@@ -1130,9 +1129,12 @@
         rep.catchMeterEnabled = isDifficultCatchTraining()
             ? true
             : rep.catchDepthYards >= state.catchMeterMinYards;
-        rep.catchMeterStartProgress = isDifficultCatchTraining()
-            ? rep.difficultStartProgress
-            : getCatchMeterStartProgress(rep.catchDepthYards, currentDifficulty());
+        rep.catchMeterStartProgress = getCatchMeterStartProgress(
+            rep.catchDepthYards,
+            currentDifficulty(),
+            isDifficultCatchTraining() ? rep.catchSweetStart : null
+        );
+        rep.difficultStartProgress = rep.catchMeterStartProgress;
 
         rep.switched = false;
 
@@ -1166,38 +1168,28 @@
         beep(520, 0.05);
     }
 
-    function getCatchMeterStartProgress(depthYards, difficulty) {
-        // 0-5 yards should NOT begin at the far/right side of the green.
-        // Start these very short catches just before the green so the user
-        // still has a small reaction window.
-        if (depthYards < 5) {
-            return Math.max(0, difficulty.catchSweetStart - 0.08);
-        }
+    function getCatchMeterStartProgress(depthYards, difficulty, sweetStartOverride = null) {
+        const sweetStart = Number.isFinite(sweetStartOverride)
+            ? sweetStartOverride
+            : difficulty.catchSweetStart;
 
-        // 5-10 yd catches still begin in/near the green for a quick release,
-        // but no longer at the very end of the green zone.
+        // WURD catch-meter depth model:
+        //   0-9 yds   = starts IN GREEN
+        //   10-14     = one step before green
+        //   15-19     = two steps before green
+        //   20-24     = three steps before green
+        //   25-29     = four steps before green
+        //   30-34     = five steps before green
+        //   35-39     = six steps before green
+        // The later catch-input timing penalty can still push the start to the right.
         if (depthYards < 10) {
-            const t = clamp((depthYards - 5) / 5, 0, 1);
-            const fiveYardStart = difficulty.catchSweetStart + 0.025;
-            const tenYardStart = difficulty.catchSweetStart - 0.095;
-            return lerp(fiveYardStart, tenYardStart, t);
+            // Start slightly inside the front portion of green so a quick release works.
+            return sweetStart + 0.015;
         }
 
-        if (depthYards < 15) {
-            const t = clamp((depthYards - 10) / 5, 0, 1);
-            return lerp(
-                difficulty.catchSweetStart - 0.095,
-                Math.max(0, difficulty.catchSweetStart - 0.18),
-                t
-            );
-        }
-
-        if (depthYards < 40) {
-            const t = clamp((depthYards - 15) / 25, 0, 1);
-            return lerp(Math.max(0, difficulty.catchSweetStart - 0.18), 0, t);
-        }
-
-        return 0;
+        const band = Math.min(6, Math.max(1, Math.floor((depthYards - 10) / 5) + 1));
+        const stepBeforeGreen = 0.075;
+        return Math.max(0, sweetStart - band * stepBeforeGreen);
     }
 
     function currentCatchMeterProgress(rep, now = performance.now()) {
