@@ -1254,7 +1254,7 @@
         // and the visible meter begins later when the ball enters catch range.
         // Longer throws wait slightly longer before activating.
         const depth = clamp(rep?.catchDepthYards || 25, 25, 40);
-        return lerp(0.45, 0.55, (depth - 25) / 15);
+        return lerp(0.40, 0.50, (depth - 25) / 15);
     }
 
     function activatePreHeldCatchMeter(rep, now) {
