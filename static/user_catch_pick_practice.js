@@ -83,7 +83,7 @@
         rookie: {
             label: "Rookie",
             ballSpeed: 360,
-            routeSpeed: 66,
+            routeSpeed: 73,
             steerSpeed: 205,
             catchRadius: 68,
             catchMeterDuration: 870,
@@ -98,7 +98,7 @@
         pro: {
             label: "Pro",
             ballSpeed: 430,
-            routeSpeed: 75,
+            routeSpeed: 83,
             steerSpeed: 220,
             catchRadius: 55,
             catchMeterDuration: 675,
@@ -113,7 +113,7 @@
         allPro: {
             label: "All-Pro",
             ballSpeed: 505,
-            routeSpeed: 93,
+            routeSpeed: 102,
             steerSpeed: 235,
             catchRadius: 44,
             catchMeterDuration: 565,
@@ -128,7 +128,7 @@
         allMadden: {
             label: "All-Madden",
             ballSpeed: 585,
-            routeSpeed: 85,
+            routeSpeed: 94,
             steerSpeed: 248,
             catchRadius: 36,
             catchMeterDuration: 490,
