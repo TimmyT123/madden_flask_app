@@ -82,7 +82,7 @@
     const DIFFICULTIES = {
         rookie: {
             label: "Rookie",
-            ballSpeed: 335,
+            ballSpeed: 285,
             routeSpeed: 73,
             steerSpeed: 205,
             catchRadius: 68,
@@ -97,7 +97,7 @@
         },
         pro: {
             label: "Pro",
-            ballSpeed: 400,
+            ballSpeed: 340,
             routeSpeed: 83,
             steerSpeed: 220,
             catchRadius: 55,
@@ -112,7 +112,7 @@
         },
         allPro: {
             label: "All-Pro",
-            ballSpeed: 465,
+            ballSpeed: 400,
             routeSpeed: 102,
             steerSpeed: 235,
             catchRadius: 44,
@@ -127,7 +127,7 @@
         },
         allMadden: {
             label: "All-Madden",
-            ballSpeed: 535,
+            ballSpeed: 455,
             routeSpeed: 94,
             steerSpeed: 248,
             catchRadius: 36,
