@@ -1,4 +1,4 @@
-// VERSION 18: faster receiver + yardage-based catch-meter starts + initiation timing
+// VERSION 20: 25-yard full-meter threshold + deep pre-hold catch arming
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
@@ -537,6 +537,8 @@
             catchHeldAt: null,
             catchHoldMs: 0,
             catchButtonHeld: null,
+            catchPreHeld: false,
+            catchPreHeldAt: null,
             catchMeterStarted: false,
             catchMeterStartedAt: null,
             catchMeterLocked: false,
@@ -918,18 +920,64 @@
         moveOffenseRoute(rep, dt);
         moveCoverageDefender(rep);
 
+        // On 25+ yard throws, an early catch-button hold can arm the catch before
+        // the visible meter starts. Activate it only once the ball reaches catch range.
+        if (
+            rep.catchPreHeld &&
+            rep.ball &&
+            rep.ball.progress >= deepCatchActivationProgress(rep)
+        ) {
+            activatePreHeldCatchMeter(rep, now);
+        }
+
         // Madden 27 catch meter behavior:
         // PRESS a catch button to START the meter.
         // HOLD the button while the meter moves.
         // RELEASE that same button to FREEZE/STOP the meter.
         const catchButtons = ["X", "SQUARE", "TRIANGLE"];
 
-        if (!rep.catchMeterStarted && !rep.catchAttempted) {
+        if (!rep.catchMeterStarted && !rep.catchAttempted && !rep.catchPreHeld) {
             for (const buttonName of catchButtons) {
                 if (pressed(input, buttonName)) {
-                    startOffenseCatchMeter(rep, buttonName, now);
+                    if (
+                        isDeepPreHoldCatch(rep) &&
+                        rep.ball &&
+                        rep.ball.progress < deepCatchActivationProgress(rep)
+                    ) {
+                        rep.catchPreHeld = true;
+                        rep.catchPreHeldAt = rep.ball.progress;
+                        rep.catchButtonHeld = buttonName;
+                        rep.catchHolding = true;
+                        rep.catchHeldAt = now;
+                        rep.catchHoldMs = 0;
+                        rep.catchInitiationBallProgress = rep.ball.progress;
+                        rep.catchInitiationLabel = 'PRE-HOLD / READY';
+
+                        setTiming(
+                            `Deep throw: ${BUTTON_LABELS[buttonName]} armed early. Keep holding — meter will start when the ball enters catch range.`,
+                            'good'
+                        );
+                        vibrate(18, 0.10);
+                    } else {
+                        startOffenseCatchMeter(rep, buttonName, now);
+                    }
                     break;
                 }
+            }
+        }
+
+        if (rep.catchPreHeld && rep.catchButtonHeld) {
+            const preHeldIndex = BUTTONS[rep.catchButtonHeld];
+            const releaseEdge = released(input, rep.catchButtonHeld);
+            const noLongerDown = !input.down.has(preHeldIndex);
+
+            if (releaseEdge || noLongerDown) {
+                rep.catchPreHeld = false;
+                rep.catchHolding = false;
+                rep.catchHeldAt = null;
+                rep.catchButtonHeld = null;
+                rep.catchInitiationLabel = null;
+                setTiming('Deep catch arm canceled — keep holding until the meter activates.', 'warn');
             }
         }
 
@@ -1135,6 +1183,8 @@
             isDifficultCatchTraining() ? rep.catchSweetStart : null
         );
         rep.difficultStartProgress = rep.catchMeterStartProgress;
+        rep.catchPreHeld = false;
+        rep.catchPreHeldAt = null;
 
         rep.switched = false;
 
@@ -1174,27 +1224,72 @@
             : difficulty.catchSweetStart;
 
         // WURD catch-meter depth model:
-        //   0-9 yds   = starts just LEFT of the green; a quick tap should land in green
-        //   10-14     = 20% of the available pre-green meter used
-        //   15-19     = 40%
-        //   20-24     = 60%
-        //   25-29     = 80%
-        //   30+       = 100% / starts at the far-left edge of the meter
+        //   0-9 yds   = starts just LEFT of green; quick tap should land in green
+        //   10-14     = 25% of the available pre-green meter used
+        //   15-19     = 50%
+        //   20-24     = 75%
+        //   25+       = 100% / far-left start / full meter
         //
-        // This makes 30 yards the point where pressing catch early gives the user
-        // the entire meter to travel. The late-input timing penalty is then layered
-        // on top and can still push the starting point rightward, even into red.
-        const justBeforeGreen = Math.max(0, sweetStart - 0.025);
+        // The 25-yard mark is also where deep throws may allow the user to PRE-HOLD
+        // the catch button. On those throws, the button can be held early and the
+        // moving meter does not begin until the ball is close enough to the catch point.
+        const justBeforeGreen = Math.max(0, sweetStart - 0.018);
 
         if (depthYards < 10) {
             return justBeforeGreen;
         }
 
-        // Every 5 yards beginning at 10 consumes another 20% of the distance
-        // between the just-before-green start and the far-left edge.
         const band = Math.floor((depthYards - 10) / 5) + 1;
-        const fullMeterFraction = clamp(band / 5, 0.20, 1.00);
+        const fullMeterFraction = clamp(band / 4, 0.25, 1.00);
         return lerp(justBeforeGreen, 0, fullMeterFraction);
+    }
+
+    function isDeepPreHoldCatch(rep) {
+        return Boolean(rep && rep.catchDepthYards >= 25);
+    }
+
+    function deepCatchActivationProgress(rep) {
+        // Training approximation from observed Madden behavior:
+        // once the throw is 25+ yards, an early catch-button hold can arm the catch
+        // and the visible meter begins later when the ball enters catch range.
+        // Longer throws wait slightly longer before activating.
+        const depth = clamp(rep?.catchDepthYards || 25, 25, 40);
+        return lerp(0.56, 0.68, (depth - 25) / 15);
+    }
+
+    function activatePreHeldCatchMeter(rep, now) {
+        if (
+            !rep ||
+            !rep.catchPreHeld ||
+            rep.catchMeterStarted ||
+            rep.catchMeterLocked ||
+            !rep.catchButtonHeld
+        ) {
+            return;
+        }
+
+        rep.catchInitiationBallProgress = rep.catchPreHeldAt ?? rep.ball?.progress ?? 0;
+        rep.catchInitiationLabel = 'PRE-HOLD / READY';
+        rep.catchMeterStartProgress = rep.difficultStartProgress ?? rep.catchMeterStartProgress ?? 0;
+
+        rep.catchMeterStarted = true;
+        rep.catchMeterStartedAt = now;
+        rep.catchHolding = true;
+        rep.catchHeldAt = now;
+        rep.catchHoldMs = 0;
+        rep.catchPreHeld = false;
+
+        const profile = catchMeterProfile(rep);
+        const startProgress = rep.catchMeterStartProgress || 0;
+        const startsGreen = startProgress >= profile.sweetStart && startProgress <= profile.sweetEnd;
+
+        setTiming(
+            startsGreen
+                ? `Deep catch armed — meter activated GREEN. Release ${BUTTON_LABELS[rep.catchButtonHeld]} NOW.`
+                : `Deep catch armed — meter activated. Hold ${BUTTON_LABELS[rep.catchButtonHeld]} and release in green.`,
+            'good'
+        );
+        vibrate(28, 0.14);
     }
 
     function currentCatchMeterProgress(rep, now = performance.now()) {
