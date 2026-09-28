@@ -1,4 +1,4 @@
-// VERSION 21: short-pass quick-tap timing + hidden short meter + deep pre-hold
+// VERSION 22: short-pass quick-tap timing + 25% hidden short meters + deep pre-hold
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
@@ -545,6 +545,7 @@
             catchMeterEnabled: true,
             catchMeterStartProgress: 0,
             catchDepthYards: 0,
+            shortMeterHidden: false,
             success: false,
             placementPoints: 0,
             catchTimingPoints: 0,
@@ -1174,6 +1175,10 @@
             OFFENSE_FIELD_YARDS
         );
 
+        // Short throws always use quick-tap timing, but only about 25% hide
+        // the visual meter. The other 75% show the meter normally.
+        rep.shortMeterHidden = rep.catchDepthYards < 10 && Math.random() < 0.25;
+
         rep.catchMeterEnabled = isDifficultCatchTraining()
             ? true
             : rep.catchDepthYards >= state.catchMeterMinYards;
@@ -1196,7 +1201,11 @@
                     : "Defender tight";
 
         if (rep.catchDepthYards < 10) {
-            setInstruction(`${coverageRead}. SHORT PASS: read defender, QUICK-TAP X / Square / Triangle after the throw — do not wait for a visible meter.`);
+            setInstruction(
+                rep.shortMeterHidden
+                    ? `${coverageRead}. SHORT PASS: QUICK-TAP X / Square / Triangle — this rep may not show the meter.`
+                    : `${coverageRead}. SHORT PASS: QUICK-TAP X / Square / Triangle — meter is visible on this rep.`
+            );
         } else if (isDifficultCatchTraining()) {
             setInstruction(`${coverageRead}. READ THE DEFENDER, choose X / Square / Triangle, then release in the SMALL GREEN window.`);
         } else if (!rep.catchMeterEnabled) {
@@ -1359,8 +1368,10 @@
             const alreadyRed = startProgress > profile.sweetEnd;
             setTiming(
                 alreadyRed
-                    ? "SHORT PASS: catch input started too late — hidden timing is already RED."
-                    : `SHORT PASS: quick-tap ${BUTTON_LABELS[buttonName]} now. Do not hold waiting for a meter.`,
+                    ? `SHORT PASS: catch input started too late — timing is already RED${rep.shortMeterHidden ? " (meter hidden)" : ""}.`
+                    : rep.shortMeterHidden
+                        ? `SHORT PASS: quick-tap ${BUTTON_LABELS[buttonName]} — meter is hidden on this rep.`
+                        : `SHORT PASS: quick-tap ${BUTTON_LABELS[buttonName]} and release in green.`,
                 alreadyRed ? "bad" : "good"
             );
         } else if (isDifficultCatchTraining()) {
@@ -1408,12 +1419,13 @@
         if (isShortTapCatch(rep)) {
             const releaseProgress = currentCatchMeterProgress(rep, now);
             const profile = catchMeterProfile(rep);
+            const hiddenText = rep.shortMeterHidden ? " (hidden meter)" : "";
             if (releaseProgress >= profile.sweetStart && releaseProgress <= profile.sweetEnd) {
-                setTiming("SHORT PASS: good quick tap — hidden timing landed GREEN.", "good");
+                setTiming(`SHORT PASS: good quick tap — timing landed GREEN${hiddenText}.`, "good");
             } else if (releaseProgress > profile.sweetEnd) {
-                setTiming("SHORT PASS: held too long — hidden timing went past GREEN into RED.", "bad");
+                setTiming(`SHORT PASS: held too long — timing went past GREEN into RED${hiddenText}.`, "bad");
             } else {
-                setTiming("SHORT PASS: tap was a little too quick — release slightly later.", "warn");
+                setTiming(`SHORT PASS: tap was a little too quick — release slightly later${hiddenText}.`, "warn");
             }
         } else if (rep.catchTimingPoints >= 22) {
             setTiming("Catch meter stopped: GREEN.", "good");
@@ -1884,7 +1896,7 @@
             if (rep.catchType.button && !isDifficultCatchTraining()) {
                 drawCatchPrompt(rep.receiver, rep.catchType.button);
             }
-            if (rep.catchMeterStarted && !isShortTapCatch(rep)) {
+            if (rep.catchMeterStarted && !(isShortTapCatch(rep) && rep.shortMeterHidden)) {
                 drawCatchMeter(rep);
             }
         }
