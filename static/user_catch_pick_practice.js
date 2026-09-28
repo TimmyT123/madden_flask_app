@@ -1,4 +1,4 @@
-// VERSION 20: 25-yard full-meter threshold + deep pre-hold catch arming
+// VERSION 21: short-pass quick-tap timing + hidden short meter + deep pre-hold
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
@@ -82,7 +82,7 @@
     const DIFFICULTIES = {
         rookie: {
             label: "Rookie",
-            ballSpeed: 285,
+            ballSpeed: 360,
             routeSpeed: 73,
             steerSpeed: 205,
             catchRadius: 68,
@@ -97,7 +97,7 @@
         },
         pro: {
             label: "Pro",
-            ballSpeed: 340,
+            ballSpeed: 430,
             routeSpeed: 83,
             steerSpeed: 220,
             catchRadius: 55,
@@ -112,7 +112,7 @@
         },
         allPro: {
             label: "All-Pro",
-            ballSpeed: 400,
+            ballSpeed: 505,
             routeSpeed: 102,
             steerSpeed: 235,
             catchRadius: 44,
@@ -127,7 +127,7 @@
         },
         allMadden: {
             label: "All-Madden",
-            ballSpeed: 455,
+            ballSpeed: 585,
             routeSpeed: 94,
             steerSpeed: 248,
             catchRadius: 36,
@@ -1195,7 +1195,9 @@
                     ? "Defender behind"
                     : "Defender tight";
 
-        if (isDifficultCatchTraining()) {
+        if (rep.catchDepthYards < 10) {
+            setInstruction(`${coverageRead}. SHORT PASS: read defender, QUICK-TAP X / Square / Triangle after the throw — do not wait for a visible meter.`);
+        } else if (isDifficultCatchTraining()) {
             setInstruction(`${coverageRead}. READ THE DEFENDER, choose X / Square / Triangle, then release in the SMALL GREEN window.`);
         } else if (!rep.catchMeterEnabled) {
             setInstruction(
@@ -1242,6 +1244,10 @@
         const band = Math.floor((depthYards - 10) / 5) + 1;
         const fullMeterFraction = clamp(band / 4, 0.25, 1.00);
         return lerp(justBeforeGreen, 0, fullMeterFraction);
+    }
+
+    function isShortTapCatch(rep) {
+        return Boolean(rep && rep.catchDepthYards < 10);
     }
 
     function isDeepPreHoldCatch(rep) {
@@ -1349,7 +1355,15 @@
             startProgress >= profile.sweetStart &&
             startProgress <= profile.sweetEnd;
 
-        if (isDifficultCatchTraining()) {
+        if (isShortTapCatch(rep)) {
+            const alreadyRed = startProgress > profile.sweetEnd;
+            setTiming(
+                alreadyRed
+                    ? "SHORT PASS: catch input started too late — hidden timing is already RED."
+                    : `SHORT PASS: quick-tap ${BUTTON_LABELS[buttonName]} now. Do not hold waiting for a meter.`,
+                alreadyRed ? "bad" : "good"
+            );
+        } else if (isDifficultCatchTraining()) {
             const initiation = rep.catchInitiationLabel || "GOOD";
             const alreadyRed = startProgress > profile.sweetEnd;
             const message = alreadyRed
@@ -1391,7 +1405,17 @@
             rep
         );
 
-        if (rep.catchTimingPoints >= 22) {
+        if (isShortTapCatch(rep)) {
+            const releaseProgress = currentCatchMeterProgress(rep, now);
+            const profile = catchMeterProfile(rep);
+            if (releaseProgress >= profile.sweetStart && releaseProgress <= profile.sweetEnd) {
+                setTiming("SHORT PASS: good quick tap — hidden timing landed GREEN.", "good");
+            } else if (releaseProgress > profile.sweetEnd) {
+                setTiming("SHORT PASS: held too long — hidden timing went past GREEN into RED.", "bad");
+            } else {
+                setTiming("SHORT PASS: tap was a little too quick — release slightly later.", "warn");
+            }
+        } else if (rep.catchTimingPoints >= 22) {
             setTiming("Catch meter stopped: GREEN.", "good");
         } else if (rep.catchTimingPoints >= 15) {
             setTiming("Catch meter stopped near green.", "warn");
@@ -1453,15 +1477,18 @@
         const initiationText = isDifficultCatchTraining() && rep.catchInitiationLabel
             ? ` • initiation: ${rep.catchInitiationLabel}`
             : "";
+        const shortTapText = isShortTapCatch(rep)
+            ? ` • quick tap: ${Math.round(rep.catchHoldMs)} ms`
+            : "";
 
         if (!correctCatch && inGreen) {
-            rep.resultReason = `GREEN timing, but wrong catch type — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}${initiationText}`;
+            rep.resultReason = `GREEN timing, but wrong catch type — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}${initiationText}${shortTapText}`;
         } else if (!correctCatch) {
-            rep.resultReason = `Wrong catch type AND missed timing — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}${initiationText}`;
+            rep.resultReason = `Wrong catch type AND missed timing — use ${BUTTON_LABELS[rep.catchType.button]} for ${rep.catchType.name}${initiationText}${shortTapText}`;
         } else if (!inGreen) {
-            rep.resultReason = `Correct ${rep.catchType.name} choice, but meter stopped outside GREEN${initiationText}`;
+            rep.resultReason = `Correct ${rep.catchType.name} choice, but meter stopped outside GREEN${initiationText}${shortTapText}`;
         } else {
-            rep.resultReason = `${rep.catchType.name}: correct catch decision + GREEN timing${initiationText}`;
+            rep.resultReason = `${rep.catchType.name}: correct catch decision + GREEN timing${initiationText}${shortTapText}`;
         }
 
         finishRep(success);
@@ -1857,7 +1884,7 @@
             if (rep.catchType.button && !isDifficultCatchTraining()) {
                 drawCatchPrompt(rep.receiver, rep.catchType.button);
             }
-            if (rep.catchMeterStarted) {
+            if (rep.catchMeterStarted && !isShortTapCatch(rep)) {
                 drawCatchMeter(rep);
             }
         }
