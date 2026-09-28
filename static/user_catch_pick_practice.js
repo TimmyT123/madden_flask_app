@@ -1174,22 +1174,27 @@
             : difficulty.catchSweetStart;
 
         // WURD catch-meter depth model:
-        //   0-9 yds   = starts IN GREEN
-        //   10-14     = one step before green
-        //   15-19     = two steps before green
-        //   20-24     = three steps before green
-        //   25-29     = four steps before green
-        //   30-34     = five steps before green
-        //   35-39     = six steps before green
-        // The later catch-input timing penalty can still push the start to the right.
+        //   0-9 yds   = starts just LEFT of the green; a quick tap should land in green
+        //   10-14     = 20% of the available pre-green meter used
+        //   15-19     = 40%
+        //   20-24     = 60%
+        //   25-29     = 80%
+        //   30+       = 100% / starts at the far-left edge of the meter
+        //
+        // This makes 30 yards the point where pressing catch early gives the user
+        // the entire meter to travel. The late-input timing penalty is then layered
+        // on top and can still push the starting point rightward, even into red.
+        const justBeforeGreen = Math.max(0, sweetStart - 0.025);
+
         if (depthYards < 10) {
-            // Start slightly inside the front portion of green so a quick release works.
-            return sweetStart + 0.015;
+            return justBeforeGreen;
         }
 
-        const band = Math.min(6, Math.max(1, Math.floor((depthYards - 10) / 5) + 1));
-        const stepBeforeGreen = 0.075;
-        return Math.max(0, sweetStart - band * stepBeforeGreen);
+        // Every 5 yards beginning at 10 consumes another 20% of the distance
+        // between the just-before-green start and the far-left edge.
+        const band = Math.floor((depthYards - 10) / 5) + 1;
+        const fullMeterFraction = clamp(band / 5, 0.20, 1.00);
+        return lerp(justBeforeGreen, 0, fullMeterFraction);
     }
 
     function currentCatchMeterProgress(rep, now = performance.now()) {
