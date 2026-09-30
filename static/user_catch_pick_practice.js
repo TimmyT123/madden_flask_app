@@ -1,4 +1,5 @@
-// VERSION 22: short-pass quick-tap timing + 25% hidden short meters + deep pre-hold
+// VERSION 23: catch meter uses actual QB-to-catch-point throw distance
+// Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
 (() => {
@@ -545,6 +546,7 @@
             catchMeterEnabled: true,
             catchMeterStartProgress: 0,
             catchDepthYards: 0,
+            throwDistanceYards: 0,
             shortMeterHidden: false,
             success: false,
             placementPoints: 0,
@@ -1169,21 +1171,28 @@
             arcHeight: profile.arcHeight
         };
 
+        // Keep route/catch depth relative to the line of scrimmage for field/route logic.
         rep.catchDepthYards = clamp(
             (OFFENSE_LOS_Y - rep.ball.target.y) / OFFENSE_PIXELS_PER_YARD,
             0,
             OFFENSE_FIELD_YARDS
         );
 
+        // Madden catch-meter distance is modeled from the QB's ACTUAL throw position
+        // to the catch point, not from the line of scrimmage to the receiver.
+        // This means QB dropback and lateral movement can make the catch-meter
+        // behave like a longer pass even when the receiver is shallow past the LOS.
+        rep.throwDistanceYards = distance(rep.ball.start, rep.ball.target) / OFFENSE_PIXELS_PER_YARD;
+
         // Short throws always use quick-tap timing, but only about 25% hide
         // the visual meter. The other 75% show the meter normally.
-        rep.shortMeterHidden = rep.catchDepthYards < 10 && Math.random() < 0.25;
+        rep.shortMeterHidden = rep.throwDistanceYards < 10 && Math.random() < 0.25;
 
         rep.catchMeterEnabled = isDifficultCatchTraining()
             ? true
-            : rep.catchDepthYards >= state.catchMeterMinYards;
+            : rep.throwDistanceYards >= state.catchMeterMinYards;
         rep.catchMeterStartProgress = getCatchMeterStartProgress(
-            rep.catchDepthYards,
+            rep.throwDistanceYards,
             currentDifficulty(),
             isDifficultCatchTraining() ? rep.catchSweetStart : null
         );
@@ -1200,7 +1209,7 @@
                     ? "Defender behind"
                     : "Defender tight";
 
-        if (rep.catchDepthYards < 10) {
+        if (rep.throwDistanceYards < 10) {
             setInstruction(
                 rep.shortMeterHidden
                     ? `${coverageRead}. SHORT PASS: QUICK-TAP X / Square / Triangle — this rep may not show the meter.`
@@ -1210,7 +1219,7 @@
             setInstruction(`${coverageRead}. READ THE DEFENDER, choose X / Square / Triangle, then release in the SMALL GREEN window.`);
         } else if (!rep.catchMeterEnabled) {
             setInstruction(
-                `${coverageRead}: ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. No catch meter at ${rep.catchDepthYards.toFixed(1)} yds.`
+                `${coverageRead}: ${BUTTON_LABELS[rep.catchType.button]} = ${rep.catchType.name}. No catch meter at ${rep.throwDistanceYards.toFixed(1)} throw yds.`
             );
         } else {
             setInstruction(
@@ -1229,12 +1238,12 @@
         beep(520, 0.05);
     }
 
-    function getCatchMeterStartProgress(depthYards, difficulty, sweetStartOverride = null) {
+    function getCatchMeterStartProgress(throwDistanceYards, difficulty, sweetStartOverride = null) {
         const sweetStart = Number.isFinite(sweetStartOverride)
             ? sweetStartOverride
             : difficulty.catchSweetStart;
 
-        // WURD catch-meter depth model:
+        // WURD catch-meter throw-distance model (QB to catch point):
         //   0-9 yds   = starts just LEFT of green; quick tap should land in green
         //   10-14     = 25% of the available pre-green meter used
         //   15-19     = 50%
@@ -1246,21 +1255,21 @@
         // moving meter does not begin until the ball is close enough to the catch point.
         const justBeforeGreen = Math.max(0, sweetStart - 0.018);
 
-        if (depthYards < 10) {
+        if (throwDistanceYards < 10) {
             return justBeforeGreen;
         }
 
-        const band = Math.floor((depthYards - 10) / 5) + 1;
+        const band = Math.floor((throwDistanceYards - 10) / 5) + 1;
         const fullMeterFraction = clamp(band / 4, 0.25, 1.00);
         return lerp(justBeforeGreen, 0, fullMeterFraction);
     }
 
     function isShortTapCatch(rep) {
-        return Boolean(rep && rep.catchDepthYards < 10);
+        return Boolean(rep && rep.throwDistanceYards < 10);
     }
 
     function isDeepPreHoldCatch(rep) {
-        return Boolean(rep && rep.catchDepthYards >= 25);
+        return Boolean(rep && rep.throwDistanceYards >= 25);
     }
 
     function deepCatchActivationProgress(rep) {
@@ -1268,8 +1277,8 @@
         // once the throw is 25+ yards, an early catch-button hold can arm the catch
         // and the visible meter begins later when the ball enters catch range.
         // Longer throws wait slightly longer before activating.
-        const depth = clamp(rep?.catchDepthYards || 25, 25, 40);
-        return lerp(0.20, 0.30, (depth - 25) / 15);
+        const throwDistance = clamp(rep?.throwDistanceYards || 25, 25, 40);
+        return lerp(0.20, 0.30, (throwDistance - 25) / 15);
     }
 
     function activatePreHeldCatchMeter(rep, now) {
