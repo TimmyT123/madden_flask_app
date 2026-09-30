@@ -1,4 +1,4 @@
-// VERSION 24: catch meter uses actual QB-to-catch-point throw distance
+// VERSION 25: catch meter uses actual QB-to-catch-point throw distance
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -77,6 +77,9 @@
     const THROW_METER_DURATION_MS = 820;
     const LOB_MAX_HOLD_MS = 165;
     const TOUCH_MAX_HOLD_MS = 500;
+    // Tiny Madden-like hesitation before the catch meter moves on 25+ yard throws.
+    // This is intentionally subtle: just enough to remind the user that deep catches hesitate.
+    const DEEP_CATCH_METER_PAUSE_MS = 90;
     const CATCH_METER_MIN_STORAGE_KEY = "wurdCatchMeterMinYards";
     const CATCH_TRAINING_STORAGE_KEY = "wurdCatchTrainingMode";
     const ROUTE_TYPE_STORAGE_KEY = "wurdCatchRouteType";
@@ -209,7 +212,7 @@
         const sweetStart = randomRange(0.55, 0.70);
         const greenWidth = randomRange(0.045, 0.095);
         const sweetEnd = Math.min(0.82, sweetStart + greenWidth);
-        const duration = randomRange(700, 800);
+        const duration = randomRange(680, 1050);
         return { sweetStart, sweetEnd, duration };
     }
 
@@ -1328,8 +1331,13 @@
                 ? Math.max(0, now - rep.catchMeterStartedAt)
                 : rep.catchHoldMs;
 
+        // On deep throws, briefly hold the marker at its starting position before
+        // it begins moving. This is a tiny visual cue, not a major timing advantage.
+        const meterPauseMs = isDeepPreHoldCatch(rep) ? DEEP_CATCH_METER_PAUSE_MS : 0;
+        const movingMs = Math.max(0, heldMs - meterPauseMs);
+
         return clamp(
-            (rep.catchMeterStartProgress || 0) + heldMs / profile.duration,
+            (rep.catchMeterStartProgress || 0) + movingMs / profile.duration,
             0,
             1.25
         );
