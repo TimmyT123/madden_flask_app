@@ -1,4 +1,4 @@
-// VERSION 23: catch meter uses actual QB-to-catch-point throw distance
+// VERSION 24: catch meter uses actual QB-to-catch-point throw distance
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -11,6 +11,9 @@
     const OFFENSE_FIELD_TOP_Y = 40;
     const OFFENSE_FIELD_YARDS = 40;
     const OFFENSE_PIXELS_PER_YARD = (OFFENSE_LOS_Y - OFFENSE_FIELD_TOP_Y) / OFFENSE_FIELD_YARDS;
+    const OFFENSE_FIELD_LEFT_X = 170;
+    const OFFENSE_FIELD_RIGHT_X = 830;
+    const OFFENSE_FIELD_CENTER_X = (OFFENSE_FIELD_LEFT_X + OFFENSE_FIELD_RIGHT_X) / 2;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -454,7 +457,7 @@
 
     function createOffenseRep() {
         const route = selectedRouteSettings();
-        const receiverX = randomRange(300, 700);
+        const receiverX = randomRange(350, 650);
         const receiver = {
             x: receiverX,
             y: OFFENSE_LOS_Y,
@@ -508,7 +511,7 @@
             routeCutYards: route.cutYards,
             leverage,
             coveragePosition,
-            qb: { x: 500, y: 578 },
+            qb: { x: OFFENSE_FIELD_CENTER_X, y: 578 },
             receiver,
             defender,
             ball: null,
@@ -563,7 +566,7 @@
     }
 
     function createDefenseRep() {
-        const targetX = randomRange(300, 700);
+        const targetX = randomRange(350, 650);
         const receiver = {
             x: targetX + randomRange(-75, 75),
             y: 445,
@@ -589,7 +592,7 @@
         defenders[bestIndex].vx = (catchPoint.x - defenders[bestIndex].x) * 0.16;
         defenders[bestIndex].vy = -72;
 
-        const ballStart = { x: 500, y: 555 };
+        const ballStart = { x: OFFENSE_FIELD_CENTER_X, y: 555 };
         const dist = Math.hypot(catchPoint.x - ballStart.x, catchPoint.y - ballStart.y);
         const duration = dist / currentDifficulty().ballSpeed;
 
@@ -850,8 +853,8 @@
             if (!(rep.throwHolding && l2Held)) {
                 rep.qb.x = clamp(
                     rep.qb.x + input.axisX * difficulty.steerSpeed * dt,
-                    55,
-                    945
+                    OFFENSE_FIELD_LEFT_X + 20,
+                    OFFENSE_FIELD_RIGHT_X - 20
                 );
                 rep.qb.y = clamp(
                     rep.qb.y + input.axisY * difficulty.steerSpeed * dt,
@@ -1081,7 +1084,7 @@
             if (!sim.cutMade && sim.routeType !== "go" && depthYards >= sim.cutYards) {
                 sim.cutMade = true;
 
-                const towardSideline = sim.startX < canvas.width / 2 ? -1 : 1;
+                const towardSideline = sim.startX < OFFENSE_FIELD_CENTER_X ? -1 : 1;
                 const towardMiddle = -towardSideline;
 
                 if (sim.routeType === "out") {
@@ -1099,7 +1102,7 @@
                 }
             }
 
-            sim.x = clamp(sim.x + sim.vx * dt, 38, 962);
+            sim.x = clamp(sim.x + sim.vx * dt, OFFENSE_FIELD_LEFT_X, OFFENSE_FIELD_RIGHT_X);
             sim.y = clamp(sim.y + sim.vy * dt, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
             remaining -= dt;
         }
@@ -1140,7 +1143,7 @@
         const leadY = rep.precisionLeadActive ? rep.precisionLeadY * LEAD_PIXELS : 0;
 
         const passTarget = {
-            x: clamp(projectedCatchPoint.x + leadX, 38, 962),
+            x: clamp(projectedCatchPoint.x + leadX, OFFENSE_FIELD_LEFT_X, OFFENSE_FIELD_RIGHT_X),
             y: clamp(projectedCatchPoint.y + leadY, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y)
         };
 
@@ -1725,7 +1728,7 @@
         if (!receiver.cutMade && receiver.routeType !== "go" && depthYards >= receiver.cutYards) {
             receiver.cutMade = true;
 
-            const towardSideline = receiver.startX < canvas.width / 2 ? -1 : 1;
+            const towardSideline = receiver.startX < OFFENSE_FIELD_CENTER_X ? -1 : 1;
             const towardMiddle = -towardSideline;
 
             if (receiver.routeType === "out") {
@@ -1743,12 +1746,12 @@
             }
         }
 
-        receiver.x = clamp(receiver.x + receiver.vx * dt, 38, 962);
+        receiver.x = clamp(receiver.x + receiver.vx * dt, OFFENSE_FIELD_LEFT_X, OFFENSE_FIELD_RIGHT_X);
         receiver.y = clamp(receiver.y + receiver.vy * dt, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
     }
 
     function moveAutoRoute(player, dt) {
-        player.x = clamp(player.x + player.vx * dt, 38, 962);
+        player.x = clamp(player.x + player.vx * dt, OFFENSE_FIELD_LEFT_X, OFFENSE_FIELD_RIGHT_X);
         player.y = clamp(player.y + player.vy * dt, OFFENSE_FIELD_TOP_Y, OFFENSE_LOS_Y);
     }
 
@@ -1771,8 +1774,8 @@
         rep.defender.vy = rep.receiver.vy;
         rep.defender.x = clamp(
             rep.receiver.x + side * coverageOffset,
-            38,
-            962
+            OFFENSE_FIELD_LEFT_X,
+            OFFENSE_FIELD_RIGHT_X
         );
         rep.defender.y = clamp(
             rep.receiver.y + verticalOffset,
@@ -1823,6 +1826,16 @@
         ctx.font = "bold 16px Arial";
         ctx.textAlign = "left";
 
+        // Narrow playable field so routes and reads are easier to see.
+        ctx.strokeStyle = "rgba(255,255,255,0.48)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(OFFENSE_FIELD_LEFT_X, OFFENSE_FIELD_TOP_Y);
+        ctx.lineTo(OFFENSE_FIELD_LEFT_X, OFFENSE_LOS_Y);
+        ctx.moveTo(OFFENSE_FIELD_RIGHT_X, OFFENSE_FIELD_TOP_Y);
+        ctx.lineTo(OFFENSE_FIELD_RIGHT_X, OFFENSE_LOS_Y);
+        ctx.stroke();
+
         // 0-40 yards stretched over the full vertical practice area.
         // Madden's catch-meter starting behavior changes in roughly 5-yard
         // bands, so show every 5 yards. Ten-yard lines are slightly stronger.
@@ -1838,8 +1851,8 @@
             ctx.lineWidth = yards === 0 ? 4 : isTenYardLine ? 2 : 1;
 
             ctx.beginPath();
-            ctx.moveTo(30, y);
-            ctx.lineTo(970, y);
+            ctx.moveTo(OFFENSE_FIELD_LEFT_X, y);
+            ctx.lineTo(OFFENSE_FIELD_RIGHT_X, y);
             ctx.stroke();
 
             ctx.fillStyle = yards === 0
@@ -1863,8 +1876,8 @@
         ctx.strokeStyle = "rgba(255, 209, 102, 0.9)";
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(30, OFFENSE_LOS_Y);
-        ctx.lineTo(970, OFFENSE_LOS_Y);
+        ctx.moveTo(OFFENSE_FIELD_LEFT_X, OFFENSE_LOS_Y);
+        ctx.lineTo(OFFENSE_FIELD_RIGHT_X, OFFENSE_LOS_Y);
         ctx.stroke();
 
         ctx.strokeStyle = "rgba(255,255,255,0.22)";
@@ -1946,7 +1959,7 @@
     function drawRoutePreview(rep) {
         const r = rep.receiver;
         const cutY = r.startY - r.cutYards * OFFENSE_PIXELS_PER_YARD;
-        const towardSideline = r.startX < canvas.width / 2 ? -1 : 1;
+        const towardSideline = r.startX < OFFENSE_FIELD_CENTER_X ? -1 : 1;
         const towardMiddle = -towardSideline;
 
         ctx.save();
