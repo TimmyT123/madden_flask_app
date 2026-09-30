@@ -209,7 +209,7 @@
         const sweetStart = randomRange(0.55, 0.70);
         const greenWidth = randomRange(0.045, 0.095);
         const sweetEnd = Math.min(0.82, sweetStart + greenWidth);
-        const duration = randomRange(680, 1050);
+        const duration = randomRange(700, 800);
         return { sweetStart, sweetEnd, duration };
     }
 
