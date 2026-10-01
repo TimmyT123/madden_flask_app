@@ -1,6 +1,6 @@
-# madden_flask_app_v9_1.py
-# Version: 9.1
-# Modified sections: Added temporary public /new-orleans trip hub route.
+# madden_flask_app_v9_2.py
+# Version: 9.2
+# Modified sections: Added temporary /new-orleans trip hub and mobile-first trip styling.
 
 from flask import Flask, request, jsonify, url_for, redirect, make_response
 from flask import send_from_directory
