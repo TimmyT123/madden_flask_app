@@ -1,6 +1,6 @@
-# madden_flask_app_v9.py
-# Version: 9.0
-# Modified sections: Added public /power-rankings page using the existing power_rankings.json source.
+# madden_flask_app_v9_1.py
+# Version: 9.1
+# Modified sections: Added temporary public /new-orleans trip hub route.
 
 from flask import Flask, request, jsonify, url_for, redirect, make_response
 from flask import send_from_directory
@@ -4909,6 +4909,15 @@ def team_draw_state_api():
     return response
 
 import os
+
+
+# --- Temporary New Orleans trip hub -----------------------------------------
+# Public trip page for the Oct. 10-14, 2026 New Orleans group trip.
+# Safe to remove after the trip along with templates/new_orleans*.html.
+@app.route("/new-orleans")
+@app.route("/new_orleans")
+def new_orleans_trip():
+    return render_template("new_orleans.html")
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"

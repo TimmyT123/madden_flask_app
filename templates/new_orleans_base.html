@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#2b0a3d">
+    <title>{% block title %}New Orleans Trip{% endblock %}</title>
+    <style>
+        :root {
+            --purple: #3d0b5f;
+            --purple-2: #5c1680;
+            --gold: #e9bd3e;
+            --gold-soft: #f8e7aa;
+            --green: #0f6f5d;
+            --cream: #fff8e8;
+            --ink: #23152f;
+            --muted: #6f6377;
+            --night: #120d27;
+            --card: rgba(255, 250, 238, 0.97);
+            --shadow: 0 18px 45px rgba(26, 10, 42, .18);
+        }
+
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 15% 0%, rgba(233,189,62,.18), transparent 30%),
+                linear-gradient(180deg, #f8efd9 0%, #fffaf0 50%, #f4ead3 100%);
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+
+        a { color: inherit; }
+        .trip-shell { min-height: 100vh; }
+
+        .trip-nav {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            padding: 10px 12px;
+            background: rgba(18, 13, 39, .96);
+            border-bottom: 2px solid var(--gold);
+            box-shadow: 0 8px 24px rgba(0,0,0,.22);
+            backdrop-filter: blur(8px);
+        }
+
+        .trip-nav a {
+            color: white;
+            text-decoration: none;
+            border: 1px solid rgba(233,189,62,.5);
+            border-radius: 999px;
+            padding: 8px 13px;
+            font-weight: 800;
+            font-size: 13px;
+            letter-spacing: .2px;
+        }
+
+        .trip-nav a:hover { background: var(--purple-2); }
+        .trip-nav .home-link {
+            background: var(--gold);
+            color: #211124;
+            border-color: var(--gold);
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            min-height: 420px;
+            color: white;
+            display: grid;
+            place-items: center;
+            text-align: center;
+            padding: 64px 18px 52px;
+            background:
+                linear-gradient(rgba(28,8,44,.52), rgba(13,8,31,.76)),
+                url("https://commons.wikimedia.org/wiki/Special:FilePath/New%20Orleans%2C%20Louisiana%20-%20French%20Quarter%2C%20February%202018%20Balconies.jpg")
+                center 40% / cover no-repeat;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: auto 0 0 0;
+            height: 90px;
+            background: linear-gradient(transparent, rgba(18,13,39,.88));
+        }
+
+        .hero-inner { position: relative; z-index: 2; max-width: 900px; }
+        .fleur {
+            color: var(--gold);
+            font-size: 30px;
+            letter-spacing: 8px;
+            margin-bottom: 6px;
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: clamp(48px, 9vw, 92px);
+            line-height: .95;
+            color: #ffe9a0;
+            text-shadow: 0 4px 0 #35114b, 0 8px 24px rgba(0,0,0,.55);
+            letter-spacing: -2px;
+        }
+
+        .hero .sub {
+            margin-top: 16px;
+            font-size: clamp(18px, 3vw, 28px);
+            font-weight: 800;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .hero .tagline {
+            margin: 16px auto 0;
+            max-width: 720px;
+            color: #fff6d7;
+            font-size: 17px;
+            line-height: 1.6;
+        }
+
+        .wrap {
+            width: min(1180px, calc(100% - 28px));
+            margin: 0 auto;
+        }
+
+        .quick-grid {
+            margin-top: -30px;
+            position: relative;
+            z-index: 5;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .quick {
+            background: var(--card);
+            border: 1px solid rgba(61,11,95,.18);
+            border-top: 4px solid var(--gold);
+            border-radius: 16px;
+            padding: 18px 12px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .quick strong { display: block; font-size: 24px; color: var(--purple); }
+        .quick span { display: block; margin-top: 4px; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+        .section { padding: 42px 0 10px; }
+        .section-title {
+            text-align: center;
+            margin: 0 0 22px;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--purple);
+            font-size: clamp(31px, 5vw, 48px);
+        }
+
+        .section-title small {
+            display: block;
+            margin-top: 7px;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: .2px;
+        }
+
+        .day {
+            margin: 26px 0;
+            border: 1px solid rgba(61,11,95,.18);
+            border-radius: 22px;
+            overflow: hidden;
+            background: rgba(255,255,255,.72);
+            box-shadow: var(--shadow);
+        }
+
+        .day-head {
+            background: linear-gradient(100deg, var(--purple), #241037);
+            color: white;
+            padding: 18px 22px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            border-bottom: 3px solid var(--gold);
+        }
+
+        .day-head h2 {
+            margin: 0;
+            font-family: Georgia, serif;
+            font-size: 30px;
+            color: #ffe394;
+        }
+
+        .day-head .theme {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #f8e7aa;
+            font-weight: 800;
+        }
+
+        .events {
+            padding: 18px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .event {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            min-height: 230px;
+            border: 1px solid #ead9ab;
+            border-radius: 18px;
+            overflow: hidden;
+            background: #fffdf7;
+        }
+
+        .event.compact { min-height: 190px; }
+        .event-image {
+            min-height: 220px;
+            background: linear-gradient(135deg, #37114d, #0c6759);
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+
+        .event-image::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 50px rgba(0,0,0,.22);
+        }
+
+        .event-body { padding: 17px 18px; }
+        .eyebrow {
+            color: var(--green);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            font-size: 11px;
+        }
+
+        .event h3 {
+            margin: 5px 0 8px;
+            color: var(--purple);
+            font-family: Georgia, serif;
+            font-size: 24px;
+        }
+
+        .meta {
+            display: grid;
+            gap: 7px;
+            margin: 10px 0 12px;
+            color: #4d3f55;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .event p {
+            margin: 0 0 12px;
+            line-height: 1.55;
+            color: #4e4354;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 6px 9px;
+            margin: 3px 5px 8px 0;
+            background: #e6f6ed;
+            color: #17613d;
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .status.free { background: #fff2c4; color: #76570a; }
+        .status.info { background: #eee6f6; color: #52216c; }
+
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .btn {
+            display: inline-block;
+            padding: 9px 12px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 900;
+            font-size: 12px;
+            border: 1px solid rgba(61,11,95,.18);
+            background: var(--purple);
+            color: white;
+        }
+        .btn.alt { background: var(--gold); color: #251328; }
+        .btn.green { background: var(--green); }
+
+        details {
+            margin-top: 11px;
+            border-top: 1px dashed #d8c78f;
+            padding-top: 10px;
+        }
+        summary {
+            cursor: pointer;
+            color: var(--purple);
+            font-weight: 900;
+        }
+        details ul { margin: 9px 0 0 18px; padding: 0; line-height: 1.55; color: #514457; }
+
+        .travel-box {
+            margin: 28px 0 50px;
+            padding: 22px;
+            background: linear-gradient(135deg, #fff6d6, #fffdf5);
+            border: 2px solid var(--gold);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .travel-box h3 { margin: 0 0 12px; color: var(--purple); font-size: 26px; font-family: Georgia, serif; }
+        .travel-box ul { margin: 0; padding-left: 20px; line-height: 1.7; }
+
+        footer {
+            margin-top: 30px;
+            background: var(--night);
+            color: #eee4f4;
+            padding: 26px 16px 34px;
+            text-align: center;
+            border-top: 3px solid var(--gold);
+        }
+        footer strong { color: #ffe18a; }
+        footer a { color: #d9c8ff; }
+
+        @media (max-width: 900px) {
+            .quick-grid { grid-template-columns: repeat(2, 1fr); }
+            .events { grid-template-columns: 1fr; }
+            .event { grid-template-columns: 180px 1fr; }
+        }
+
+        @media (max-width: 620px) {
+            .trip-nav { justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; }
+            .trip-nav a { white-space: nowrap; }
+            .hero { min-height: 350px; padding-top: 48px; }
+            .quick-grid { grid-template-columns: repeat(2, 1fr); }
+            .quick strong { font-size: 19px; }
+            .wrap { width: min(100% - 18px, 1180px); }
+            .events { padding: 10px; }
+            .event { grid-template-columns: 1fr; }
+            .event-image { min-height: 190px; }
+            .event-body { padding: 15px; }
+            .day-head h2 { font-size: 25px; }
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+<div class="trip-shell">
+    <nav class="trip-nav">
+        <a class="home-link" href="/new-orleans">⚜ Trip Home</a>
+        <a href="#saturday">Sat</a>
+        <a href="#sunday">Sun</a>
+        <a href="#monday">Mon</a>
+        <a href="#tuesday">Tue</a>
+        <a href="#wednesday">Wed</a>
+        <a href="#travel-info">Travel Info</a>
+        <a href="/">WURD</a>
+    </nav>
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>
