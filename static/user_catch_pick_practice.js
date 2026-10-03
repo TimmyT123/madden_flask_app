@@ -1292,14 +1292,14 @@
         // The 25-yard mark is also where deep throws may allow the user to PRE-HOLD
         // the catch button. On those throws, the button can be held early and the
         // moving meter does not begin until the ball is close enough to the catch point.
-        const justBeforeGreen = Math.max(0, sweetStart - 0.018);
+        const justBeforeGreen = Math.max(0, sweetStart - 0.025);
 
         if (throwDistanceYards < 10) {
             return justBeforeGreen;
         }
 
         const band = Math.floor((throwDistanceYards - 10) / 5) + 1;
-        const fullMeterFraction = clamp(band / 4, 0.25, 1.00);
+        const fullMeterFraction = clamp(band / 5.5, 0.20, .70);
         return lerp(justBeforeGreen, 0, fullMeterFraction);
     }
 
@@ -2317,14 +2317,14 @@
         ctx.restore();
     }
 
-    function beep(frequency, duration) {
+    function beep(frequency, duration, volume=0.055) {
         try {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             const audio = new AudioContextClass();
             const oscillator = audio.createOscillator();
             const gain = audio.createGain();
             oscillator.frequency.value = frequency;
-            gain.gain.value = 0.055;
+            gain.gain.value = volume;
             oscillator.connect(gain);
             gain.connect(audio.destination);
             oscillator.start();
@@ -2338,8 +2338,8 @@
     // Distinct two-tone warning used only when the catch button was not pressed
     // soon enough after the throw. Keep this different from normal drill beeps.
     function lateCatchWarningChirp() {
-        beep(210, 0.055);
-        window.setTimeout(() => beep(125, 0.075), 58);
+        beep(900, 0.10, .18);
+        window.setTimeout(() => beep(125, 0.075, .18), 58);
     }
 
     function vibrate(duration, magnitude) {
