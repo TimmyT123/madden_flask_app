@@ -1,4 +1,4 @@
-// VERSION 28: broader DualSense/browser haptic support + reliable catch reminder rumble
+// VERSION 29: 1.5s diagnostic pause after early catch-button warning
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -531,6 +531,7 @@
             catchInitiationBallProgress: null,
             catchInitiationLabel: null,
             catchInputReminderBuzzed: false,
+            catchInputReminderPauseUntil: 0,
             catchDecisionCorrect: null,
             throwHolding: false,
             throwHeldAt: null,
@@ -914,6 +915,15 @@
             return;
         }
 
+        // Diagnostic freeze after the early catch-input warning. This makes the
+        // warning unmistakable while we verify that the reminder path is firing.
+        if (rep.catchInputReminderPauseUntil && now < rep.catchInputReminderPauseUntil) {
+            return;
+        }
+        if (rep.catchInputReminderPauseUntil && now >= rep.catchInputReminderPauseUntil) {
+            rep.catchInputReminderPauseUntil = 0;
+        }
+
         updateBall(rep.ball, dt);
 
         // Early catch-input training cue. If the user has not committed to any
@@ -929,8 +939,10 @@
             rep.ball.progress >= CATCH_INPUT_REMINDER_PROGRESS
         ) {
             rep.catchInputReminderBuzzed = true;
-            setTiming("Catch button — get it down early.", "warn");
+            rep.catchInputReminderPauseUntil = now + 1500;
+            setTiming("Catch button — get it down early. (PAUSED 1.5s)", "warn");
             vibrate(90, 0.45);
+            return;
         }
 
         // A precision throw led to the defender's leverage side is intercepted
