@@ -1,4 +1,4 @@
-// VERSION 30: fair catch-input grace period + single warning cue
+// VERSION 31: distinctive late-catch warning chirp + fair catch-input grace period
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -939,8 +939,7 @@
         ) {
             rep.catchInputReminderBuzzed = true;
             setTiming("Catch button — get it down early.", "warn");
-            beep(240, 0.10);
-            vibrate(90, 0.45);
+            lateCatchWarningChirp();
         }
 
         // A precision throw led to the defender's leverage side is intercepted
@@ -2318,6 +2317,13 @@
         } catch (error) {
             // Audio feedback is optional.
         }
+    }
+
+    // Distinct two-tone warning used only when the catch button was not pressed
+    // soon enough after the throw. Keep this different from normal drill beeps.
+    function lateCatchWarningChirp() {
+        beep(210, 0.055);
+        window.setTimeout(() => beep(125, 0.075), 58);
     }
 
     function vibrate(duration, magnitude) {
