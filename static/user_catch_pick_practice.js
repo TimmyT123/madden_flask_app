@@ -1,4 +1,4 @@
-// VERSION 31: distinctive late-catch warning chirp + fair catch-input grace period
+// VERSION 32: strict short-throw catch timing + always-visible short meters + late-warning chirp
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -16,7 +16,10 @@
     const OFFENSE_FIELD_CENTER_X = (OFFENSE_FIELD_LEFT_X + OFFENSE_FIELD_RIGHT_X) / 2;
     // Training cue: if no catch button has been pressed by this point in the ball flight,
     // give one light buzz to reinforce getting the catch input down early.
-    const CATCH_INPUT_REMINDER_DELAY_MS = 180;
+    const CATCH_INPUT_REMINDER_DELAY_MS = 250;
+    // Short throws require an almost-immediate catch input after the throw.
+    // If the user waits longer than this, the short-pass meter starts in RED.
+    const SHORT_CATCH_INPUT_MAX_DELAY_MS = 130;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -935,7 +938,11 @@
             !rep.catchPreHeld &&
             !rep.catchAttempted &&
             rep.ball &&
-            rep.ball.elapsed * 1000 >= CATCH_INPUT_REMINDER_DELAY_MS
+            rep.ball.elapsed * 1000 >= (
+                isShortTapCatch(rep)
+                    ? SHORT_CATCH_INPUT_MAX_DELAY_MS
+                    : CATCH_INPUT_REMINDER_DELAY_MS
+            )
         ) {
             rep.catchInputReminderBuzzed = true;
             setTiming("Catch button — get it down early.", "warn");
@@ -1220,7 +1227,7 @@
 
         // Short throws always use quick-tap timing, but only about 25% hide
         // the visual meter. The other 75% show the meter normally.
-        rep.shortMeterHidden = rep.throwDistanceYards < 10 && Math.random() < 0.25;
+        rep.shortMeterHidden = false;
 
         rep.catchMeterEnabled = isDifficultCatchTraining()
             ? true
@@ -1245,9 +1252,7 @@
 
         if (rep.throwDistanceYards < 10) {
             setInstruction(
-                rep.shortMeterHidden
-                    ? `${coverageRead}. SHORT PASS: QUICK-TAP X / Square / Triangle — this rep may not show the meter.`
-                    : `${coverageRead}. SHORT PASS: QUICK-TAP X / Square / Triangle — meter is visible on this rep.`
+                `${coverageRead}. SHORT PASS: QUICK-TAP X / Square / Triangle IMMEDIATELY after the throw.`
             );
         } else if (isDifficultCatchTraining()) {
             setInstruction(`${coverageRead}. READ THE DEFENDER, choose X / Square / Triangle, then release in the SMALL GREEN window.`);
@@ -1287,14 +1292,14 @@
         // The 25-yard mark is also where deep throws may allow the user to PRE-HOLD
         // the catch button. On those throws, the button can be held early and the
         // moving meter does not begin until the ball is close enough to the catch point.
-        const justBeforeGreen = Math.max(0, sweetStart - 0.025);
+        const justBeforeGreen = Math.max(0, sweetStart - 0.018);
 
         if (throwDistanceYards < 10) {
             return justBeforeGreen;
         }
 
         const band = Math.floor((throwDistanceYards - 10) / 5) + 1;
-        const fullMeterFraction = clamp(band / 5.5, 0.20, 0.70);
+        const fullMeterFraction = clamp(band / 4, 0.25, 1.00);
         return lerp(justBeforeGreen, 0, fullMeterFraction);
     }
 
@@ -1381,9 +1386,22 @@
             return;
         }
 
-        // Grade WHEN the user commits to the catch. In Difficult mode, waiting
-        // until the ball is almost on the receiver pushes the meter start right.
-        applyCatchInitiationTiming(rep);
+        // Grade WHEN the user commits to the catch.
+        // Short throws are intentionally strict: the catch button must come almost
+        // immediately after the throw. If it comes after the short-pass grace window,
+        // force the meter to begin in RED.
+        if (
+            isShortTapCatch(rep) &&
+            rep.ball &&
+            rep.ball.elapsed * 1000 > SHORT_CATCH_INPUT_MAX_DELAY_MS
+        ) {
+            const profile = catchMeterProfile(rep);
+            rep.catchInitiationBallProgress = rep.ball.progress;
+            rep.catchInitiationLabel = "VERY LATE";
+            rep.catchMeterStartProgress = Math.min(1.08, profile.sweetEnd + 0.045);
+        } else {
+            applyCatchInitiationTiming(rep);
+        }
 
         rep.catchMeterStarted = true;
         rep.catchMeterStartedAt = now;
@@ -1416,10 +1434,8 @@
             const alreadyRed = startProgress > profile.sweetEnd;
             setTiming(
                 alreadyRed
-                    ? `SHORT PASS: catch input started too late — timing is already RED${rep.shortMeterHidden ? " (meter hidden)" : ""}.`
-                    : rep.shortMeterHidden
-                        ? `SHORT PASS: quick-tap ${BUTTON_LABELS[buttonName]} — meter is hidden on this rep.`
-                        : `SHORT PASS: quick-tap ${BUTTON_LABELS[buttonName]} and release in green.`,
+                    ? `SHORT PASS: catch input started too late — timing is already RED.`
+                    : `SHORT PASS: quick-tap ${BUTTON_LABELS[buttonName]} and release in green.`,
                 alreadyRed ? "bad" : "good"
             );
         } else if (isDifficultCatchTraining()) {
@@ -1467,7 +1483,7 @@
         if (isShortTapCatch(rep)) {
             const releaseProgress = currentCatchMeterProgress(rep, now);
             const profile = catchMeterProfile(rep);
-            const hiddenText = rep.shortMeterHidden ? " (hidden meter)" : "";
+            const hiddenText = "";
             if (releaseProgress >= profile.sweetStart && releaseProgress <= profile.sweetEnd) {
                 setTiming(`SHORT PASS: good quick tap — timing landed GREEN${hiddenText}.`, "good");
             } else if (releaseProgress > profile.sweetEnd) {
@@ -2301,14 +2317,14 @@
         ctx.restore();
     }
 
-    function beep(frequency, duration, volume = 0.055) {
+    function beep(frequency, duration) {
         try {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             const audio = new AudioContextClass();
             const oscillator = audio.createOscillator();
             const gain = audio.createGain();
             oscillator.frequency.value = frequency;
-            gain.gain.value = volume;
+            gain.gain.value = 0.055;
             oscillator.connect(gain);
             gain.connect(audio.destination);
             oscillator.start();
@@ -2322,8 +2338,8 @@
     // Distinct two-tone warning used only when the catch button was not pressed
     // soon enough after the throw. Keep this different from normal drill beeps.
     function lateCatchWarningChirp() {
-        beep(700, 0.1, 0.18);
-        window.setTimeout(() => beep(950, 0.075, 0.18), 58);
+        beep(210, 0.055);
+        window.setTimeout(() => beep(125, 0.075), 58);
     }
 
     function vibrate(duration, magnitude) {
