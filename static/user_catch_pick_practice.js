@@ -1287,7 +1287,7 @@
         // The 25-yard mark is also where deep throws may allow the user to PRE-HOLD
         // the catch button. On those throws, the button can be held early and the
         // moving meter does not begin until the ball is close enough to the catch point.
-        const justBeforeGreen = Math.max(0, sweetStart - 0.018);
+        const justBeforeGreen = Math.max(0, sweetStart - 0.025);
 
         if (throwDistanceYards < 10) {
             return justBeforeGreen;
