@@ -16,7 +16,7 @@
     const OFFENSE_FIELD_CENTER_X = (OFFENSE_FIELD_LEFT_X + OFFENSE_FIELD_RIGHT_X) / 2;
     // Training cue: if no catch button has been pressed by this point in the ball flight,
     // give one light buzz to reinforce getting the catch input down early.
-    const CATCH_INPUT_REMINDER_DELAY_MS = 150;
+    const CATCH_INPUT_REMINDER_DELAY_MS = 180;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -2322,8 +2322,8 @@
     // Distinct two-tone warning used only when the catch button was not pressed
     // soon enough after the throw. Keep this different from normal drill beeps.
     function lateCatchWarningChirp() {
-        beep(210, 0.055, 0.12);
-        window.setTimeout(() => beep(125, 0.075, 0.12), 58);
+        beep(1000, 0.055, 0.12);
+        window.setTimeout(() => beep(1400, 0.075, 0.12), 58);
     }
 
     function vibrate(duration, magnitude) {
