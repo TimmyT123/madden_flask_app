@@ -1,4 +1,4 @@
-// VERSION 29: 1.5s diagnostic pause after early catch-button warning
+// VERSION 30: fair catch-input grace period + single warning cue
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -16,7 +16,7 @@
     const OFFENSE_FIELD_CENTER_X = (OFFENSE_FIELD_LEFT_X + OFFENSE_FIELD_RIGHT_X) / 2;
     // Training cue: if no catch button has been pressed by this point in the ball flight,
     // give one light buzz to reinforce getting the catch input down early.
-    const CATCH_INPUT_REMINDER_PROGRESS = 0.10;
+    const CATCH_INPUT_REMINDER_DELAY_MS = 250;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -531,7 +531,6 @@
             catchInitiationBallProgress: null,
             catchInitiationLabel: null,
             catchInputReminderBuzzed: false,
-            catchInputReminderPauseUntil: 0,
             catchDecisionCorrect: null,
             throwHolding: false,
             throwHeldAt: null,
@@ -915,34 +914,33 @@
             return;
         }
 
-        // Diagnostic freeze after the early catch-input warning. This makes the
-        // warning unmistakable while we verify that the reminder path is firing.
-        if (rep.catchInputReminderPauseUntil && now < rep.catchInputReminderPauseUntil) {
-            return;
-        }
-        if (rep.catchInputReminderPauseUntil && now >= rep.catchInputReminderPauseUntil) {
-            rep.catchInputReminderPauseUntil = 0;
-        }
-
         updateBall(rep.ball, dt);
 
-        // Early catch-input training cue. If the user has not committed to any
-        // catch button by 10% of the ball flight, give one short reminder buzz.
-        // This happens well before Difficult mode begins adding the late-input
-        // meter-start penalty (which starts after 58% ball progress).
+        // Catch-input training cue. Give the user a short, fixed grace period
+        // after the throw instead of using a percentage of flight time. This keeps
+        // the cue fair on short and long throws. If a catch button is already
+        // pressed/held on this frame, suppress the warning before it can fire.
+        const catchButtons = ["X", "SQUARE", "TRIANGLE"];
+        const catchInputNow = catchButtons.some(buttonName =>
+            pressed(input, buttonName) || input.down.has(BUTTONS[buttonName])
+        );
+
+        if (catchInputNow) {
+            rep.catchInputReminderBuzzed = true;
+        }
+
         if (
             !rep.catchInputReminderBuzzed &&
             !rep.catchMeterStarted &&
             !rep.catchPreHeld &&
             !rep.catchAttempted &&
             rep.ball &&
-            rep.ball.progress >= CATCH_INPUT_REMINDER_PROGRESS
+            rep.ball.elapsed * 1000 >= CATCH_INPUT_REMINDER_DELAY_MS
         ) {
             rep.catchInputReminderBuzzed = true;
-            rep.catchInputReminderPauseUntil = now + 1500;
-            setTiming("Catch button — get it down early. (PAUSED 1.5s)", "warn");
+            setTiming("Catch button — get it down early.", "warn");
+            beep(240, 0.10);
             vibrate(90, 0.45);
-            return;
         }
 
         // A precision throw led to the defender's leverage side is intercepted
@@ -976,8 +974,6 @@
         // PRESS a catch button to START the meter.
         // HOLD the button while the meter moves.
         // RELEASE that same button to FREEZE/STOP the meter.
-        const catchButtons = ["X", "SQUARE", "TRIANGLE"];
-
         if (!rep.catchMeterStarted && !rep.catchAttempted && !rep.catchPreHeld) {
             for (const buttonName of catchButtons) {
                 if (pressed(input, buttonName)) {
