@@ -1,4 +1,4 @@
-// VERSION 27: early catch-input reminder buzz + QB-to-catch-point meter distance
+// VERSION 28: broader DualSense/browser haptic support + reliable catch reminder rumble
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -2314,16 +2314,63 @@
 
     function vibrate(duration, magnitude) {
         const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-        const pad = state.gamepadIndex !== null ? pads[state.gamepadIndex] : null;
-        const actuator = pad?.vibrationActuator;
-        if (!actuator || typeof actuator.playEffect !== "function") return;
+        const pad =
+            (state.gamepadIndex !== null && pads[state.gamepadIndex])
+                ? pads[state.gamepadIndex]
+                : Array.from(pads).find(Boolean) || null;
 
-        actuator.playEffect("dual-rumble", {
-            startDelay: 0,
-            duration,
-            weakMagnitude: magnitude,
-            strongMagnitude: magnitude
-        }).catch(() => {});
+        if (!pad) return;
+
+        const safeDuration = clamp(Number(duration) || 0, 1, 2000);
+        const safeMagnitude = clamp(Number(magnitude) || 0, 0, 1);
+
+        // Browsers commonly expose controller rumble in one of two ways:
+        // 1) vibrationActuator.playEffect("dual-rumble", ...)
+        // 2) hapticActuators[0].pulse(magnitude, duration)
+        // Try the richer DualSense-style API first, then fall back to pulse().
+        const vibrationActuator = pad.vibrationActuator;
+        const hapticActuator = Array.isArray(pad.hapticActuators)
+            ? pad.hapticActuators[0]
+            : pad.hapticActuators?.[0];
+
+        const tryPulseFallback = () => {
+            const pulseActuator =
+                (hapticActuator && typeof hapticActuator.pulse === "function")
+                    ? hapticActuator
+                    : (vibrationActuator && typeof vibrationActuator.pulse === "function")
+                        ? vibrationActuator
+                        : null;
+
+            if (!pulseActuator) return;
+
+            try {
+                const result = pulseActuator.pulse(safeMagnitude, safeDuration);
+                if (result?.catch) result.catch(() => {});
+            } catch (error) {
+                // Haptic feedback is optional if the browser/controller blocks it.
+            }
+        };
+
+        if (vibrationActuator && typeof vibrationActuator.playEffect === "function") {
+            try {
+                const result = vibrationActuator.playEffect("dual-rumble", {
+                    startDelay: 0,
+                    duration: safeDuration,
+                    weakMagnitude: safeMagnitude,
+                    strongMagnitude: safeMagnitude
+                });
+
+                if (result?.catch) {
+                    result.catch(() => tryPulseFallback());
+                }
+                return;
+            } catch (error) {
+                tryPulseFallback();
+                return;
+            }
+        }
+
+        tryPulseFallback();
     }
 
     function loop(now) {
