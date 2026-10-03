@@ -16,7 +16,7 @@
     const OFFENSE_FIELD_CENTER_X = (OFFENSE_FIELD_LEFT_X + OFFENSE_FIELD_RIGHT_X) / 2;
     // Training cue: if no catch button has been pressed by this point in the ball flight,
     // give one light buzz to reinforce getting the catch input down early.
-    const CATCH_INPUT_REMINDER_DELAY_MS = 250;
+    const CATCH_INPUT_REMINDER_DELAY_MS = 150;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -1294,7 +1294,7 @@
         }
 
         const band = Math.floor((throwDistanceYards - 10) / 5) + 1;
-        const fullMeterFraction = clamp(band / 8, 0.15, 0.60);
+        const fullMeterFraction = clamp(band / 6, 0.20, 0.70);
         return lerp(justBeforeGreen, 0, fullMeterFraction);
     }
 
@@ -2301,14 +2301,14 @@
         ctx.restore();
     }
 
-    function beep(frequency, duration) {
+    function beep(frequency, duration, volume = 0.055) {
         try {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             const audio = new AudioContextClass();
             const oscillator = audio.createOscillator();
             const gain = audio.createGain();
             oscillator.frequency.value = frequency;
-            gain.gain.value = 0.055;
+            gain.gain.value = volume;
             oscillator.connect(gain);
             gain.connect(audio.destination);
             oscillator.start();
@@ -2322,8 +2322,8 @@
     // Distinct two-tone warning used only when the catch button was not pressed
     // soon enough after the throw. Keep this different from normal drill beeps.
     function lateCatchWarningChirp() {
-        beep(210, 0.055);
-        window.setTimeout(() => beep(125, 0.075), 58);
+        beep(210, 0.055, 0.12);
+        window.setTimeout(() => beep(125, 0.075, 0.12), 58);
     }
 
     function vibrate(duration, magnitude) {
