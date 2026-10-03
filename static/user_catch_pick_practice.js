@@ -1,4 +1,4 @@
-// VERSION 26: early catch-input reminder buzz + QB-to-catch-point meter distance
+// VERSION 27: early catch-input reminder buzz + QB-to-catch-point meter distance
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -16,7 +16,7 @@
     const OFFENSE_FIELD_CENTER_X = (OFFENSE_FIELD_LEFT_X + OFFENSE_FIELD_RIGHT_X) / 2;
     // Training cue: if no catch button has been pressed by this point in the ball flight,
     // give one light buzz to reinforce getting the catch input down early.
-    const CATCH_INPUT_REMINDER_PROGRESS = 0.25;
+    const CATCH_INPUT_REMINDER_PROGRESS = 0.10;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -917,7 +917,7 @@
         updateBall(rep.ball, dt);
 
         // Early catch-input training cue. If the user has not committed to any
-        // catch button by 25% of the ball flight, give one short reminder buzz.
+        // catch button by 10% of the ball flight, give one short reminder buzz.
         // This happens well before Difficult mode begins adding the late-input
         // meter-start penalty (which starts after 58% ball progress).
         if (
@@ -930,7 +930,7 @@
         ) {
             rep.catchInputReminderBuzzed = true;
             setTiming("Catch button — get it down early.", "warn");
-            vibrate(55, 0.20);
+            vibrate(90, 0.45);
         }
 
         // A precision throw led to the defender's leverage side is intercepted
