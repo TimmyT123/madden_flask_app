@@ -1294,7 +1294,7 @@
         }
 
         const band = Math.floor((throwDistanceYards - 10) / 5) + 1;
-        const fullMeterFraction = clamp(band / 6, 0.20, 0.70);
+        const fullMeterFraction = clamp(band / 5.5, 0.20, 0.70);
         return lerp(justBeforeGreen, 0, fullMeterFraction);
     }
 
