@@ -2322,8 +2322,8 @@
     // Distinct two-tone warning used only when the catch button was not pressed
     // soon enough after the throw. Keep this different from normal drill beeps.
     function lateCatchWarningChirp() {
-        beep(1000, 0.055, 0.12);
-        window.setTimeout(() => beep(1400, 0.075, 0.12), 58);
+        beep(700, 0.1, 0.18);
+        window.setTimeout(() => beep(950, 0.075, 0.18), 58);
     }
 
     function vibrate(duration, magnitude) {
