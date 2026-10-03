@@ -1,4 +1,4 @@
-// VERSION 25: catch meter uses actual QB-to-catch-point throw distance
+// VERSION 26: early catch-input reminder buzz + QB-to-catch-point meter distance
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -14,6 +14,9 @@
     const OFFENSE_FIELD_LEFT_X = 170;
     const OFFENSE_FIELD_RIGHT_X = 830;
     const OFFENSE_FIELD_CENTER_X = (OFFENSE_FIELD_LEFT_X + OFFENSE_FIELD_RIGHT_X) / 2;
+    // Training cue: if no catch button has been pressed by this point in the ball flight,
+    // give one light buzz to reinforce getting the catch input down early.
+    const CATCH_INPUT_REMINDER_PROGRESS = 0.25;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -527,6 +530,7 @@
             difficultStartProgress: null,
             catchInitiationBallProgress: null,
             catchInitiationLabel: null,
+            catchInputReminderBuzzed: false,
             catchDecisionCorrect: null,
             throwHolding: false,
             throwHeldAt: null,
@@ -912,6 +916,23 @@
 
         updateBall(rep.ball, dt);
 
+        // Early catch-input training cue. If the user has not committed to any
+        // catch button by 25% of the ball flight, give one short reminder buzz.
+        // This happens well before Difficult mode begins adding the late-input
+        // meter-start penalty (which starts after 58% ball progress).
+        if (
+            !rep.catchInputReminderBuzzed &&
+            !rep.catchMeterStarted &&
+            !rep.catchPreHeld &&
+            !rep.catchAttempted &&
+            rep.ball &&
+            rep.ball.progress >= CATCH_INPUT_REMINDER_PROGRESS
+        ) {
+            rep.catchInputReminderBuzzed = true;
+            setTiming("Catch button — get it down early.", "warn");
+            vibrate(55, 0.20);
+        }
+
         // A precision throw led to the defender's leverage side is intercepted
         // as soon as the pass reaches the catch point.
         if (rep.defenderSidePick && rep.ball.progress >= 1.0 && !rep.catchAttempted) {
@@ -1266,7 +1287,7 @@
         }
 
         const band = Math.floor((throwDistanceYards - 10) / 5) + 1;
-        const fullMeterFraction = clamp(band / 6, 0.20, 0.70);
+        const fullMeterFraction = clamp(band / 4, 0.25, 1.00);
         return lerp(justBeforeGreen, 0, fullMeterFraction);
     }
 
