@@ -1,5 +1,7 @@
 "use strict";
 
+// VERSION 6: Pass Switch Reaction finish choices — △ play ball, □ dive, ✕ safe tackle, RS↑ Hit Stick
+
 // WURD Switch Stick Practice - Pass Switch Reaction update 2026-10-03
 
 const modeSelect = document.getElementById("modeSelect");
@@ -62,7 +64,9 @@ const NEXT_TARGET_DELAY_MS = 260;
 const ROUTE_BREAK_FRACTION = 0.52;
 
 const PS_HOME_BUTTON_INDEX = 16;
+const PS_X_BUTTON_INDEX = 0;
 const PS_CIRCLE_BUTTON_INDEX = 1;
+const PS_SQUARE_BUTTON_INDEX = 2;
 const PS_TRIANGLE_BUTTON_INDEX = 3;
 const WURD_HOME_URL = "/";
 
@@ -91,8 +95,11 @@ let nextRoundTimerId = null;
 let countdownTimerIds = [];
 let startSequenceId = 0;
 let lastPsHomePressed = false;
+let lastXPressed = false;
 let lastCirclePressed = false;
+let lastSquarePressed = false;
 let lastTrianglePressed = false;
+let lastHitStickUp = false;
 let passReactionPhase = "idle";
 let passReactionNeedsSwitch = false;
 let passReactionBestDefenderId = null;
@@ -241,8 +248,12 @@ document.addEventListener("keydown", function(event) {
     if (event.repeat) return;
 
     if (drillType === "pass_switch_reaction") {
-        if (event.key.toLowerCase() === "o") { event.preventDefault(); handlePassReactionCircle(); return; }
-        if (event.key.toLowerCase() === "t") { event.preventDefault(); handlePassReactionTriangle(); return; }
+        const key = event.key.toLowerCase();
+        if (key === "o") { event.preventDefault(); handlePassReactionCircle(); return; }
+        if (key === "t" || key === "4") { event.preventDefault(); handlePassReactionFinish("play_ball"); return; }
+        if (key === "3") { event.preventDefault(); handlePassReactionFinish("dive"); return; }
+        if (key === "1") { event.preventDefault(); handlePassReactionFinish("safe"); return; }
+        if (key === "h") { event.preventDefault(); handlePassReactionFinish("hit_stick"); return; }
     }
 
     const vector = keyboardVectorForKey(event.key);
@@ -384,8 +395,11 @@ function startGame() {
     leftStickVector = { x: 0, y: 0 };
     lastAnimationTimestamp = null;
     lastPsHomePressed = false;
+    lastXPressed = false;
     lastCirclePressed = false;
+    lastSquarePressed = false;
     lastTrianglePressed = false;
+    lastHitStickUp = false;
     resetPassReactionState();
     pressedMovementKeys.clear();
 
@@ -664,18 +678,22 @@ function checkControllerInput() {
 
     lastPsHomePressed = psHomePressed;
 
+    const xPressed = Boolean(gamepad.buttons[PS_X_BUTTON_INDEX]?.pressed);
     const circlePressed = Boolean(gamepad.buttons[PS_CIRCLE_BUTTON_INDEX]?.pressed);
+    const squarePressed = Boolean(gamepad.buttons[PS_SQUARE_BUTTON_INDEX]?.pressed);
     const trianglePressed = Boolean(gamepad.buttons[PS_TRIANGLE_BUTTON_INDEX]?.pressed);
 
     if (drillType === "pass_switch_reaction") {
         if (circlePressed && !lastCirclePressed) handlePassReactionCircle();
-        if (trianglePressed && !lastTrianglePressed) handlePassReactionTriangle();
-        lastCirclePressed = circlePressed;
-        lastTrianglePressed = trianglePressed;
-    } else {
-        lastCirclePressed = circlePressed;
-        lastTrianglePressed = trianglePressed;
+        if (trianglePressed && !lastTrianglePressed) handlePassReactionFinish("play_ball");
+        if (squarePressed && !lastSquarePressed) handlePassReactionFinish("dive");
+        if (xPressed && !lastXPressed) handlePassReactionFinish("safe");
     }
+
+    lastXPressed = xPressed;
+    lastCirclePressed = circlePressed;
+    lastSquarePressed = squarePressed;
+    lastTrianglePressed = trianglePressed;
 
     const rawLeftX = gamepad.axes[LEFT_STICK_X_AXIS] || 0;
     const rawLeftY = gamepad.axes[LEFT_STICK_Y_AXIS] || 0;
@@ -691,9 +709,20 @@ function checkControllerInput() {
     updateStickMonitor(vector.x, vector.y);
 
     if (drillType === "pass_switch_reaction") {
-        stickStatus.textContent = "Right stick: not used after the throw";
+        const hitStickUpNow = vector.y <= -0.72 && magnitude >= FLICK_THRESHOLD;
+
+        if (hitStickUpNow && !lastHitStickUp) {
+            handlePassReactionFinish("hit_stick");
+        }
+
+        lastHitStickUp = hitStickUpNow;
+        stickStatus.textContent = hitStickUpNow
+            ? "Right stick: HIT STICK ↑"
+            : "Right stick: ↑ = Hit Stick after the throw";
         return;
     }
+
+    lastHitStickUp = false;
 
     if (magnitude <= NEUTRAL_THRESHOLD) {
         waitingForNeutral = false;
@@ -1480,7 +1509,7 @@ function beginPassSwitchReactionRound() {
     coverResolved = false;
     passReactionPhase = "route";
     setFeedback("Watch the route. Wait for the throw...", "info");
-    flickDetails.textContent = "After the throw: ○ only if another defender should make the play.";
+    flickDetails.textContent = "After the throw: ○ only if another defender should make the play. Then choose △ / □ / ✕ / RS↑.";
     movementDetails.textContent = "Do not guess. Read the throw, then control the defender toward the ball.";
 }
 
@@ -1497,7 +1526,7 @@ function updatePassSwitchReaction(timestamp) {
         flickDetails.textContent = passReactionNeedsSwitch
             ? "Another defender is closer — react with ○."
             : "You are already the closest defender — DON'T press ○.";
-        movementDetails.textContent = "Then steer toward the catch point and press △ to play the ball.";
+        movementDetails.textContent = "Then finish the play: △ ball • □ dive • ✕ safe tackle • RS↑ Hit Stick.";
     }
 
     if ((passReactionPhase === "throw" || passReactionPhase === "play_ball") && activeRoute.completed && !coverResolved) {
@@ -1518,7 +1547,7 @@ function handlePassReactionCircle() {
         switchCorrectCount++;
         totalReactionMs += reactionMs;
         measuredReactionCount++;
-        setFeedback(`Good ○ switch — ${reactionMs} ms. Now steer ${getDefender(currentControlledId).role} and time △!`, "good");
+        setFeedback(`Good ○ switch — ${reactionMs} ms. Now steer ${getDefender(currentControlledId).role} and choose your finish!`, "good");
         flickDetails.textContent = `○ reaction: ${reactionMs} ms.`;
     } else {
         // Simulate Madden taking you off the defender you already had.
@@ -1537,14 +1566,20 @@ function handlePassReactionCircle() {
     renderDefenders(passReactionSwitchWasCorrect === true, false);
 }
 
-function handlePassReactionTriangle() {
+function handlePassReactionFinish(action) {
     if (drillType !== "pass_switch_reaction" || !activeRoute || coverResolved) return;
     if (passReactionPhase !== "throw" && passReactionPhase !== "play_ball") return;
 
+    const actionLabel =
+        action === "play_ball" ? "△" :
+        action === "dive" ? "□" :
+        action === "safe" ? "✕" :
+        "RS↑";
+
     if (passReactionNeedsSwitch && passReactionSwitchWasCorrect !== true) {
-        setFeedback("△ too soon — you needed ○ first to get the defender nearest the ball.", "bad");
+        setFeedback(`${actionLabel} too soon — you needed ○ first to get the defender nearest the play.`, "bad");
         playSound(wrongSound);
-        resolvePassReaction(false);
+        resolvePassReaction(false, { action, reason: "missed_switch" });
         return;
     }
 
@@ -1557,15 +1592,66 @@ function handlePassReactionTriangle() {
     }
 
     const controlled = getDefender(currentControlledId);
-    const distance = Math.hypot(controlled.x - activeRoute.catchPoint.x, controlled.y - activeRoute.catchPoint.y);
     const now = performance.now();
     const arrival = activeRoute.passArrivalAt || now;
     const timingError = Math.abs(arrival - now);
-    const inPosition = distance <= COVERAGE_RADIUS + 2.5;
-    const timingGood = timingError <= 420;
     const movementOkay = passReactionMoveWasCorrect !== false;
 
-    resolvePassReaction(inPosition && timingGood && movementOkay, { distance, timingError });
+    if (action === "play_ball") {
+        const distance = Math.hypot(
+            controlled.x - activeRoute.catchPoint.x,
+            controlled.y - activeRoute.catchPoint.y
+        );
+        const inPosition = distance <= COVERAGE_RADIUS + 2.5;
+        const timingGood = timingError <= 420;
+
+        resolvePassReaction(inPosition && timingGood && movementOkay, {
+            action,
+            distance,
+            timingError,
+        });
+        return;
+    }
+
+    // Tackle finishes are judged against the receiver's live position.
+    const receiver = activeRoute.currentPoint || activeRoute.catchPoint;
+    const receiverDistance = Math.hypot(
+        controlled.x - receiver.x,
+        controlled.y - receiver.y
+    );
+
+    const SAFE_TACKLE_RADIUS = COVERAGE_RADIUS + 3.0;
+    const DIVE_TACKLE_RADIUS = COVERAGE_RADIUS + 6.0;
+    const HIT_STICK_RADIUS = COVERAGE_RADIUS + 4.0;
+
+    const tackleRadius =
+        action === "dive" ? DIVE_TACKLE_RADIUS :
+        action === "hit_stick" ? HIT_STICK_RADIUS :
+        SAFE_TACKLE_RADIUS;
+
+    // Tackles should be made close to the catch/arrival moment.
+    const timingWindow =
+        action === "dive" ? 520 :
+        action === "hit_stick" ? 390 :
+        560;
+
+    const inRange = receiverDistance <= tackleRadius;
+    const timingGood = timingError <= timingWindow;
+
+    let forcedFumble = false;
+    if (action === "hit_stick" && inRange && timingGood && movementOkay) {
+        // Training-only reward: better/closer hits have a larger fumble chance.
+        const closeness = clamp(1 - receiverDistance / HIT_STICK_RADIUS, 0, 1);
+        const fumbleChance = 0.18 + closeness * 0.42;
+        forcedFumble = Math.random() < fumbleChance;
+    }
+
+    resolvePassReaction(inRange && timingGood && movementOkay, {
+        action,
+        distance: receiverDistance,
+        timingError,
+        forcedFumble,
+    });
 }
 
 function resolvePassReaction(success, details = null) {
@@ -1581,20 +1667,58 @@ function resolvePassReaction(success, details = null) {
         score++;
         streak++;
         bestStreak = Math.max(bestStreak, streak);
-        setFeedback("INTERCEPTION! Correct switch decision, direction, and △ timing.", "good");
-        movementDetails.textContent = details ? `Ball play: ${details.distance.toFixed(1)} from catch point · △ ${Math.round(details.timingError)} ms from arrival.` : "Great play on the ball.";
+
+        const action = details?.action || "play_ball";
+
+        if (action === "play_ball") {
+            setFeedback("INTERCEPTION! Correct switch decision, direction, and △ timing.", "good");
+            movementDetails.textContent =
+                `Ball play: ${details.distance.toFixed(1)} from catch point · △ ${Math.round(details.timingError)} ms from arrival.`;
+        } else if (action === "dive") {
+            setFeedback("DIVING TACKLE! □ stopped the receiver.", "good");
+            movementDetails.textContent =
+                `Dive: ${details.distance.toFixed(1)} from receiver · ${Math.round(details.timingError)} ms from arrival.`;
+        } else if (action === "safe") {
+            setFeedback("SAFE TACKLE! ✕ wrapped up the receiver.", "good");
+            movementDetails.textContent =
+                `Safe tackle: ${details.distance.toFixed(1)} from receiver · ${Math.round(details.timingError)} ms from arrival.`;
+        } else {
+            setFeedback(
+                details.forcedFumble
+                    ? "HIT STICK! FUMBLE FORCED!"
+                    : "HIT STICK! Big stop.",
+                "good"
+            );
+            movementDetails.textContent =
+                `Hit Stick: ${details.distance.toFixed(1)} from receiver · ${Math.round(details.timingError)} ms from arrival.` +
+                (details.forcedFumble ? " • FORCED FUMBLE" : "");
+        }
+
         playSound(perfectSound);
     } else {
         streak = 0;
-        if (!details) {
-            setFeedback("Pass completed — reaction sequence was not finished in time.", "bad");
+
+        const action = details?.action || null;
+        if (!details || details.reason === "missed_switch") {
+            setFeedback("Pass completed — reaction sequence was not finished correctly.", "bad");
         } else if (passReactionMoveWasCorrect === false) {
             setFeedback("Missed play — your first movement after taking control went the wrong direction.", "bad");
-        } else if (details.distance > COVERAGE_RADIUS + 2.5) {
-            setFeedback("Missed play — you were not close enough to the catch point when you pressed △.", "bad");
+        } else if (action === "play_ball") {
+            if (details.distance > COVERAGE_RADIUS + 2.5) {
+                setFeedback("Missed play — you were not close enough to the catch point when you pressed △.", "bad");
+            } else {
+                setFeedback("△ timing was off. Play the ball closer to arrival.", "bad");
+            }
+        } else if (action === "dive") {
+            setFeedback("Missed □ dive — get closer or time the tackle nearer the catch.", "bad");
+        } else if (action === "safe") {
+            setFeedback("Missed ✕ safe tackle — close the space and wrap up near the catch.", "bad");
+        } else if (action === "hit_stick") {
+            setFeedback("WHIFFED HIT STICK — RS↑ needs a close angle and good timing.", "bad");
         } else {
-            setFeedback("△ timing was off. Get in position and play the ball closer to arrival.", "bad");
+            setFeedback("Pass completed — no defensive finish in time.", "bad");
         }
+
         playSound(wrongSound);
     }
 
@@ -1627,7 +1751,7 @@ function updateScoreboard() {
     const coverMode = drillType === "switch_and_cover";
     const passReactionMode = drillType === "pass_switch_reaction";
 
-    scoreLabel.textContent = passReactionMode ? "INT Plays" : (coverMode ? "Stops" : "Correct");
+    scoreLabel.textContent = passReactionMode ? "Stops" : (coverMode ? "Stops" : "Correct");
     accuracyLabel.textContent = passReactionMode ? "Success Rate" : (coverMode ? "Stop Rate" : "Accuracy");
     switchScoreItem.classList.toggle("hidden", !(coverMode || passReactionMode));
 
@@ -1841,7 +1965,7 @@ function updateDrillTypeHelp() {
     routeSpeedSelect.disabled = !routeMode;
 
     practiceInstructions.textContent = passReactionMode
-        ? "When the QB throws, decide instantly: if another defender is closer to the catch point, press ○. If you already control the best defender, stay on him. Steer toward the ball, then press △ for the interception."
+        ? "When the QB throws, decide instantly: press ○ only if another defender is closer. Then steer into the play and finish with △ to play the ball, □ to dive, ✕ for a safe tackle, or Right Stick Up for a Hit Stick."
         : coverMode
             ? "Read the route break, flick the right stick to the responsible defender, then use the left stick to move him into the catch area before the pass arrives."
             : selectedType === "route_reaction"

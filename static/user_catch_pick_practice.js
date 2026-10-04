@@ -1,4 +1,4 @@
-// VERSION 34: defense Hit Stick — Circle switch + Right Stick Up for high-risk fumble attempt
+// VERSION 35: restored pre-defense-change behavior from Version 32
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -177,7 +177,6 @@
         keysDown: new Set(),
         gamepadIndex: null,
         psHomeDown: false,
-        rightStickUpDown: false,
         flash: null,
         paused: false,
         pauseStartedAt: 0,
@@ -390,7 +389,6 @@
         state.keyboardButtons.clear();
         state.keyboardPressed.clear();
         state.keyboardReleased.clear();
-        state.rightStickUpDown = false;
         setInstruction("Connect a controller and press Start Drill.");
         setTiming("");
         setFeedback();
@@ -422,7 +420,6 @@
         state.keyboardButtons.clear();
         state.keyboardPressed.clear();
         state.keyboardReleased.clear();
-        state.rightStickUpDown = false;
         syncCurrentControllerButtons();
         updateScoreboard();
         beginRep();
@@ -629,8 +626,6 @@
             },
             switched: false,
             pickAttempted: false,
-            defenseFinishAttempted: false,
-            defenseFinishType: null,
             success: false,
             switchPoints: 0,
             movementPoints: 0,
@@ -644,9 +639,6 @@
     function getInput() {
         let axisX = 0;
         let axisY = 0;
-        let rightAxisX = 0;
-        let rightAxisY = 0;
-        let rightStickUpPressed = false;
         const pressed = new Set();
         const released = new Set();
         const down = new Set();
@@ -667,12 +659,6 @@
 
             axisX = Math.abs(pad.axes[0] || 0) > 0.14 ? pad.axes[0] : 0;
             axisY = Math.abs(pad.axes[1] || 0) > 0.14 ? pad.axes[1] : 0;
-            rightAxisX = Math.abs(pad.axes[2] || 0) > 0.18 ? pad.axes[2] : 0;
-            rightAxisY = Math.abs(pad.axes[3] || 0) > 0.18 ? pad.axes[3] : 0;
-
-            const rightStickUpNow = rightAxisY <= -0.72;
-            rightStickUpPressed = rightStickUpNow && !state.rightStickUpDown;
-            state.rightStickUpDown = rightStickUpNow;
 
             pad.buttons.forEach((button, index) => {
                 const wasPressed = Boolean(state.previousButtons[index]);
@@ -693,7 +679,6 @@
             ui.controller.textContent = "Controller not detected";
             ui.controller.className = "controller-status disconnected";
             state.previousButtons = [];
-            state.rightStickUpDown = false;
         }
 
         if (state.keysDown.has("KeyA")) axisX -= 1;
@@ -716,9 +701,6 @@
         return {
             axisX: clamp(axisX, -1, 1),
             axisY: clamp(axisY, -1, 1),
-            rightAxisX: clamp(rightAxisX, -1, 1),
-            rightAxisY: clamp(rightAxisY, -1, 1),
-            rightStickUpPressed,
             pressed,
             released,
             down
@@ -1610,25 +1592,11 @@
         }
 
         if (pressed(input, "TRIANGLE")) {
-            attemptDefenseFinish(rep, "interception");
+            attemptInterception(rep);
         }
 
-        if (pressed(input, "SQUARE")) {
-            attemptDefenseFinish(rep, "dive");
-        }
-
-        if (pressed(input, "X")) {
-            attemptDefenseFinish(rep, "safe");
-        }
-
-        if (input.rightStickUpPressed) {
-            attemptDefenseFinish(rep, "hitStick");
-        }
-
-        if (rep.ball.progress >= 1.06 && !rep.defenseFinishAttempted) {
-            rep.resultReason = rep.switched
-                ? "No defensive finish — use Triangle, Square, X, or Right Stick Up"
-                : "No click-on";
+        if (rep.ball.progress >= 1.06 && !rep.pickAttempted) {
+            rep.resultReason = rep.switched ? "No interception attempt" : "No click-on";
             finishRep(false);
         }
     }
@@ -1657,151 +1625,42 @@
             defender.selected = index === rep.selectedIndex;
         });
 
-        setInstruction("Steer into position: Triangle = play ball • Square = dive • X = safe tackle • Right Stick Up = HIT STICK.");
+        setInstruction("Steer into the passing lane and press Triangle at the ball.");
         vibrate(48, 0.24);
     }
 
-    function attemptDefenseFinish(rep, action) {
-        if (rep.defenseFinishAttempted) return;
-
-        const buttonLabel =
-            action === "interception" ? "Triangle" :
-            action === "dive" ? "Square" :
-            action === "hitStick" ? "Right Stick Up" :
-            "X";
+    function attemptInterception(rep) {
+        if (rep.pickAttempted) return;
 
         if (!rep.switched || rep.selectedIndex === null) {
-            setTiming(`Press Circle to click on before using ${buttonLabel}.`, "bad");
+            setTiming("Press Circle to click on before using Triangle.", "bad");
             return;
         }
 
         const selected = rep.defenders[rep.selectedIndex];
-        const difficulty = currentDifficulty();
-        const correctDefender = rep.selectedIndex === rep.bestIndex;
+        const ballDistance = distance(selected, rep.ball);
+        const catchRadius = currentDifficulty().catchRadius;
 
-        if (action === "interception") {
-            const ballDistance = distance(selected, rep.ball);
-            const catchRadius = difficulty.catchRadius;
-
-            if (ballDistance > catchRadius) {
-                if (rep.ball.progress < 0.72) {
-                    setTiming("Triangle too early.", "warn");
-                } else {
-                    setTiming("You are outside the interception window.", "bad");
-                }
-                return;
-            }
-
-            rep.defenseFinishAttempted = true;
-            rep.pickAttempted = true;
-            rep.defenseFinishType = "interception";
-            rep.movementPoints = Math.round(clamp(1 - ballDistance / catchRadius, 0, 1) * 35);
-            rep.catchPoints = 40;
-
-            const success =
-                correctDefender &&
-                rep.switchPoints >= 8 &&
-                rep.movementPoints >= 9;
-
-            rep.resultReason = success
-                ? "User interception"
-                : "Reached the ball, but the interception angle was poor";
-
-            finishRep(success);
-            return;
-        }
-
-        const receiverDistance = distance(selected, rep.receiver);
-
-        if (action === "hitStick") {
-            // Hit Stick is high risk / high reward. It needs a close, square angle,
-            // but a well-timed hit gets the largest defensive finish reward and
-            // may produce a simulated forced fumble.
-            const hitStickRadius = difficulty.catchRadius + 16;
-
-            if (receiverDistance > hitStickRadius) {
-                if (rep.ball.progress < 0.72) {
-                    setTiming("Hit Stick too early — close the space first.", "warn");
-                } else {
-                    setTiming("WHIFFED HIT STICK — you were too far away.", "bad");
-                }
-                return;
-            }
-
-            rep.defenseFinishAttempted = true;
-            rep.pickAttempted = true;
-            rep.defenseFinishType = "hitStick";
-            rep.movementPoints = Math.round(clamp(1 - receiverDistance / hitStickRadius, 0, 1) * 35);
-
-            const angleQuality = clamp(1 - receiverDistance / hitStickRadius, 0, 1);
-            const fumbleChance = 0.18 + angleQuality * 0.42;
-            const forcedFumble = Math.random() < fumbleChance;
-
-            rep.catchPoints = forcedFumble ? 45 : 35;
-
-            const success =
-                correctDefender &&
-                rep.switchPoints >= 8 &&
-                rep.movementPoints >= 8;
-
-            if (success && forcedFumble) {
-                rep.resultReason = "HIT STICK — FUMBLE FORCED!";
-            } else if (success) {
-                rep.resultReason = "HIT STICK — big tackle";
-            } else {
-                rep.resultReason = "Hit Stick connected, but the angle was poor";
-            }
-
-            finishRep(success);
-            return;
-        }
-
-        const safeRadius = difficulty.catchRadius + 8;
-        const diveRadius = difficulty.catchRadius + 34;
-        const tackleRadius = action === "dive" ? diveRadius : safeRadius;
-
-        if (receiverDistance > tackleRadius) {
+        if (ballDistance > catchRadius) {
             if (rep.ball.progress < 0.72) {
-                setTiming(
-                    action === "dive"
-                        ? "Dive tackle too early — close more space first."
-                        : "Safe tackle too early — get closer to the receiver.",
-                    "warn"
-                );
+                setTiming("Triangle too early.", "warn");
             } else {
-                setTiming(
-                    action === "dive"
-                        ? "Dive missed — you were too far from the receiver."
-                        : "Safe tackle missed — you were outside tackle range.",
-                    "bad"
-                );
+                setTiming("You are outside the interception window.", "bad");
             }
             return;
         }
 
-        rep.defenseFinishAttempted = true;
         rep.pickAttempted = true;
-        rep.defenseFinishType = action;
+        rep.movementPoints = Math.round(clamp(1 - ballDistance / catchRadius, 0, 1) * 35);
+        rep.catchPoints = 40;
 
-        const movementScale = action === "dive" ? diveRadius : safeRadius;
-        rep.movementPoints = Math.round(clamp(1 - receiverDistance / movementScale, 0, 1) * 35);
-        rep.catchPoints = action === "dive" ? 30 : 25;
-
+        const correctDefender = rep.selectedIndex === rep.bestIndex;
         const success =
             correctDefender &&
             rep.switchPoints >= 8 &&
-            receiverDistance <= tackleRadius;
+            rep.movementPoints >= 9;
 
-        if (action === "dive") {
-            rep.resultReason = success
-                ? "Diving tackle"
-                : "Dive attempt reached the receiver, but the defensive angle was poor";
-        } else {
-            rep.resultReason = success
-                ? "Safe tackle"
-                : "Safe tackle attempt reached the receiver, but the defensive angle was poor";
-        }
-
+        rep.resultReason = success ? "User interception" : "Reached the ball, but the angle was poor";
         finishRep(success);
     }
 
@@ -1906,14 +1765,6 @@
     }
 
     function feedbackCatch(points, defense = false) {
-        if (defense && state.rep?.kind === "defense") {
-            if (state.rep.defenseFinishType === "interception") return points > 0 ? "Interception" : "Missed pick";
-            if (state.rep.defenseFinishType === "dive") return points > 0 ? "Dive tackle" : "Missed dive";
-            if (state.rep.defenseFinishType === "safe") return points > 0 ? "Safe tackle" : "Missed tackle";
-            if (state.rep.defenseFinishType === "hitStick") return points >= 45 ? "Forced fumble" : (points > 0 ? "Hit Stick" : "Whiffed hit");
-            return "No finish";
-        }
-
         const max = defense ? 40 : 20;
         const ratio = points / max;
         if (ratio >= 0.95) return defense ? "Interception" : "Correct catch";
@@ -2151,13 +2002,10 @@
         drawBall(rep.ball);
 
         if (rep.switched && rep.selectedIndex !== null) {
-            drawCatchPrompt(rep.defenders[rep.selectedIndex], "△  □  ✕");
+            drawCatchPrompt(rep.defenders[rep.selectedIndex], "TRIANGLE");
         }
 
-        drawMiniLegend(
-            "Circle = click on",
-            "△ = intercept • □ = dive • ✕ = safe tackle • RS↑ = HIT STICK"
-        );
+        drawMiniLegend("Circle = click on", "Triangle = intercept");
     }
 
     function drawRoutePreview(rep) {
