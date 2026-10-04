@@ -1,5 +1,7 @@
 "use strict";
 
+// WURD Switch Stick Practice - Pass Switch Reaction update 2026-10-03
+
 const modeSelect = document.getElementById("modeSelect");
 const drillTypeSelect = document.getElementById("drillTypeSelect");
 const routeSpeedSelect = document.getElementById("routeSpeedSelect");
@@ -60,6 +62,8 @@ const NEXT_TARGET_DELAY_MS = 260;
 const ROUTE_BREAK_FRACTION = 0.52;
 
 const PS_HOME_BUTTON_INDEX = 16;
+const PS_CIRCLE_BUTTON_INDEX = 1;
+const PS_TRIANGLE_BUTTON_INDEX = 3;
 const WURD_HOME_URL = "/";
 
 const defenders = [
@@ -87,6 +91,16 @@ let nextRoundTimerId = null;
 let countdownTimerIds = [];
 let startSequenceId = 0;
 let lastPsHomePressed = false;
+let lastCirclePressed = false;
+let lastTrianglePressed = false;
+let passReactionPhase = "idle";
+let passReactionNeedsSwitch = false;
+let passReactionBestDefenderId = null;
+let passReactionThrowAt = 0;
+let passReactionSwitchedAt = 0;
+let passReactionFirstMoveChecked = false;
+let passReactionSwitchWasCorrect = null;
+let passReactionMoveWasCorrect = null;
 
 const pauseAwareTimers = {
     round: null,
@@ -225,6 +239,11 @@ document.addEventListener("keydown", function(event) {
     }
 
     if (event.repeat) return;
+
+    if (drillType === "pass_switch_reaction") {
+        if (event.key.toLowerCase() === "o") { event.preventDefault(); handlePassReactionCircle(); return; }
+        if (event.key.toLowerCase() === "t") { event.preventDefault(); handlePassReactionTriangle(); return; }
+    }
 
     const vector = keyboardVectorForKey(event.key);
     if (!vector) return;
@@ -365,6 +384,9 @@ function startGame() {
     leftStickVector = { x: 0, y: 0 };
     lastAnimationTimestamp = null;
     lastPsHomePressed = false;
+    lastCirclePressed = false;
+    lastTrianglePressed = false;
+    resetPassReactionState();
     pressedMovementKeys.clear();
 
     drillType = drillTypeSelect.value;
@@ -441,6 +463,11 @@ function beginNextRound() {
     resetDefenderPositions();
     updateLeftStickMonitor(0, 0);
     hideCoverHud();
+
+    if (drillType === "pass_switch_reaction") {
+        beginPassSwitchReactionRound();
+        return;
+    }
 
     const candidates = getGoodTargetCandidates();
     const provisionalTarget = chooseRandomTarget(candidates);
@@ -534,6 +561,7 @@ function startAnimationLoop() {
         checkControllerInput();
         updateControlledMovement(deltaMs);
         updateRouteAnimation(timestamp);
+        updatePassSwitchReaction(timestamp);
         updateCoverHud(timestamp);
         animationId = requestAnimationFrame(loop);
     };
@@ -587,8 +615,11 @@ function triggerRouteBreak(timestamp) {
     if (!activeRoute || activeRoute.breakTriggered) return;
 
     activeRoute.breakTriggered = true;
-    roundLocked = false;
+    roundLocked = drillType === "pass_switch_reaction";
     roundStartedAt = timestamp;
+    if (drillType === "pass_switch_reaction") {
+        activeRoute.passArrivalAt = timestamp + activeRoute.finishDuration;
+    }
 
     showCatchPoint(activeRoute.catchPoint);
     setFeedback(`${activeRoute.name} break! Switch to the defender responsible for that area.`, "info");
@@ -633,10 +664,23 @@ function checkControllerInput() {
 
     lastPsHomePressed = psHomePressed;
 
+    const circlePressed = Boolean(gamepad.buttons[PS_CIRCLE_BUTTON_INDEX]?.pressed);
+    const trianglePressed = Boolean(gamepad.buttons[PS_TRIANGLE_BUTTON_INDEX]?.pressed);
+
+    if (drillType === "pass_switch_reaction") {
+        if (circlePressed && !lastCirclePressed) handlePassReactionCircle();
+        if (trianglePressed && !lastTrianglePressed) handlePassReactionTriangle();
+        lastCirclePressed = circlePressed;
+        lastTrianglePressed = trianglePressed;
+    } else {
+        lastCirclePressed = circlePressed;
+        lastTrianglePressed = trianglePressed;
+    }
+
     const rawLeftX = gamepad.axes[LEFT_STICK_X_AXIS] || 0;
     const rawLeftY = gamepad.axes[LEFT_STICK_Y_AXIS] || 0;
     const movementVector = applyRadialDeadzone(rawLeftX, rawLeftY, LEFT_STICK_DEADZONE);
-    leftStickVector = coverPhaseActive ? movementVector : { x: 0, y: 0 };
+    leftStickVector = (coverPhaseActive || (drillType === "pass_switch_reaction" && passReactionPhase === "play_ball")) ? movementVector : { x: 0, y: 0 };
     updateLeftStickMonitor(leftStickVector.x, leftStickVector.y);
 
     const rawX = gamepad.axes[RIGHT_STICK_X_AXIS] || 0;
@@ -645,6 +689,11 @@ function checkControllerInput() {
     const magnitude = Math.hypot(vector.x, vector.y);
 
     updateStickMonitor(vector.x, vector.y);
+
+    if (drillType === "pass_switch_reaction") {
+        stickStatus.textContent = "Right stick: not used after the throw";
+        return;
+    }
 
     if (magnitude <= NEUTRAL_THRESHOLD) {
         waitingForNeutral = false;
@@ -1047,7 +1096,7 @@ function buildRouteForTarget(target) {
     }
 
     const breakDuration = routeSpeedMs * ROUTE_BREAK_FRACTION;
-    const finishDuration = drillType === "switch_and_cover"
+    const finishDuration = (drillType === "switch_and_cover" || drillType === "pass_switch_reaction")
         ? routeSpeedMs
         : routeSpeedMs * (1 - ROUTE_BREAK_FRACTION);
 
@@ -1089,7 +1138,7 @@ function getCatchPointForTarget(target) {
         OLB: { x: -8, y: 4 },
     };
 
-    const offsets = drillType === "switch_and_cover" ? coverOffsets : routeOffsets;
+    const offsets = (drillType === "switch_and_cover" || drillType === "pass_switch_reaction") ? coverOffsets : routeOffsets;
 
     const offset = offsets[target.role] || { x: 0, y: 0 };
 
@@ -1104,7 +1153,7 @@ function createRouteVisuals(route) {
 
     catchPointElement = document.createElement("div");
     catchPointElement.className = "catch-point";
-    if (drillType === "switch_and_cover") {
+    if (drillType === "switch_and_cover" || drillType === "pass_switch_reaction") {
         catchPointElement.classList.add("cover-zone");
     }
     catchPointElement.style.left = route.catchPoint.x + "%";
@@ -1203,7 +1252,8 @@ function getKeyboardMovementVector() {
 }
 
 function updateControlledMovement(deltaMs) {
-    if (!coverPhaseActive || coverResolved || deltaMs <= 0 || !currentControlledId) return;
+    const passReactionMoving = drillType === "pass_switch_reaction" && passReactionPhase === "play_ball";
+    if ((!coverPhaseActive && !passReactionMoving) || coverResolved || deltaMs <= 0 || !currentControlledId) return;
 
     const input = modeSelect.value === "keyboard"
         ? getKeyboardMovementVector()
@@ -1213,6 +1263,18 @@ function updateControlledMovement(deltaMs) {
     if (magnitude <= LEFT_STICK_DEADZONE) return;
 
     const direction = normalizeVector(input.x, input.y);
+
+    if (passReactionMoving && !passReactionFirstMoveChecked && activeRoute?.catchPoint) {
+        passReactionFirstMoveChecked = true;
+        const controlledNow = getDefender(currentControlledId);
+        const desired = normalizeVector(activeRoute.catchPoint.x - controlledNow.x, activeRoute.catchPoint.y - controlledNow.y);
+        const moveError = vectorAngleDifferenceDegrees(direction, desired);
+        passReactionMoveWasCorrect = moveError <= 70;
+        movementDetails.textContent = passReactionMoveWasCorrect
+            ? `First move: GOOD (${Math.round(moveError)}° from ball path). Now time △.`
+            : `First move: WRONG WAY (${Math.round(moveError)}° off). Recover and time △.`;
+    }
+
     const distance = DEFENDER_MOVE_SPEED * (deltaMs / 1000) * magnitude;
     const current = getDefender(currentControlledId);
 
@@ -1375,6 +1437,178 @@ function scheduleNextRound() {
     }, ROUND_FEEDBACK_MS);
 }
 
+function resetPassReactionState() {
+    passReactionPhase = "idle";
+    passReactionNeedsSwitch = false;
+    passReactionBestDefenderId = null;
+    passReactionThrowAt = 0;
+    passReactionSwitchedAt = 0;
+    passReactionFirstMoveChecked = false;
+    passReactionSwitchWasCorrect = null;
+    passReactionMoveWasCorrect = null;
+}
+
+function beginPassSwitchReactionRound() {
+    resetPassReactionState();
+    resetDefenderPositions();
+
+    // Randomize who the user starts on so some throws require ○ and some do not.
+    const startPool = defenders.filter(d => ["MLB", "NICKEL", "OLB", "FS", "SS"].includes(d.id));
+    currentControlledId = startPool[Math.floor(Math.random() * startPool.length)].id;
+
+    const routeTargets = defenders.filter(d => d.id !== currentControlledId);
+    const provisional = chooseRandomTarget(routeTargets);
+    activeRoute = buildRouteForTarget(provisional);
+    activeRoute.passReaction = true;
+
+    // For this drill, include the currently controlled defender when deciding who
+    // is actually closest to the catch point. That creates the DON'T SWITCH reps.
+    let best = null;
+    for (const base of defenders) {
+        const d = getDefender(base.id);
+        const distance = Math.hypot(d.x - activeRoute.catchPoint.x, d.y - activeRoute.catchPoint.y);
+        if (!best || distance < best.distance) best = { ...d, distance };
+    }
+    passReactionBestDefenderId = best.id;
+    targetDefenderId = best.id;
+    passReactionNeedsSwitch = best.id !== currentControlledId;
+
+    createRouteVisuals(activeRoute);
+    renderDefenders();
+    roundLocked = true;
+    coverPhaseActive = false;
+    coverResolved = false;
+    passReactionPhase = "route";
+    setFeedback("Watch the route. Wait for the throw...", "info");
+    flickDetails.textContent = "After the throw: ○ only if another defender should make the play.";
+    movementDetails.textContent = "Do not guess. Read the throw, then control the defender toward the ball.";
+}
+
+function updatePassSwitchReaction(timestamp) {
+    if (drillType !== "pass_switch_reaction" || !activeRoute || practicePaused || drillComplete) return;
+
+    if (activeRoute.breakTriggered && passReactionPhase === "route") {
+        passReactionPhase = "throw";
+        passReactionThrowAt = timestamp;
+        roundStartedAt = timestamp;
+        coverPhaseActive = true;
+        showCatchPoint(activeRoute.catchPoint);
+        setFeedback("BALL OUT! Decide: ○ switch or stay on your defender!", "info");
+        flickDetails.textContent = passReactionNeedsSwitch
+            ? "Another defender is closer — react with ○."
+            : "You are already the closest defender — DON'T press ○.";
+        movementDetails.textContent = "Then steer toward the catch point and press △ to play the ball.";
+    }
+
+    if ((passReactionPhase === "throw" || passReactionPhase === "play_ball") && activeRoute.completed && !coverResolved) {
+        resolvePassReaction(false);
+    }
+}
+
+function handlePassReactionCircle() {
+    if (drillType !== "pass_switch_reaction" || !activeRoute || coverResolved) return;
+    if (passReactionPhase !== "throw" && passReactionPhase !== "play_ball") return;
+
+    const reactionMs = Math.round(performance.now() - passReactionThrowAt);
+    if (passReactionNeedsSwitch) {
+        currentControlledId = passReactionBestDefenderId;
+        selectedDefenderId = currentControlledId;
+        passReactionSwitchWasCorrect = true;
+        passReactionSwitchedAt = performance.now();
+        switchCorrectCount++;
+        totalReactionMs += reactionMs;
+        measuredReactionCount++;
+        setFeedback(`Good ○ switch — ${reactionMs} ms. Now steer ${getDefender(currentControlledId).role} and time △!`, "good");
+        flickDetails.textContent = `○ reaction: ${reactionMs} ms.`;
+    } else {
+        // Simulate Madden taking you off the defender you already had.
+        const alternatives = defenders
+            .filter(d => d.id !== currentControlledId)
+            .map(d => ({...getDefender(d.id), distance: Math.hypot(getDefender(d.id).x-activeRoute.catchPoint.x, getDefender(d.id).y-activeRoute.catchPoint.y)}))
+            .sort((a,b) => a.distance-b.distance);
+        if (alternatives[0]) currentControlledId = alternatives[0].id;
+        selectedDefenderId = currentControlledId;
+        passReactionSwitchWasCorrect = false;
+        setFeedback("UNNECESSARY ○ SWITCH! You already had the best defender. Recover!", "bad");
+        flickDetails.textContent = "Stay on your defender when he is already closest to the ball.";
+        playSound(wrongSound);
+    }
+    passReactionPhase = "play_ball";
+    renderDefenders(passReactionSwitchWasCorrect === true, false);
+}
+
+function handlePassReactionTriangle() {
+    if (drillType !== "pass_switch_reaction" || !activeRoute || coverResolved) return;
+    if (passReactionPhase !== "throw" && passReactionPhase !== "play_ball") return;
+
+    if (passReactionNeedsSwitch && passReactionSwitchWasCorrect !== true) {
+        setFeedback("△ too soon — you needed ○ first to get the defender nearest the ball.", "bad");
+        playSound(wrongSound);
+        resolvePassReaction(false);
+        return;
+    }
+
+    if (!passReactionNeedsSwitch && passReactionSwitchWasCorrect === null) {
+        // Correctly stayed on the original defender.
+        passReactionSwitchWasCorrect = true;
+        const reactionMs = Math.round(performance.now() - passReactionThrowAt);
+        totalReactionMs += reactionMs;
+        measuredReactionCount++;
+    }
+
+    const controlled = getDefender(currentControlledId);
+    const distance = Math.hypot(controlled.x - activeRoute.catchPoint.x, controlled.y - activeRoute.catchPoint.y);
+    const now = performance.now();
+    const arrival = activeRoute.passArrivalAt || now;
+    const timingError = Math.abs(arrival - now);
+    const inPosition = distance <= COVERAGE_RADIUS + 2.5;
+    const timingGood = timingError <= 420;
+    const movementOkay = passReactionMoveWasCorrect !== false;
+
+    resolvePassReaction(inPosition && timingGood && movementOkay, { distance, timingError });
+}
+
+function resolvePassReaction(success, details = null) {
+    if (coverResolved) return;
+    coverResolved = true;
+    coverPhaseActive = false;
+    roundLocked = true;
+    passReactionPhase = "resolved";
+    attempts++;
+    if (activeRoute) activeRoute.frozen = true;
+
+    if (success) {
+        score++;
+        streak++;
+        bestStreak = Math.max(bestStreak, streak);
+        setFeedback("INTERCEPTION! Correct switch decision, direction, and △ timing.", "good");
+        movementDetails.textContent = details ? `Ball play: ${details.distance.toFixed(1)} from catch point · △ ${Math.round(details.timingError)} ms from arrival.` : "Great play on the ball.";
+        playSound(perfectSound);
+    } else {
+        streak = 0;
+        if (!details) {
+            setFeedback("Pass completed — reaction sequence was not finished in time.", "bad");
+        } else if (passReactionMoveWasCorrect === false) {
+            setFeedback("Missed play — your first movement after taking control went the wrong direction.", "bad");
+        } else if (details.distance > COVERAGE_RADIUS + 2.5) {
+            setFeedback("Missed play — you were not close enough to the catch point when you pressed △.", "bad");
+        } else {
+            setFeedback("△ timing was off. Get in position and play the ball closer to arrival.", "bad");
+        }
+        playSound(wrongSound);
+    }
+
+    selectedDefenderId = currentControlledId;
+    renderDefenders(success, true);
+    updateScoreboard();
+
+    if (isDrillFinished()) {
+        setPauseAwareTimer("next", finishDrill, ROUND_FEEDBACK_MS);
+        return;
+    }
+    scheduleNextRound();
+}
+
 function updateStickMonitor(x, y) {
     const maxOffsetPercent = 36;
     const clampedX = clamp(x, -1, 1);
@@ -1391,10 +1625,11 @@ function updateStickMonitor(x, y) {
 
 function updateScoreboard() {
     const coverMode = drillType === "switch_and_cover";
+    const passReactionMode = drillType === "pass_switch_reaction";
 
-    scoreLabel.textContent = coverMode ? "Stops" : "Correct";
-    accuracyLabel.textContent = coverMode ? "Stop Rate" : "Accuracy";
-    switchScoreItem.classList.toggle("hidden", !coverMode);
+    scoreLabel.textContent = passReactionMode ? "INT Plays" : (coverMode ? "Stops" : "Correct");
+    accuracyLabel.textContent = passReactionMode ? "Success Rate" : (coverMode ? "Stop Rate" : "Accuracy");
+    switchScoreItem.classList.toggle("hidden", !(coverMode || passReactionMode));
 
     scoreEl.textContent = score;
     switchCorrectEl.textContent = switchCorrectCount;
@@ -1600,18 +1835,22 @@ function updateModeHelp() {
 
 function updateDrillTypeHelp() {
     const selectedType = drillTypeSelect.value;
-    const routeMode = selectedType === "route_reaction" || selectedType === "switch_and_cover";
+    const passReactionMode = selectedType === "pass_switch_reaction";
+    const routeMode = selectedType === "route_reaction" || selectedType === "switch_and_cover" || passReactionMode;
     const coverMode = selectedType === "switch_and_cover";
     routeSpeedSelect.disabled = !routeMode;
 
-    practiceInstructions.textContent = coverMode
-        ? "Read the route break, flick the right stick to the responsible defender, then use the left stick to move him into the catch area before the pass arrives."
-        : selectedType === "route_reaction"
-            ? "Watch the receiver run his route. When he makes his break, identify the coverage defender responsible for the threatened area and flick the right stick toward that defender."
-            : "Find the pulsing coverage defender and flick the right stick toward him. The selected defender becomes your controlled defender for the next repetition.";
+    practiceInstructions.textContent = passReactionMode
+        ? "When the QB throws, decide instantly: if another defender is closer to the catch point, press ○. If you already control the best defender, stay on him. Steer toward the ball, then press △ for the interception."
+        : coverMode
+            ? "Read the route break, flick the right stick to the responsible defender, then use the left stick to move him into the catch area before the pass arrives."
+            : selectedType === "route_reaction"
+                ? "Watch the receiver run his route. When he makes his break, identify the coverage defender responsible for the threatened area and flick the right stick toward that defender."
+                : "Find the pulsing coverage defender and flick the right stick toward him. The selected defender becomes your controlled defender for the next repetition.";
 
-    leftStickPanel.classList.toggle("hidden", !coverMode);
-    leftStickStatus.classList.toggle("hidden", !coverMode);
+    const showLeftStick = coverMode || passReactionMode;
+    leftStickPanel.classList.toggle("hidden", !showLeftStick);
+    leftStickStatus.classList.toggle("hidden", !showLeftStick);
     if (!coverMode) hideCoverHud();
 
     drillType = selectedType;
