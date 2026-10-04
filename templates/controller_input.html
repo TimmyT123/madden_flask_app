@@ -1,42 +1,138 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>WURD Madden Controller Input Recorder v1</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WURD Madden Controller Input Recorder v2</title>
 <style>
-body{font-family:Arial;background:#0b0d10;color:#eee;margin:0}.w{max-width:1000px;margin:auto;padding:20px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.c{background:#15181d;border:1px solid #444;border-radius:10px;padding:14px}
-.v{font-size:27px;font-weight:bold}.on{outline:3px solid white}button{padding:10px;margin:5px;font-size:16px}
-#log{width:100%;height:280px;background:#070809;color:#ddd;margin-top:15px;font-family:monospace}
-</style></head><body><div class="w">
-<h1>WURD Madden Controller Input Recorder</h1><p>v1 — keep this open while playing through chiaki-ng.</p>
-<p id="status">Press a DualSense button.</p>
-<button id="start">Start Recording</button><button id="stop" disabled>Stop Recording</button>
-<button id="clear">Clear</button><button id="download" disabled>Download CSV</button>
+:root{color-scheme:dark}
+body{font-family:Arial,sans-serif;background:#0b0d10;color:#eee;margin:0}
+.wrap{max-width:1100px;margin:auto;padding:20px}
+h1{margin-bottom:5px}.sub{color:#aaa;margin-top:0}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
+button{padding:10px 14px;font-size:16px;cursor:pointer}
+.status{padding:10px 12px;border:1px solid #444;border-radius:8px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.card{background:#15181d;border:1px solid #444;border-radius:10px;padding:12px}
+.label{font-size:12px;color:#aaa}.value{font-size:24px;font-weight:bold;margin-top:5px}
+.on{outline:3px solid #fff}
+.meter{height:10px;background:#292d34;border-radius:8px;overflow:hidden;margin-top:7px}
+.fill{height:100%;width:0;background:currentColor}
+.stick{font-family:Consolas,monospace;font-size:18px;line-height:1.45}
+#log{width:100%;height:270px;box-sizing:border-box;margin-top:14px;background:#070809;color:#ddd;
+border:1px solid #444;padding:9px;font-family:Consolas,monospace}
+</style>
+</head>
+<body><div class="wrap">
+<h1>WURD Madden Controller Input Recorder</h1>
+<p class="sub">v2 — full defensive input diagnostic</p>
+<div id="status" class="status">Connect the DualSense by USB and press a controller button.</div>
+<div class="toolbar">
+<button id="start">Start Recording</button>
+<button id="stop" disabled>Stop Recording</button>
+<button id="clear">Clear Log</button>
+<button id="download" disabled>Download CSV</button>
+</div>
+
 <div class="grid">
-<div class="c"><small>R2 PRESSURE</small><div class="v" id="r2">0%</div></div>
-<div class="c" id="tc"><small>TRIANGLE</small><div class="v" id="tri">UP</div></div>
-<div class="c" id="cc"><small>CIRCLE</small><div class="v" id="cir">UP</div></div>
-<div class="c"><small>LEFT STICK</small><div class="v" id="ls">X +0.000<br>Y +0.000</div></div>
-<div class="c"><small>RIGHT STICK</small><div class="v" id="rs">X +0.000<br>Y +0.000</div></div>
-<div class="c"><small>RECORDING</small><div class="v" id="rec">STOPPED</div></div>
-</div><textarea id="log" readonly></textarea>
+<div class="card" id="triangleCard"><div class="label">△ TRIANGLE</div><div id="triangle" class="value">UP</div></div>
+<div class="card" id="circleCard"><div class="label">○ CIRCLE</div><div id="circle" class="value">UP</div></div>
+<div class="card" id="squareCard"><div class="label">□ SQUARE</div><div id="square" class="value">UP</div></div>
+<div class="card" id="xCard"><div class="label">✕ X</div><div id="xbtn" class="value">UP</div></div>
+
+<div class="card" id="l1Card"><div class="label">L1</div><div id="l1" class="value">UP</div></div>
+<div class="card"><div class="label">L2 PRESSURE</div><div id="l2" class="value">0%</div><div class="meter"><div id="l2fill" class="fill"></div></div></div>
+<div class="card" id="r1Card"><div class="label">R1</div><div id="r1" class="value">UP</div></div>
+<div class="card"><div class="label">R2 PRESSURE</div><div id="r2" class="value">0%</div><div class="meter"><div id="r2fill" class="fill"></div></div></div>
+
+<div class="card"><div class="label">LEFT STICK</div><div id="ls" class="value stick">X +0.000<br>Y +0.000</div></div>
+<div class="card"><div class="label">RIGHT STICK</div><div id="rs" class="value stick">X +0.000<br>Y +0.000</div></div>
+<div class="card"><div class="label">D-PAD</div><div id="dpad" class="value" style="font-size:18px">—</div></div>
+<div class="card"><div class="label">RECORDING</div><div id="rec" class="value">STOPPED</div></div>
+</div>
+
+<textarea id="log" readonly placeholder="Changed controller inputs appear here while recording..."></textarea>
+
 <script>
-// WURD Madden Controller Input Recorder v1.0
-const $=x=>document.getElementById(x);let recording=false,t0=0,rows=[],last=null;
+// WURD Madden Controller Input Recorder
+// Version: 2.0
+const $=id=>document.getElementById(id);
+let recording=false,startTime=0,rows=[],last=null;
+const DZ=.06, EPS=.025;
 const gp=()=>[...navigator.getGamepads()].find(Boolean);
-const f=n=>(n>=0?"+":"")+n.toFixed(3), dz=n=>Math.abs(n)<.06?0:n;
-function state(g){return{lx:dz(g.axes[0]||0),ly:dz(g.axes[1]||0),rx:dz(g.axes[2]||0),ry:dz(g.axes[3]||0),
- circle:!!g.buttons[1]?.pressed,triangle:!!g.buttons[3]?.pressed,r2:g.buttons[7]?.value||0}}
-function diff(a,b){return !b||Math.abs(a.lx-b.lx)>.025||Math.abs(a.ly-b.ly)>.025||Math.abs(a.rx-b.rx)>.025||
- Math.abs(a.ry-b.ry)>.025||Math.abs(a.r2-b.r2)>.01||a.circle!=b.circle||a.triangle!=b.triangle}
-function ui(s){$("r2").textContent=Math.round(s.r2*100)+"%";$("tri").textContent=s.triangle?"DOWN":"UP";
- $("cir").textContent=s.circle?"DOWN":"UP";$("tc").classList.toggle("on",s.triangle);$("cc").classList.toggle("on",s.circle);
- $("ls").innerHTML=`X ${f(s.lx)}<br>Y ${f(s.ly)}`;$("rs").innerHTML=`X ${f(s.rx)}<br>Y ${f(s.ry)}`}
-function loop(){let g=gp();if(g){$("status").textContent="Controller: "+g.id;let s=state(g);ui(s);
- if(recording&&diff(s,last)){let ms=Math.round(performance.now()-t0);rows.push([ms,(ms/1000).toFixed(3),s.r2.toFixed(3),+s.circle,+s.triangle,s.lx.toFixed(3),s.ly.toFixed(3),s.rx.toFixed(3),s.ry.toFixed(3)].join(","));
- $("log").value+=`${(ms/1000).toFixed(3)}s R2 ${Math.round(s.r2*100)}%  ○ ${s.circle?"DOWN":"up"}  △ ${s.triangle?"DOWN":"up"}  LS(${f(s.lx)},${f(s.ly)}) RS(${f(s.rx)},${f(s.ry)})\n`;
- $("log").scrollTop=$("log").scrollHeight;last={...s}}}requestAnimationFrame(loop)}
-$("start").onclick=()=>{if(!gp())return alert("Controller not detected.");rows=["ms,seconds,r2,circle,triangle,left_x,left_y,right_x,right_y"];$("log").value="";last=null;t0=performance.now();recording=true;$("rec").textContent="RECORDING";$("start").disabled=true;$("stop").disabled=false;$("download").disabled=true};
+const dz=n=>Math.abs(n)<DZ?0:n;
+const fmt=n=>(n>=0?"+":"")+n.toFixed(3);
+
+function read(g){
+ return {
+  x:!!g.buttons[0]?.pressed, circle:!!g.buttons[1]?.pressed,
+  square:!!g.buttons[2]?.pressed, triangle:!!g.buttons[3]?.pressed,
+  l1:!!g.buttons[4]?.pressed, r1:!!g.buttons[5]?.pressed,
+  l2:g.buttons[6]?.value||0, r2:g.buttons[7]?.value||0,
+  up:!!g.buttons[12]?.pressed, down:!!g.buttons[13]?.pressed,
+  left:!!g.buttons[14]?.pressed, right:!!g.buttons[15]?.pressed,
+  lx:dz(g.axes[0]||0), ly:dz(g.axes[1]||0),
+  rx:dz(g.axes[2]||0), ry:dz(g.axes[3]||0)
+ };
+}
+function changed(a,b){
+ if(!b)return true;
+ for(const k of ["x","circle","square","triangle","l1","r1","up","down","left","right"])
+  if(a[k]!==b[k])return true;
+ for(const k of ["l2","r2"])if(Math.abs(a[k]-b[k])>.01)return true;
+ for(const k of ["lx","ly","rx","ry"])if(Math.abs(a[k]-b[k])>EPS)return true;
+ return false;
+}
+function setButton(id,card,on){$(id).textContent=on?"DOWN":"UP";$(card).classList.toggle("on",on)}
+function dpadText(s){
+ let a=[];if(s.up)a.push("UP");if(s.down)a.push("DOWN");if(s.left)a.push("LEFT");if(s.right)a.push("RIGHT");
+ return a.length?a.join(" + "):"—";
+}
+function update(s){
+ setButton("triangle","triangleCard",s.triangle); setButton("circle","circleCard",s.circle);
+ setButton("square","squareCard",s.square); setButton("xbtn","xCard",s.x);
+ setButton("l1","l1Card",s.l1); setButton("r1","r1Card",s.r1);
+ $("l2").textContent=Math.round(s.l2*100)+"%"; $("l2fill").style.width=(s.l2*100)+"%";
+ $("r2").textContent=Math.round(s.r2*100)+"%"; $("r2fill").style.width=(s.r2*100)+"%";
+ $("ls").innerHTML=`X ${fmt(s.lx)}<br>Y ${fmt(s.ly)}`;
+ $("rs").innerHTML=`X ${fmt(s.rx)}<br>Y ${fmt(s.ry)}`;
+ $("dpad").textContent=dpadText(s);
+}
+function csv(ms,s){
+ return [ms,(ms/1000).toFixed(3),+s.x,+s.circle,+s.square,+s.triangle,+s.l1,s.l2.toFixed(3),
+ +s.r1,s.r2.toFixed(3),+s.up,+s.down,+s.left,+s.right,s.lx.toFixed(3),s.ly.toFixed(3),
+ s.rx.toFixed(3),s.ry.toFixed(3)].join(",");
+}
+function logLine(ms,s){
+ return `${(ms/1000).toFixed(3)}s  L2 ${String(Math.round(s.l2*100)).padStart(3)}% R2 ${String(Math.round(s.r2*100)).padStart(3)}%  `+
+ `✕${s.x?"↓":"·"} ○${s.circle?"↓":"·"} □${s.square?"↓":"·"} △${s.triangle?"↓":"·"} `+
+ `L1${s.l1?"↓":"·"} R1${s.r1?"↓":"·"} D:${dpadText(s)} LS(${fmt(s.lx)},${fmt(s.ly)}) RS(${fmt(s.rx)},${fmt(s.ry)})`;
+}
+function loop(){
+ const g=gp();
+ if(!g){$("status").textContent="No controller detected. Press a DualSense button."}
+ else{
+  $("status").textContent="Controller detected: "+g.id;
+  const s=read(g);update(s);
+  if(recording&&changed(s,last)){
+   const ms=Math.round(performance.now()-startTime);
+   rows.push(csv(ms,s));$("log").value+=logLine(ms,s)+"\n";$("log").scrollTop=$("log").scrollHeight;last={...s};
+  }
+ }
+ requestAnimationFrame(loop);
+}
+$("start").onclick=()=>{
+ if(!gp())return alert("Controller not detected.");
+ rows=["ms,seconds,x,circle,square,triangle,l1,l2,r1,r2,dpad_up,dpad_down,dpad_left,dpad_right,left_x,left_y,right_x,right_y"];
+ $("log").value="";last=null;startTime=performance.now();recording=true;$("rec").textContent="RECORDING";
+ $("start").disabled=true;$("stop").disabled=false;$("download").disabled=true;
+};
 $("stop").onclick=()=>{recording=false;$("rec").textContent="STOPPED";$("start").disabled=false;$("stop").disabled=true;$("download").disabled=rows.length<2};
 $("clear").onclick=()=>{if(!recording){rows=[];$("log").value="";$("download").disabled=true}};
-$("download").onclick=()=>{let b=new Blob([rows.join("\n")+"\n"],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="madden_controller_log_v1.csv";a.click()};
+$("download").onclick=()=>{
+ const blob=new Blob([rows.join("\n")+"\n"],{type:"text/csv"}),a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);a.download="controller_input_log_v2.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
 requestAnimationFrame(loop);
-</script></div></body></html>
+</script>
+</div></body></html>
