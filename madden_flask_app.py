@@ -1853,6 +1853,11 @@ def switch_stick_practice():
     return render_template("switch_stick_practice.html")
 
 
+@app.route("/controller-input")
+def controller_input():
+    return render_template("controller_input.html")
+
+
 def _knife_practice_cookie_value() -> str:
     """Return a cookie value that automatically changes when the PIN changes."""
     raw = f"{KNIFE_PRACTICE_PIN}|wurd-knife-practice"
