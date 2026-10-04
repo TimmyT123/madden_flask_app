@@ -1,6 +1,6 @@
-# madden_flask_app_v9_2.py
-# Version: 9.2
-# Modified sections: Added temporary /new-orleans trip hub and mobile-first trip styling.
+# madden_flask_app_v9_3.py
+# Version: 9.3
+# Modified sections: Added required Discord username to recruit applications, Discord webhook output, and recruit CSV storage with automatic migration of older CSV rows.
 
 from flask import Flask, request, jsonify, url_for, redirect, make_response
 from flask import send_from_directory
@@ -1269,6 +1269,7 @@ def _validate_payload(form: dict):
     clean = {
         "first_name": _clean_field(form.get("first_name"), 60),
         "last_name": _clean_field(form.get("last_name"), 60),
+        "discord_username": _clean_field(form.get("discord_username"), 80),
         "timezone": _clean_field(form.get("timezone"), 8).upper(),
         "platform_id": _clean_field(form.get("platform_id"), 60),
         "ea_id": _clean_field(form.get("ea_id"), 60),
@@ -1286,6 +1287,8 @@ def _validate_payload(form: dict):
         errors["first_name"] = "First name is required."
     if not clean["last_name"]:
         errors["last_name"] = "Last name is required."
+    if not clean["discord_username"]:
+        errors["discord_username"] = "Discord username is required."
     if clean["timezone"] not in TIMEZONES:
         errors["timezone"] = "Please pick a valid time zone (PT/AZ/MT/CT/ET)."
     if not clean["platform_id"]:
@@ -1319,6 +1322,7 @@ def _post_new_recruit_to_discord(clean: dict):
         SEP,  # <-- separator first so it appears between applicants
         "**New Recruit Application**",
         f"**Name:** {escape(clean['first_name'])} {escape(clean['last_name'])}",
+        f"**Discord Username:** {escape(clean['discord_username'])}",
         f"**Time Zone:** {escape(clean['timezone'])}",
         f"**PS/Xbox ID:** {escape(clean['platform_id'])}",
         f"**EA ID:** {escape(clean['ea_id'])}",
@@ -1350,7 +1354,7 @@ def _append_registration_csv(clean: dict):
     path = os.path.join(folder, "new_recruits.csv")
     new_row = [
         datetime.utcnow().isoformat(timespec='seconds') + "Z",
-        clean["first_name"], clean["last_name"], clean["timezone"],
+        clean["first_name"], clean["last_name"], clean["discord_username"], clean["timezone"],
         clean["platform_id"], clean["ea_id"], clean["favorite_teams"],
         clean["skill_level"],
         clean["schedule_handling"],
@@ -1358,12 +1362,36 @@ def _append_registration_csv(clean: dict):
         clean["referrer"],
     ]
     header = [
-        "submitted_at", "first_name", "last_name", "timezone",
+        "submitted_at", "first_name", "last_name", "discord_username", "timezone",
         "platform_id", "ea_id", "favorite_teams", "skill_level",
         "schedule_handling", "rule_disagreement", "referrer"
     ]
 
-    write_header = not os.path.exists(path)
+    # Migrate the existing recruit CSV once if it was created before the
+    # Discord username field existed. Old rows keep a blank value.
+    if os.path.exists(path):
+        with open(path, "r", newline="", encoding="utf-8") as f:
+            existing_rows = list(csv.reader(f))
+
+        if existing_rows:
+            old_header = existing_rows[0]
+            if "discord_username" not in old_header:
+                old_data = existing_rows[1:]
+                old_index = {name: i for i, name in enumerate(old_header)}
+
+                migrated_rows = []
+                for row in old_data:
+                    migrated_rows.append([
+                        row[old_index[name]] if name in old_index and old_index[name] < len(row) else ""
+                        for name in header
+                    ])
+
+                with open(path, "w", newline="", encoding="utf-8") as f:
+                    w = csv.writer(f)
+                    w.writerow(header)
+                    w.writerows(migrated_rows)
+
+    write_header = not os.path.exists(path) or os.path.getsize(path) == 0
     with open(path, "a", newline='', encoding="utf-8") as f:
         w = csv.writer(f)
         if write_header:

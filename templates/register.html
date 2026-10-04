@@ -50,6 +50,14 @@
           {% if errors.last_name %}<div class="err">{{ errors.last_name }}</div>{% endif %}
         </div>
 
+        <div class="full">
+          <label for="discord_username">Discord Username</label>
+          <input id="discord_username" name="discord_username" required
+            value="{{ (data.discord_username or '') if data else '' }}" />
+          {% if errors.discord_username %}<div class="err">{{ errors.discord_username }}</div>{% endif %}
+          <div class="hint">Enter your Discord username exactly as it appears in Discord (for example: RemainCalm).</div>
+        </div>
+
         <div>
           <label for="ea_id">EA ID</label>
           <input id="ea_id" name="ea_id" required value="{{ (data.ea_id or '') if data else '' }}" />
