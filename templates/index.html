@@ -1,4 +1,5 @@
-<!-- index_v3.html -->
+<!-- index_v4_fireworks.html -->
+<!-- v4 CHANGE: Added subtle animated WURD fireworks behind the home page content. -->
 <!-- v3 CHANGE: Added WURD Power Rankings to the League navigation menu. -->
 <!DOCTYPE html>
 <html lang="en">
@@ -100,6 +101,32 @@
         button,
         select {
             font: inherit;
+        }
+
+
+
+        /* ========== Animated WURD fireworks ========== */
+        #wurdFireworks {
+            position: fixed;
+            inset: var(--nav-height) 0 0 0;
+            width: 100%;
+            height: calc(100vh - var(--nav-height));
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.72;
+            mix-blend-mode: screen;
+        }
+
+        @media (max-width: 860px) {
+            #wurdFireworks {
+                opacity: 0.55;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #wurdFireworks {
+                display: none;
+            }
         }
 
         /* ========== Top navigation ========== */
@@ -1177,6 +1204,7 @@
 </head>
 
 <body>
+    <canvas id="wurdFireworks" aria-hidden="true"></canvas>
     <header class="site-header">
         <nav class="navbar" aria-label="Main navigation">
             <a class="nav-brand" href="/" aria-label="WURD home">
@@ -1788,6 +1816,150 @@
                 window.location.href = "/admin/ap-users/ui";
             }
         });
+
+
+        // ===== WURD animated fireworks =====
+        (() => {
+            const canvas = document.getElementById("wurdFireworks");
+            const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+            if (!canvas || reducedMotion) return;
+
+            const ctx = canvas.getContext("2d", { alpha: true });
+            if (!ctx) return;
+
+            const colors = [
+                "#32c3ff", // WURD cyan
+                "#2e8cff", // WURD blue
+                "#8fe8ff", // ice blue
+                "#ffffff", // white
+                "#f3c84a"  // WURD gold
+            ];
+
+            let particles = [];
+            let cssWidth = 0;
+            let cssHeight = 0;
+            let lastFrame = performance.now();
+            let nextBurstAt = performance.now() + 900;
+            let running = true;
+
+            function resizeFireworksCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+
+                cssWidth = Math.max(1, rect.width);
+                cssHeight = Math.max(1, rect.height);
+
+                canvas.width = Math.round(cssWidth * dpr);
+                canvas.height = Math.round(cssHeight * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+
+            function random(min, max) {
+                return min + Math.random() * (max - min);
+            }
+
+            function createBurst() {
+                const mobile = cssWidth < 700;
+                const centerX = random(cssWidth * 0.10, cssWidth * 0.90);
+                const centerY = random(cssHeight * 0.05, cssHeight * (mobile ? 0.34 : 0.46));
+                const count = mobile ? Math.floor(random(24, 38)) : Math.floor(random(38, 58));
+                const mainColor = colors[Math.floor(Math.random() * colors.length)];
+
+                for (let i = 0; i < count; i++) {
+                    const angle = (Math.PI * 2 * i) / count + random(-0.06, 0.06);
+                    const speed = random(mobile ? 42 : 52, mobile ? 105 : 145);
+
+                    particles.push({
+                        x: centerX,
+                        y: centerY,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: random(0.85, 1.35),
+                        age: 0,
+                        size: random(1.1, 2.2),
+                        color: Math.random() < 0.78 ? mainColor : colors[Math.floor(Math.random() * colors.length)],
+                        trail: []
+                    });
+                }
+
+                // Small bright core flash.
+                particles.push({
+                    x: centerX, y: centerY, vx: 0, vy: 0,
+                    life: 0.18, age: 0, size: mobile ? 7 : 10,
+                    color: "#ffffff", trail: [], core: true
+                });
+            }
+
+            function updateAndDraw(now) {
+                if (!running) return;
+
+                const dt = Math.min((now - lastFrame) / 1000, 0.033);
+                lastFrame = now;
+
+                ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+                if (now >= nextBurstAt && particles.length < 180) {
+                    createBurst();
+                    nextBurstAt = now + random(3600, 6500);
+                }
+
+                ctx.globalCompositeOperation = "lighter";
+
+                particles = particles.filter(p => {
+                    p.age += dt;
+                    if (p.age >= p.life) return false;
+
+                    const fade = 1 - (p.age / p.life);
+
+                    if (!p.core) {
+                        p.trail.push({ x: p.x, y: p.y, alpha: fade });
+                        if (p.trail.length > 4) p.trail.shift();
+
+                        p.vx *= Math.pow(0.987, dt * 60);
+                        p.vy += 42 * dt;
+                        p.x += p.vx * dt;
+                        p.y += p.vy * dt;
+
+                        for (let i = 0; i < p.trail.length; i++) {
+                            const point = p.trail[i];
+                            const trailAlpha = fade * ((i + 1) / p.trail.length) * 0.24;
+                            ctx.globalAlpha = trailAlpha;
+                            ctx.fillStyle = p.color;
+                            ctx.beginPath();
+                            ctx.arc(point.x, point.y, Math.max(0.5, p.size * 0.55), 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+
+                    ctx.globalAlpha = p.core ? fade * 0.72 : fade * 0.82;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.core ? p.size * fade : p.size, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    return true;
+                });
+
+                ctx.globalAlpha = 1;
+                ctx.globalCompositeOperation = "source-over";
+                requestAnimationFrame(updateAndDraw);
+            }
+
+            document.addEventListener("visibilitychange", () => {
+                running = !document.hidden;
+                if (running) {
+                    lastFrame = performance.now();
+                    nextBurstAt = Math.min(nextBurstAt, performance.now() + 1200);
+                    requestAnimationFrame(updateAndDraw);
+                }
+            });
+
+            window.addEventListener("resize", resizeFireworksCanvas);
+            resizeFireworksCanvas();
+            requestAnimationFrame(updateAndDraw);
+        })();
+
     </script>
 </body>
 </html>
