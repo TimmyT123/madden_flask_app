@@ -3,136 +3,160 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WURD Madden Controller Input Recorder v2</title>
+<title>WURD Madden Controller Input Recorder v3</title>
 <style>
-:root{color-scheme:dark}
-body{font-family:Arial,sans-serif;background:#0b0d10;color:#eee;margin:0}
-.wrap{max-width:1100px;margin:auto;padding:20px}
-h1{margin-bottom:5px}.sub{color:#aaa;margin-top:0}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
-button{padding:10px 14px;font-size:16px;cursor:pointer}
-.status{padding:10px 12px;border:1px solid #444;border-radius:8px;margin-bottom:14px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.card{background:#15181d;border:1px solid #444;border-radius:10px;padding:12px}
-.label{font-size:12px;color:#aaa}.value{font-size:24px;font-weight:bold;margin-top:5px}
-.on{outline:3px solid #fff}
-.meter{height:10px;background:#292d34;border-radius:8px;overflow:hidden;margin-top:7px}
-.fill{height:100%;width:0;background:currentColor}
-.stick{font-family:Consolas,monospace;font-size:18px;line-height:1.45}
-#log{width:100%;height:270px;box-sizing:border-box;margin-top:14px;background:#070809;color:#ddd;
-border:1px solid #444;padding:9px;font-family:Consolas,monospace}
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#090b10;color:#f4f6fa;font-family:Arial,sans-serif}
+.wrap{max-width:1050px;margin:auto;padding:22px}
+h1{margin:0 0 5px;font-size:28px}.sub{color:#aeb7c7;margin-bottom:18px}
+.status,.card{background:#141923;border:1px solid #293244;border-radius:12px;padding:14px}
+.status{margin-bottom:14px}.connected{color:#75e29b}.waiting{color:#ffd166}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:14px 0}
+.card{text-align:center}.label{font-size:13px;color:#aeb7c7}.value{font-size:25px;font-weight:700;margin-top:6px}
+.down{background:#183c28;border-color:#42d47b}
+.trigger{height:8px;background:#293244;border-radius:5px;overflow:hidden;margin-top:8px}
+.fill{height:100%;background:#e7edf8;width:0}
+.sticks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+button{border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+#start{background:#4bd37b;color:#07130b}#stop{background:#ff6b6b;color:#1a0505}
+#download{background:#70a5ff;color:#061225}#mark{background:#ffd166;color:#211800}
+.meta{font-family:Consolas,monospace;background:#0d1118;border:1px solid #293244;border-radius:10px;padding:12px;line-height:1.65}
+.note{color:#aeb7c7;font-size:13px;margin-top:10px}
+@media(max-width:600px){.sticks{grid-template-columns:1fr}}
 </style>
 </head>
 <body><div class="wrap">
-<h1>WURD Madden Controller Input Recorder</h1>
-<p class="sub">v2 — full defensive input diagnostic</p>
-<div id="status" class="status">Connect the DualSense by USB and press a controller button.</div>
-<div class="toolbar">
-<button id="start">Start Recording</button>
-<button id="stop" disabled>Stop Recording</button>
-<button id="clear">Clear Log</button>
-<button id="download" disabled>Download CSV</button>
-</div>
+<h1>WURD Madden Controller Input Recorder <small>v3</small></h1>
+<div class="sub">Full-game controller logging with real clock timestamps for matching PS5 Save Recent Gameplay clips.</div>
+<div id="status" class="status waiting">Waiting for controller...</div>
 
+<div class="grid" id="buttons"></div>
 <div class="grid">
-<div class="card" id="triangleCard"><div class="label">△ TRIANGLE</div><div id="triangle" class="value">UP</div></div>
-<div class="card" id="circleCard"><div class="label">○ CIRCLE</div><div id="circle" class="value">UP</div></div>
-<div class="card" id="squareCard"><div class="label">□ SQUARE</div><div id="square" class="value">UP</div></div>
-<div class="card" id="xCard"><div class="label">✕ X</div><div id="xbtn" class="value">UP</div></div>
-
-<div class="card" id="l1Card"><div class="label">L1</div><div id="l1" class="value">UP</div></div>
-<div class="card"><div class="label">L2 PRESSURE</div><div id="l2" class="value">0%</div><div class="meter"><div id="l2fill" class="fill"></div></div></div>
-<div class="card" id="r1Card"><div class="label">R1</div><div id="r1" class="value">UP</div></div>
-<div class="card"><div class="label">R2 PRESSURE</div><div id="r2" class="value">0%</div><div class="meter"><div id="r2fill" class="fill"></div></div></div>
-
-<div class="card"><div class="label">LEFT STICK</div><div id="ls" class="value stick">X +0.000<br>Y +0.000</div></div>
-<div class="card"><div class="label">RIGHT STICK</div><div id="rs" class="value stick">X +0.000<br>Y +0.000</div></div>
-<div class="card"><div class="label">D-PAD</div><div id="dpad" class="value" style="font-size:18px">—</div></div>
-<div class="card"><div class="label">RECORDING</div><div id="rec" class="value">STOPPED</div></div>
+ <div class="card"><div class="label">L2</div><div id="l2" class="value">0%</div><div class="trigger"><div id="l2bar" class="fill"></div></div></div>
+ <div class="card"><div class="label">R2</div><div id="r2" class="value">0%</div><div class="trigger"><div id="r2bar" class="fill"></div></div></div>
+</div>
+<div class="sticks">
+ <div class="card"><div class="label">LEFT STICK</div><div id="ls" class="value">X +0.000 &nbsp; Y +0.000</div></div>
+ <div class="card"><div class="label">RIGHT STICK</div><div id="rs" class="value">X +0.000 &nbsp; Y +0.000</div></div>
 </div>
 
-<textarea id="log" readonly placeholder="Changed controller inputs appear here while recording..."></textarea>
-
+<div class="controls">
+ <button id="start">Start Recording</button>
+ <button id="mark" disabled>MARK PLAY</button>
+ <button id="stop" disabled>Stop Recording</button>
+ <button id="download" disabled>Download Log</button>
+</div>
+<div class="meta">
+ <div>Recording: <span id="rec">NO</span></div>
+ <div>Started: <span id="started">—</span></div>
+ <div>Elapsed: <span id="elapsed">00:00:00.000</span></div>
+ <div>Events: <span id="events">0</span> &nbsp; Marks: <span id="marks">0</span></div>
+</div>
+<div class="note">MARK PLAY is optional. The log now stores both elapsed time and the computer's local/ISO clock time on every recorded input change.</div>
+</div>
 <script>
-// WURD Madden Controller Input Recorder
-// Version: 2.0
+/* WURD Madden Controller Input Recorder v3
+   Adds absolute timestamps + optional MARK PLAY events for full-game logging. */
+const DEADZONE=.06, STICK_DELTA=.025, TRIGGER_DELTA=.01;
+const defs=[
+ ['x','✕ X',0],['circle','○ Circle',1],['square','□ Square',2],['triangle','△ Triangle',3],
+ ['l1','L1',4],['r1','R1',5],['up','D-Pad Up',12],['down','D-Pad Down',13],
+ ['left','D-Pad Left',14],['right','D-Pad Right',15]
+];
+const buttonBox=document.getElementById('buttons');
+const cards={};
+defs.forEach(([k,label])=>{
+ const d=document.createElement('div'); d.className='card';
+ d.innerHTML=`<div class="label">${label}</div><div class="value">UP</div>`;
+ buttonBox.appendChild(d); cards[k]=d;
+});
 const $=id=>document.getElementById(id);
-let recording=false,startTime=0,rows=[],last=null;
-const DZ=.06, EPS=.025;
-const gp=()=>[...navigator.getGamepads()].find(Boolean);
-const dz=n=>Math.abs(n)<DZ?0:n;
-const fmt=n=>(n>=0?"+":"")+n.toFixed(3);
+let gpIndex=null, recording=false, startPerf=0, startEpoch=0, rows=[], previous=null, markCount=0;
 
-function read(g){
+function gp(){
+ const list=navigator.getGamepads?navigator.getGamepads():[];
+ if(gpIndex!==null && list[gpIndex]) return list[gpIndex];
+ for(const g of list) if(g){gpIndex=g.index;return g}
+ return null;
+}
+function axis(v){return Math.abs(v||0)<DEADZONE?0:(v||0)}
+function pressed(g,i){return !!g.buttons[i]?.pressed}
+function val(g,i){return +(g.buttons[i]?.value||0)}
+function snap(g){
  return {
-  x:!!g.buttons[0]?.pressed, circle:!!g.buttons[1]?.pressed,
-  square:!!g.buttons[2]?.pressed, triangle:!!g.buttons[3]?.pressed,
-  l1:!!g.buttons[4]?.pressed, r1:!!g.buttons[5]?.pressed,
-  l2:g.buttons[6]?.value||0, r2:g.buttons[7]?.value||0,
-  up:!!g.buttons[12]?.pressed, down:!!g.buttons[13]?.pressed,
-  left:!!g.buttons[14]?.pressed, right:!!g.buttons[15]?.pressed,
-  lx:dz(g.axes[0]||0), ly:dz(g.axes[1]||0),
-  rx:dz(g.axes[2]||0), ry:dz(g.axes[3]||0)
+  x:pressed(g,0),circle:pressed(g,1),square:pressed(g,2),triangle:pressed(g,3),
+  l1:pressed(g,4),l2:val(g,6),r1:pressed(g,5),r2:val(g,7),
+  up:pressed(g,12),down:pressed(g,13),left:pressed(g,14),right:pressed(g,15),
+  lx:axis(g.axes[0]),ly:axis(g.axes[1]),rx:axis(g.axes[2]),ry:axis(g.axes[3])
  };
+}
+function pad(n){return String(n).padStart(2,'0')}
+function elapsed(ms){
+ const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),x=Math.floor(ms%1000);
+ return `${pad(h)}:${pad(m)}:${pad(s)}.${String(x).padStart(3,'0')}`;
+}
+function localStamp(epoch){
+ const d=new Date(epoch);
+ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,'0')}`;
 }
 function changed(a,b){
  if(!b)return true;
- for(const k of ["x","circle","square","triangle","l1","r1","up","down","left","right"])
-  if(a[k]!==b[k])return true;
- for(const k of ["l2","r2"])if(Math.abs(a[k]-b[k])>.01)return true;
- for(const k of ["lx","ly","rx","ry"])if(Math.abs(a[k]-b[k])>EPS)return true;
+ for(const k of ['x','circle','square','triangle','l1','r1','up','down','left','right']) if(a[k]!==b[k])return true;
+ if(Math.abs(a.l2-b.l2)>=TRIGGER_DELTA||Math.abs(a.r2-b.r2)>=TRIGGER_DELTA)return true;
+ for(const k of ['lx','ly','rx','ry'])if(Math.abs(a[k]-b[k])>=STICK_DELTA)return true;
  return false;
 }
-function setButton(id,card,on){$(id).textContent=on?"DOWN":"UP";$(card).classList.toggle("on",on)}
-function dpadText(s){
- let a=[];if(s.up)a.push("UP");if(s.down)a.push("DOWN");if(s.left)a.push("LEFT");if(s.right)a.push("RIGHT");
- return a.length?a.join(" + "):"—";
+function csvRow(type,s,perfNow,label=''){
+ const ms=perfNow-startPerf, epoch=startEpoch+ms;
+ return [type,Math.round(ms),elapsed(ms),localStamp(epoch),new Date(epoch).toISOString(),label,
+  +s.x,+s.circle,+s.square,+s.triangle,+s.l1,s.l2.toFixed(3),+s.r1,s.r2.toFixed(3),
+  +s.up,+s.down,+s.left,+s.right,s.lx.toFixed(3),s.ly.toFixed(3),s.rx.toFixed(3),s.ry.toFixed(3)];
 }
-function update(s){
- setButton("triangle","triangleCard",s.triangle); setButton("circle","circleCard",s.circle);
- setButton("square","squareCard",s.square); setButton("xbtn","xCard",s.x);
- setButton("l1","l1Card",s.l1); setButton("r1","r1Card",s.r1);
- $("l2").textContent=Math.round(s.l2*100)+"%"; $("l2fill").style.width=(s.l2*100)+"%";
- $("r2").textContent=Math.round(s.r2*100)+"%"; $("r2fill").style.width=(s.r2*100)+"%";
- $("ls").innerHTML=`X ${fmt(s.lx)}<br>Y ${fmt(s.ly)}`;
- $("rs").innerHTML=`X ${fmt(s.rx)}<br>Y ${fmt(s.ry)}`;
- $("dpad").textContent=dpadText(s);
+function render(s){
+ defs.forEach(([k])=>{cards[k].classList.toggle('down',s[k]);cards[k].querySelector('.value').textContent=s[k]?'DOWN':'UP'});
+ const l=Math.round(s.l2*100),r=Math.round(s.r2*100);
+ $('l2').textContent=l+'%';$('r2').textContent=r+'%';$('l2bar').style.width=l+'%';$('r2bar').style.width=r+'%';
+ $('ls').textContent=`X ${s.lx>=0?'+':''}${s.lx.toFixed(3)}   Y ${s.ly>=0?'+':''}${s.ly.toFixed(3)}`;
+ $('rs').textContent=`X ${s.rx>=0?'+':''}${s.rx.toFixed(3)}   Y ${s.ry>=0?'+':''}${s.ry.toFixed(3)}`;
 }
-function csv(ms,s){
- return [ms,(ms/1000).toFixed(3),+s.x,+s.circle,+s.square,+s.triangle,+s.l1,s.l2.toFixed(3),
- +s.r1,s.r2.toFixed(3),+s.up,+s.down,+s.left,+s.right,s.lx.toFixed(3),s.ly.toFixed(3),
- s.rx.toFixed(3),s.ry.toFixed(3)].join(",");
-}
-function logLine(ms,s){
- return `${(ms/1000).toFixed(3)}s  L2 ${String(Math.round(s.l2*100)).padStart(3)}% R2 ${String(Math.round(s.r2*100)).padStart(3)}%  `+
- `✕${s.x?"↓":"·"} ○${s.circle?"↓":"·"} □${s.square?"↓":"·"} △${s.triangle?"↓":"·"} `+
- `L1${s.l1?"↓":"·"} R1${s.r1?"↓":"·"} D:${dpadText(s)} LS(${fmt(s.lx)},${fmt(s.ly)}) RS(${fmt(s.rx)},${fmt(s.ry)})`;
-}
-function loop(){
+function loop(t){
  const g=gp();
- if(!g){$("status").textContent="No controller detected. Press a DualSense button."}
- else{
-  $("status").textContent="Controller detected: "+g.id;
-  const s=read(g);update(s);
-  if(recording&&changed(s,last)){
-   const ms=Math.round(performance.now()-startTime);
-   rows.push(csv(ms,s));$("log").value+=logLine(ms,s)+"\n";$("log").scrollTop=$("log").scrollHeight;last={...s};
+ if(g){
+  $('status').textContent='Controller connected: '+g.id;$('status').className='status connected';
+  const s=snap(g);render(s);
+  if(recording){
+   $('elapsed').textContent=elapsed(t-startPerf);
+   if(changed(s,previous)){rows.push(csvRow('INPUT',s,t));previous={...s};$('events').textContent=rows.length}
   }
- }
+ }else{$('status').textContent='Waiting for controller...';$('status').className='status waiting'}
  requestAnimationFrame(loop);
 }
-$("start").onclick=()=>{
- if(!gp())return alert("Controller not detected.");
- rows=["ms,seconds,x,circle,square,triangle,l1,l2,r1,r2,dpad_up,dpad_down,dpad_left,dpad_right,left_x,left_y,right_x,right_y"];
- $("log").value="";last=null;startTime=performance.now();recording=true;$("rec").textContent="RECORDING";
- $("start").disabled=true;$("stop").disabled=false;$("download").disabled=true;
+$('start').onclick=()=>{
+ const g=gp();if(!g){alert('Connect or press a button on the controller first.');return}
+ rows=[];markCount=0;previous=null;startPerf=performance.now();startEpoch=Date.now();recording=true;
+ const s=snap(g); rows.push(csvRow('START',s,startPerf,'GAME RECORDING START'));previous={...s};
+ $('started').textContent=localStamp(startEpoch);$('rec').textContent='YES';$('events').textContent=rows.length;$('marks').textContent='0';
+ $('start').disabled=true;$('stop').disabled=false;$('mark').disabled=false;$('download').disabled=true;
 };
-$("stop").onclick=()=>{recording=false;$("rec").textContent="STOPPED";$("start").disabled=false;$("stop").disabled=true;$("download").disabled=rows.length<2};
-$("clear").onclick=()=>{if(!recording){rows=[];$("log").value="";$("download").disabled=true}};
-$("download").onclick=()=>{
- const blob=new Blob([rows.join("\n")+"\n"],{type:"text/csv"}),a=document.createElement("a");
- a.href=URL.createObjectURL(blob);a.download="controller_input_log_v2.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+$('mark').onclick=()=>{
+ if(!recording)return; const g=gp();if(!g)return;
+ markCount++;rows.push(csvRow('MARK',snap(g),performance.now(),`PLAY ${markCount}`));
+ $('marks').textContent=markCount;$('events').textContent=rows.length;
 };
+$('stop').onclick=()=>{
+ if(!recording)return; const g=gp();if(g)rows.push(csvRow('STOP',snap(g),performance.now(),'GAME RECORDING STOP'));
+ recording=false;$('rec').textContent='NO';$('start').disabled=false;$('stop').disabled=true;$('mark').disabled=true;$('download').disabled=false;$('events').textContent=rows.length;
+};
+$('download').onclick=()=>{
+ const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];
+ const esc=v=>`"${String(v).replaceAll('"','""')}"`;
+ const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');
+ const d=new Date(startEpoch),name=`controller_input_v3_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+window.addEventListener('gamepadconnected',e=>gpIndex=e.gamepad.index);
+window.addEventListener('gamepaddisconnected',e=>{if(gpIndex===e.gamepad.index)gpIndex=null});
 requestAnimationFrame(loop);
-</script>
-</div></body></html>
+</script></body></html>
