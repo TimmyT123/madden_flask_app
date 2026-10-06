@@ -1,6 +1,6 @@
-# madden_flask_app_v9_3.py
-# Version: 9.3
-# Modified sections: Added required Discord username to recruit applications, Discord webhook output, and recruit CSV storage with automatic migration of older CSV rows.
+# madden_flask_app_v9_4.py
+# Version: 9.4
+# Modified sections: Added live New Orleans Oct. 10-14 weather forecast API with Open-Meteo, NWS point alerts, and 30-minute server cache.
 
 from flask import Flask, request, jsonify, url_for, redirect, make_response
 from flask import send_from_directory
@@ -4942,6 +4942,186 @@ def team_draw_state_api():
     return response
 
 import os
+
+
+
+
+# --- New Orleans trip weather ------------------------------------------------
+# Live trip forecast from Open-Meteo plus active National Weather Service alerts.
+# Results are cached for 30 minutes so every page view does not hit the providers.
+from zoneinfo import ZoneInfo
+
+NEW_ORLEANS_LAT = 29.9511
+NEW_ORLEANS_LON = -90.0715
+NEW_ORLEANS_TRIP_START = "2026-10-10"
+NEW_ORLEANS_TRIP_END = "2026-10-14"
+NEW_ORLEANS_WEATHER_CACHE_SECONDS = 30 * 60
+_new_orleans_weather_cache = {"fetched_at": 0.0, "payload": None}
+
+
+def _weather_code_details(code):
+    mapping = {
+        0: ("Clear", "☀️"),
+        1: ("Mainly clear", "🌤️"),
+        2: ("Partly cloudy", "⛅"),
+        3: ("Overcast", "☁️"),
+        45: ("Fog", "🌫️"), 48: ("Rime fog", "🌫️"),
+        51: ("Light drizzle", "🌦️"), 53: ("Drizzle", "🌦️"), 55: ("Heavy drizzle", "🌧️"),
+        56: ("Freezing drizzle", "🌧️"), 57: ("Freezing drizzle", "🌧️"),
+        61: ("Light rain", "🌦️"), 63: ("Rain", "🌧️"), 65: ("Heavy rain", "🌧️"),
+        66: ("Freezing rain", "🌧️"), 67: ("Freezing rain", "🌧️"),
+        71: ("Light snow", "🌨️"), 73: ("Snow", "🌨️"), 75: ("Heavy snow", "🌨️"), 77: ("Snow grains", "🌨️"),
+        80: ("Rain showers", "🌦️"), 81: ("Rain showers", "🌧️"), 82: ("Heavy showers", "🌧️"),
+        85: ("Snow showers", "🌨️"), 86: ("Heavy snow showers", "🌨️"),
+        95: ("Thunderstorms", "⛈️"), 96: ("Thunderstorms / hail", "⛈️"), 99: ("Severe thunderstorms / hail", "⛈️"),
+    }
+    try:
+        return mapping.get(int(code), ("Forecast", "🌤️"))
+    except Exception:
+        return ("Forecast", "🌤️")
+
+
+def _fetch_new_orleans_weather():
+    forecast_url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": NEW_ORLEANS_LAT,
+        "longitude": NEW_ORLEANS_LON,
+        "daily": ",".join([
+            "weather_code",
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "precipitation_probability_max",
+            "wind_speed_10m_max",
+        ]),
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "precipitation_unit": "inch",
+        "timezone": "America/Chicago",
+        "start_date": NEW_ORLEANS_TRIP_START,
+        "end_date": NEW_ORLEANS_TRIP_END,
+    }
+
+    r = requests.get(forecast_url, params=params, timeout=12)
+    r.raise_for_status()
+    forecast = r.json()
+    daily = forecast.get("daily") or {}
+
+    dates = daily.get("time") or []
+    codes = daily.get("weather_code") or []
+    highs = daily.get("temperature_2m_max") or []
+    lows = daily.get("temperature_2m_min") or []
+    rain = daily.get("precipitation_probability_max") or []
+    winds = daily.get("wind_speed_10m_max") or []
+
+    days = []
+    for i, date_s in enumerate(dates):
+        try:
+            date_obj = datetime.strptime(date_s, "%Y-%m-%d")
+            label = date_obj.strftime("%a • %b %-d")
+        except Exception:
+            # %-d is not supported on every platform, though it is on Raspberry Pi/Linux.
+            try:
+                label = datetime.strptime(date_s, "%Y-%m-%d").strftime("%a • %b %d").replace(" 0", " ")
+            except Exception:
+                label = date_s
+
+        code = codes[i] if i < len(codes) else None
+        condition, icon = _weather_code_details(code)
+        precip = rain[i] if i < len(rain) and rain[i] is not None else 0
+
+        days.append({
+            "date": date_s,
+            "label": label,
+            "weather_code": code,
+            "condition": condition,
+            "icon": icon,
+            "high_f": highs[i] if i < len(highs) else None,
+            "low_f": lows[i] if i < len(lows) else None,
+            "precipitation_probability": precip,
+            "wind_mph": winds[i] if i < len(winds) and winds[i] is not None else 0,
+            "is_stormy": code in (95, 96, 99),
+        })
+
+    # Point-specific NWS alerts for New Orleans rather than broad statewide alerts.
+    alerts = []
+    try:
+        nws_url = "https://api.weather.gov/alerts/active"
+        nws_headers = {
+            "User-Agent": "wurd-madden.com New Orleans trip weather (admin@wurd-madden.com)",
+            "Accept": "application/geo+json",
+        }
+        ar = requests.get(
+            nws_url,
+            params={"point": f"{NEW_ORLEANS_LAT},{NEW_ORLEANS_LON}"},
+            headers=nws_headers,
+            timeout=10,
+        )
+        ar.raise_for_status()
+        for feature in (ar.json().get("features") or [])[:5]:
+            p = feature.get("properties") or {}
+            alerts.append({
+                "event": p.get("event") or "Weather alert",
+                "headline": p.get("headline") or "",
+                "severity": p.get("severity") or "",
+                "urgency": p.get("urgency") or "",
+                "description": p.get("description") or "",
+                "instruction": p.get("instruction") or "",
+                "expires": p.get("expires") or "",
+            })
+    except Exception as e:
+        print(f"⚠️ NWS New Orleans alert lookup failed: {e}")
+
+    trip_warning = ""
+    risky = [d for d in days if d.get("is_stormy") or (d.get("precipitation_probability") or 0) >= 60]
+    if risky and not alerts:
+        labels = ", ".join(d["label"].split(" • ")[0] for d in risky)
+        trip_warning = f"Rain or storms may affect outdoor plans on {labels}. Check the forecast again before heading out."
+
+    now_nola = datetime.now(ZoneInfo("America/Chicago"))
+    return {
+        "ok": True,
+        "location": "New Orleans, LA",
+        "trip_dates": [NEW_ORLEANS_TRIP_START, NEW_ORLEANS_TRIP_END],
+        "days": days,
+        "alerts": alerts,
+        "trip_warning": trip_warning,
+        "updated_at": now_nola.isoformat(),
+        "updated_at_display": now_nola.strftime("%b %d at %-I:%M %p CT").replace(" 0", " "),
+        "sources": ["Open-Meteo", "National Weather Service"],
+    }
+
+
+@app.get("/api/new-orleans-weather")
+def new_orleans_weather_api():
+    now_ts = time()
+    cached_payload = _new_orleans_weather_cache.get("payload")
+    cached_at = float(_new_orleans_weather_cache.get("fetched_at") or 0)
+
+    if cached_payload and (now_ts - cached_at) < NEW_ORLEANS_WEATHER_CACHE_SECONDS:
+        response = make_response(jsonify(cached_payload))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    try:
+        payload = _fetch_new_orleans_weather()
+        _new_orleans_weather_cache["fetched_at"] = now_ts
+        _new_orleans_weather_cache["payload"] = payload
+        response = make_response(jsonify(payload))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except Exception as e:
+        print(f"❌ New Orleans weather refresh failed: {e}")
+        if cached_payload:
+            stale = dict(cached_payload)
+            stale["stale"] = True
+            stale["warning"] = "Live weather refresh failed; showing the most recent cached forecast."
+            return jsonify(stale), 200
+        return jsonify({
+            "ok": False,
+            "error": "Weather is temporarily unavailable.",
+            "days": [],
+            "alerts": [],
+        }), 503
 
 
 # --- Temporary New Orleans trip hub -----------------------------------------

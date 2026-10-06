@@ -19,6 +19,83 @@
         <div class="quick"><strong>Rental Car</strong><span>Getting Around</span></div>
     </section>
 
+    <style>
+        .weather-box {
+            margin: 18px 0 22px;
+            padding: 18px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(66, 32, 99, .96), rgba(28, 73, 78, .96));
+            color: #fff;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+        }
+        .weather-head {
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .weather-head h3 { margin: 0; }
+        .weather-updated { font-size: .88rem; opacity: .82; }
+        .weather-alert {
+            display: none;
+            margin: 10px 0 14px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: #fff1c7;
+            color: #4a3200;
+            font-weight: 700;
+        }
+        .weather-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .weather-day {
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.18);
+            border-radius: 14px;
+            padding: 12px 10px;
+            text-align: center;
+            min-height: 150px;
+        }
+        .weather-day.wet { background: rgba(255,255,255,.18); }
+        .weather-date { font-weight: 800; font-size: .96rem; }
+        .weather-icon { font-size: 2rem; line-height: 1.15; margin: 6px 0; }
+        .weather-condition { font-weight: 700; min-height: 2.4em; }
+        .weather-temp { margin-top: 6px; font-size: 1.05rem; }
+        .weather-rain, .weather-wind { font-size: .86rem; opacity: .9; margin-top: 3px; }
+        .weather-note {
+            margin-top: 12px;
+            font-size: .88rem;
+            opacity: .88;
+        }
+        .weather-loading { grid-column: 1 / -1; text-align: center; padding: 18px; }
+        @media (max-width: 850px) {
+            .weather-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 520px) {
+            .weather-grid { grid-template-columns: 1fr; }
+            .weather-day { min-height: 0; }
+        }
+    </style>
+
+    <section class="weather-box" id="trip-weather" aria-label="New Orleans trip weather forecast">
+        <div class="weather-head">
+            <div>
+                <h3>🌦️ New Orleans Weather • Oct. 10–14</h3>
+                <div>Live forecast for our trip dates</div>
+            </div>
+            <div class="weather-updated" id="weather-updated">Loading current forecast…</div>
+        </div>
+        <div class="weather-alert" id="weather-alert"></div>
+        <div class="weather-grid" id="weather-grid">
+            <div class="weather-loading">Loading New Orleans weather…</div>
+        </div>
+        <div class="weather-note">Forecast automatically refreshes about every 30 minutes. Weather can change quickly, especially several days out.</div>
+    </section>
+
     <section class="travel-box" id="hotel">
         <h3>🏨 Where We're Staying</h3>
         <p><strong>Harrah's New Orleans Hotel</strong><br>
@@ -376,4 +453,81 @@
         French Quarter, Whitney Plantation, Oak Alley, Barataria Preserve, National WWII Museum, and Creole Queen.
     </small>
 </footer>
+
+<script>
+(() => {
+    const grid = document.getElementById('weather-grid');
+    const alertBox = document.getElementById('weather-alert');
+    const updated = document.getElementById('weather-updated');
+    const refreshMs = 30 * 60 * 1000;
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function renderForecast(data) {
+        if (!data || !Array.isArray(data.days) || !data.days.length) {
+            throw new Error('No forecast returned');
+        }
+
+        grid.innerHTML = data.days.map(day => {
+            const wet = Number(day.precipitation_probability || 0) >= 50 || day.is_stormy;
+            return `
+                <div class="weather-day ${wet ? 'wet' : ''}">
+                    <div class="weather-date">${escapeHtml(day.label)}</div>
+                    <div class="weather-icon">${escapeHtml(day.icon)}</div>
+                    <div class="weather-condition">${escapeHtml(day.condition)}</div>
+                    <div class="weather-temp"><strong>${Math.round(day.high_f)}°</strong> / ${Math.round(day.low_f)}°</div>
+                    <div class="weather-rain">💧 Rain: ${Math.round(day.precipitation_probability || 0)}%</div>
+                    <div class="weather-wind">💨 Wind: up to ${Math.round(day.wind_mph || 0)} mph</div>
+                </div>`;
+        }).join('');
+
+        const warnings = [];
+        if (Array.isArray(data.alerts)) {
+            for (const a of data.alerts.slice(0, 3)) {
+                warnings.push(`<strong>${escapeHtml(a.event || 'Weather alert')}:</strong> ${escapeHtml(a.headline || a.description || '')}`);
+            }
+        }
+        if (!warnings.length && data.trip_warning) {
+            warnings.push(escapeHtml(data.trip_warning));
+        }
+
+        if (warnings.length) {
+            alertBox.innerHTML = '⚠️ ' + warnings.join('<br>');
+            alertBox.style.display = 'block';
+        } else {
+            alertBox.style.display = 'none';
+            alertBox.innerHTML = '';
+        }
+
+        if (data.updated_at_display) {
+            updated.textContent = `Updated ${data.updated_at_display}`;
+        } else {
+            updated.textContent = 'Forecast updated automatically';
+        }
+    }
+
+    async function loadWeather() {
+        try {
+            const response = await fetch('/api/new-orleans-weather', { cache: 'no-store' });
+            if (!response.ok) throw new Error(`Weather request failed (${response.status})`);
+            renderForecast(await response.json());
+        } catch (err) {
+            console.error(err);
+            grid.innerHTML = '<div class="weather-loading">Weather is temporarily unavailable. The itinerary is still available below.</div>';
+            updated.textContent = 'Unable to refresh weather';
+        }
+    }
+
+    loadWeather();
+    setInterval(loadWeather, refreshMs);
+})();
+</script>
+
 {% endblock %}
