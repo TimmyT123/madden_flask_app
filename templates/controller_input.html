@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WURD Madden Controller Input Recorder v3</title>
+<title>WURD Madden Controller Input Recorder v4</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}
 body{margin:0;background:#090b10;color:#f4f6fa;font-family:Arial,sans-serif}
@@ -22,14 +22,16 @@ button{border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:point
 button:disabled{opacity:.45;cursor:not-allowed}
 #start{background:#4bd37b;color:#07130b}#stop{background:#ff6b6b;color:#1a0505}
 #download{background:#70a5ff;color:#061225}#mark{background:#ffd166;color:#211800}
+#tagPanel{display:none;margin:14px 0;padding:14px;background:#101722;border:1px solid #31405a;border-radius:12px}
+.tagTitle{font-weight:800;margin-bottom:10px}.tagRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:9px 0}.tagLabel{width:78px;color:#aeb7c7;font-size:13px;font-weight:700}.tagBtn{background:#222b3a;color:#f4f6fa;border:1px solid #3b4860;min-width:92px}.tagBtn.selected{background:#70a5ff;color:#061225;border-color:#70a5ff}.tagActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.smallBtn{background:#2a3343;color:#f4f6fa;border:1px solid #3b4860}.lastMark{margin-top:10px;font-family:Consolas,monospace;color:#ffd166;font-weight:700}
 .meta{font-family:Consolas,monospace;background:#0d1118;border:1px solid #293244;border-radius:10px;padding:12px;line-height:1.65}
 .note{color:#aeb7c7;font-size:13px;margin-top:10px}
 @media(max-width:600px){.sticks{grid-template-columns:1fr}}
 </style>
 </head>
 <body><div class="wrap">
-<h1>WURD Madden Controller Input Recorder <small>v3</small></h1>
-<div class="sub">Full-game controller logging with real clock timestamps for matching PS5 Save Recent Gameplay clips.</div>
+<h1>WURD Madden Controller Input Recorder <small>v4</small></h1>
+<div class="sub">Full-game controller logging with play tags so marked plays are easy to identify later.</div>
 <div id="status" class="status waiting">Waiting for controller...</div>
 
 <div class="grid" id="buttons"></div>
@@ -44,20 +46,38 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 <div class="controls">
  <button id="start">Start Recording</button>
- <button id="mark" disabled>MARK PLAY</button>
+ <button id="mark" disabled>MARK LAST PLAY</button>
  <button id="stop" disabled>Stop Recording</button>
  <button id="download" disabled>Download Log</button>
 </div>
+<div id="tagPanel">
+ <div class="tagTitle">Tag the play you just marked <span style="color:#aeb7c7;font-weight:400">(optional)</span></div>
+ <div class="tagRow"><div class="tagLabel">TYPE</div>
+  <button class="tagBtn" data-cat="type" data-val="RUN">RUN</button><button class="tagBtn" data-cat="type" data-val="PASS">PASS</button><button class="tagBtn" data-cat="type" data-val="RETURN">RETURN</button><button class="tagBtn" data-cat="type" data-val="DEFENSE">DEFENSE</button><button class="tagBtn" data-cat="type" data-val="SPECIAL">SPECIAL</button>
+ </div>
+ <div class="tagRow"><div class="tagLabel">AREA</div>
+  <button class="tagBtn" data-cat="area" data-val="LEFT">LEFT</button><button class="tagBtn" data-cat="area" data-val="MIDDLE">MIDDLE</button><button class="tagBtn" data-cat="area" data-val="RIGHT">RIGHT</button><button class="tagBtn" data-cat="area" data-val="NA">N/A</button>
+ </div>
+ <div class="tagRow"><div class="tagLabel">DEPTH</div>
+  <button class="tagBtn" data-cat="depth" data-val="SHORT">SHORT</button><button class="tagBtn" data-cat="depth" data-val="MEDIUM">MEDIUM</button><button class="tagBtn" data-cat="depth" data-val="LONG">LONG</button><button class="tagBtn" data-cat="depth" data-val="NA">N/A</button>
+ </div>
+ <div class="tagRow"><div class="tagLabel">REASON</div>
+  <button class="tagBtn" data-cat="reason" data-val="GOOD">GOOD</button><button class="tagBtn" data-cat="reason" data-val="BAD">BAD</button><button class="tagBtn" data-cat="reason" data-val="QUESTION">QUESTION</button><button class="tagBtn" data-cat="reason" data-val="CATCH">CATCH</button><button class="tagBtn" data-cat="reason" data-val="READ">READ</button><button class="tagBtn" data-cat="reason" data-val="R2">R2</button><button class="tagBtn" data-cat="reason" data-val="TACKLE">TACKLE</button>
+ </div>
+ <div class="tagActions"><button id="clearTag" class="smallBtn">Clear Tag</button><button id="hideTag" class="smallBtn">Done / Hide</button></div>
+</div>
+
 <div class="meta">
  <div>Recording: <span id="rec">NO</span></div>
  <div>Started: <span id="started">—</span></div>
  <div>Elapsed: <span id="elapsed">00:00:00.000</span></div>
  <div>Events: <span id="events">0</span> &nbsp; Marks: <span id="marks">0</span></div>
+ <div class="lastMark">Last marked: <span id="lastMark">—</span></div>
 </div>
-<div class="note">MARK PLAY is optional. The log now stores both elapsed time and the computer's local/ISO clock time on every recorded input change.</div>
+<div class="note">MARK LAST PLAY is optional. After marking, tap quick tags such as PASS → RIGHT → LONG. Tags are saved in separate CSV columns and in the marker label.</div>
 </div>
 <script>
-/* WURD Madden Controller Input Recorder v3
+/* WURD Madden Controller Input Recorder v4
    Adds absolute timestamps + optional MARK PLAY events for full-game logging. */
 const DEADZONE=.06, STICK_DELTA=.025, TRIGGER_DELTA=.01;
 const defs=[
@@ -74,6 +94,7 @@ defs.forEach(([k,label])=>{
 });
 const $=id=>document.getElementById(id);
 let gpIndex=null, recording=false, startPerf=0, startEpoch=0, rows=[], previous=null, markCount=0;
+let currentMarkIndex=null,currentMarkNumber=0,currentTag={type:'',area:'',depth:'',reason:''};
 
 function gp(){
  const list=navigator.getGamepads?navigator.getGamepads():[];
@@ -135,9 +156,9 @@ function loop(t){
 }
 $('start').onclick=()=>{
  const g=gp();if(!g){alert('Connect or press a button on the controller first.');return}
- rows=[];markCount=0;previous=null;startPerf=performance.now();startEpoch=Date.now();recording=true;
+ rows=[];markCount=0;previous=null;currentMarkIndex=null;currentMarkNumber=0;currentTag={type:'',area:'',depth:'',reason:''};startPerf=performance.now();startEpoch=Date.now();recording=true;
  const s=snap(g); rows.push(csvRow('START',s,startPerf,'GAME RECORDING START'));previous={...s};
- $('started').textContent=localStamp(startEpoch);$('rec').textContent='YES';$('events').textContent=rows.length;$('marks').textContent='0';
+ $('started').textContent=localStamp(startEpoch);$('rec').textContent='YES';$('events').textContent=rows.length;$('marks').textContent='0';$('lastMark').textContent='—';$('tagPanel').style.display='none';
  $('start').disabled=true;$('stop').disabled=false;$('mark').disabled=false;$('download').disabled=true;
 };
 $('mark').onclick=()=>{
@@ -150,10 +171,10 @@ $('stop').onclick=()=>{
  recording=false;$('rec').textContent='NO';$('start').disabled=false;$('stop').disabled=true;$('mark').disabled=true;$('download').disabled=false;$('events').textContent=rows.length;
 };
 $('download').onclick=()=>{
- const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];
+ const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','play_type','area','depth','reason','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];
  const esc=v=>`"${String(v).replaceAll('"','""')}"`;
  const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');
- const d=new Date(startEpoch),name=`controller_input_v3_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;
+ const d=new Date(startEpoch),name=`controller_input_v4_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 };
 window.addEventListener('gamepadconnected',e=>gpIndex=e.gamepad.index);
