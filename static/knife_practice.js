@@ -1,3 +1,5 @@
+// WURD Knife Practice DMZ stick calibration v20261008-0900
+// Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
 const modeSelect = document.getElementById("modeSelect");
@@ -48,14 +50,28 @@ const RIGHT_STICK_Y_AXIS = 3;
 const R1_BUTTON_INDEX = 5;
 const PS_HOME_BUTTON_INDEX = 16;
 const WURD_HOME_URL = "/";
-const STICK_DEADZONE = 0.12;
+const LEFT_STICK_MIN = 0.10;
+const RIGHT_STICK_MIN = 0.10;
+const LEFT_STICK_MAX = 0.99;
+const RIGHT_STICK_MAX = 0.99;
+// An adjustable approximation of the DMZ "Standard" response curve.
+// This is NOT a reverse-engineered Call of Duty response function.
+const STANDARD_AIM_CURVE_EXPONENT = 1.5;
+const DMZ_HORIZONTAL_SENSITIVITY = 9;
+const DMZ_VERTICAL_SENSITIVITY = 7;
+const DMZ_ADS_MULTIPLIER = 0.85; // Reference only: hip-fire knife drills do not ADS.
+const MOVE_SPEED_STORAGE_KEY = "wurdKnifePracticeMoveSpeed";
+const DEFAULT_MOVE_SPEED = 90;
+const MIN_MOVE_SPEED = 10;
+const MAX_MOVE_SPEED = 300;
+let moveSpeedInput = null;
 const KNIFE_RECOVERY_MS = 570;
 const NEXT_TARGET_DELAY_MS = 560;
 const AIM_SPEED_STORAGE_KEY = "wurdKnifePracticeAimSpeed";
 const DEFAULT_AIM_SPEED = 200;
 const MIN_AIM_SPEED = 25;
 const MAX_AIM_SPEED = 500;
-const WORLD_TO_AIM_SPEED_RATIO = 0.45;
+// Left-stick movement speed is independent of right-stick Aim Speed.
 
 const SPEED_SETTINGS = {
     slow: { moving: 21, visible: 2600, peekHold: 1450 },
@@ -73,7 +89,8 @@ const WORLD_VERTICAL_SPEED_FACTOR = 0.55;
 const AIM_WORLD_LIMIT_X = 48;
 const AIM_WORLD_LIMIT_Y = 36;
 const AIM_WORLD_SPEED_RATIO = 1.0;
-const AIM_WORLD_VERTICAL_SPEED_FACTOR = 0.82;
+// Vertical aiming starts at the 7/9 sensitivity ratio; tune after measuring in DMZ.
+const AIM_WORLD_VERTICAL_SPEED_FACTOR = DMZ_VERTICAL_SENSITIVITY / DMZ_HORIZONTAL_SENSITIVITY;
 
 const TARGET_SCALE = {
     large: "target-large",
@@ -458,12 +475,12 @@ function updateInput(deltaMs) {
 
     const rawMoveX = gamepad.axes[LEFT_STICK_X_AXIS] || 0;
     const rawMoveY = gamepad.axes[LEFT_STICK_Y_AXIS] || 0;
-    const moveVector = applyRadialDeadzone(rawMoveX, rawMoveY, STICK_DEADZONE);
+    const moveVector = applyRadialDeadzone(rawMoveX, rawMoveY, LEFT_STICK_MIN, LEFT_STICK_MAX);
     moveWorld(moveVector.x, moveVector.y, deltaMs);
 
     const rawAimX = gamepad.axes[RIGHT_STICK_X_AXIS] || 0;
     const rawAimY = gamepad.axes[RIGHT_STICK_Y_AXIS] || 0;
-    const aimVector = applyRadialDeadzone(rawAimX, rawAimY, STICK_DEADZONE);
+    const aimVector = applyStandardAimCurve(applyRadialDeadzone(rawAimX, rawAimY, RIGHT_STICK_MIN, RIGHT_STICK_MAX));
 
     // Keep the cursor fixed in the center. Right-stick aiming moves the
     // world quickly behind the crosshair.
@@ -507,7 +524,7 @@ function moveCrosshair(x, y, deltaMs) {
 function moveWorld(x, y, deltaMs) {
     if (!gameRunning || drillComplete || deltaMs <= 0) return;
 
-    const speed = getAimSpeed() * WORLD_TO_AIM_SPEED_RATIO;
+    const speed = getMoveSpeed();
     const seconds = deltaMs / 1000;
 
     // Moving the player right makes the world slide left, and vice versa.
@@ -917,13 +934,56 @@ function normalizeKey(key) {
     return String(key).toLowerCase();
 }
 
-function applyRadialDeadzone(x, y, deadzone) {
+function applyRadialDeadzone(x, y, deadzone, maximum = 1) {
     const magnitude = Math.hypot(x, y);
     if (magnitude <= deadzone) return { x: 0, y: 0 };
-
-    const normalizedMagnitude = clamp((magnitude - deadzone) / (1 - deadzone), 0, 1);
+    const normalizedMagnitude = clamp((magnitude - deadzone) / (maximum - deadzone), 0, 1);
     const scale = normalizedMagnitude / magnitude;
     return { x: x * scale, y: y * scale };
+}
+
+function applyStandardAimCurve(vector) {
+    const magnitude = Math.hypot(vector.x, vector.y);
+    if (magnitude === 0) return vector;
+    const curvedMagnitude = Math.pow(clamp(magnitude, 0, 1), STANDARD_AIM_CURVE_EXPONENT);
+    const scale = curvedMagnitude / magnitude;
+    return { x: vector.x * scale, y: vector.y * scale };
+}
+
+function getMoveSpeed() {
+    const value = Number(moveSpeedInput?.value);
+    return Number.isFinite(value) && value >= MIN_MOVE_SPEED && value <= MAX_MOVE_SPEED
+        ? value : DEFAULT_MOVE_SPEED;
+}
+
+function setupMoveSpeedControl() {
+    if (!sensitivitySelect?.parentElement) return;
+    const container = document.createElement("div");
+    container.style.cssText = "margin-top:8px; display:flex; flex-wrap:wrap; align-items:center; gap:8px;";
+    const label = document.createElement("label");
+    label.textContent = "Left Stick Move Speed (DMZ calibration): ";
+    moveSpeedInput = document.createElement("input");
+    moveSpeedInput.type = "number";
+    moveSpeedInput.min = String(MIN_MOVE_SPEED);
+    moveSpeedInput.max = String(MAX_MOVE_SPEED);
+    moveSpeedInput.step = "5";
+    moveSpeedInput.style.cssText = "width:90px; padding:5px;";
+    try {
+        const stored = Number(localStorage.getItem(MOVE_SPEED_STORAGE_KEY));
+        moveSpeedInput.value = String(Number.isFinite(stored) && stored >= MIN_MOVE_SPEED && stored <= MAX_MOVE_SPEED ? stored : DEFAULT_MOVE_SPEED);
+    } catch {
+        moveSpeedInput.value = String(DEFAULT_MOVE_SPEED);
+    }
+    moveSpeedInput.addEventListener("change", () => {
+        moveSpeedInput.value = String(getMoveSpeed());
+        try { localStorage.setItem(MOVE_SPEED_STORAGE_KEY, moveSpeedInput.value); } catch { /* storage disabled */ }
+    });
+    label.appendChild(moveSpeedInput);
+    container.appendChild(label);
+    const note = document.createElement("small");
+    note.textContent = "Right stick uses Aim Speed above (H:9 / V:7, Standard-style curve). Left stick is separate. Speeds are estimates until calibrated against DMZ.";
+    container.appendChild(note);
+    sensitivitySelect.parentElement.insertAdjacentElement("afterend", container);
 }
 
 function toggleFullscreen() {
@@ -1075,6 +1135,7 @@ window.addEventListener("resize", renderWorldOffset);
 document.addEventListener("fullscreenchange", renderWorldOffset);
 
 setupAimSpeedControl();
+setupMoveSpeedControl();
 renderCrosshair();
 renderWorldOffset();
 updateScoreboard();
