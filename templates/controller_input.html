@@ -3,41 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WURD Madden Controller Input Recorder v5</title>
+<title>WURD Madden Controller Input Recorder v6</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}
-body{margin:0;background:#090b10;color:#f4f6fa;font-family:Arial,sans-serif}
+:root{color-scheme:dark;--bg:#090b10;--panel:#141923;--border:#293244;--text:#f4f6fa;--muted:#aeb7c7;--green:#4bd37b;--yellow:#ffd166;--blue:#70a5ff;--red:#ff6b6b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
 .wrap{max-width:1050px;margin:auto;padding:22px}
-h1{margin:0 0 5px;font-size:28px}.sub{color:#aeb7c7;margin-bottom:18px}
-.status,.card{background:#141923;border:1px solid #293244;border-radius:12px;padding:14px}
-.status{margin-bottom:14px}.connected{color:#75e29b}.waiting{color:#ffd166}
+h1{margin:0 0 5px;font-size:28px}.sub{color:var(--muted);margin-bottom:18px}
+.status,.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+.status{margin-bottom:14px}.connected{color:#75e29b}.waiting{color:var(--yellow)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:14px 0}
-.card{text-align:center}.label{font-size:13px;color:#aeb7c7}.value{font-size:25px;font-weight:700;margin-top:6px}
+.card{text-align:center}.label{font-size:13px;color:var(--muted)}.value{font-size:25px;font-weight:700;margin-top:6px}
 .down{background:#183c28;border-color:#42d47b}
-.trigger{height:8px;background:#293244;border-radius:5px;overflow:hidden;margin-top:8px}
-.fill{height:100%;background:#e7edf8;width:0}
+.trigger{height:8px;background:#293244;border-radius:5px;overflow:hidden;margin-top:8px}.fill{height:100%;background:#e7edf8;width:0}
 .sticks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .controls{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
-button{border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:pointer;font-size:15px}
-button:disabled{opacity:.45;cursor:not-allowed}
-#start{background:#4bd37b;color:#07130b}#stop{background:#ff6b6b;color:#1a0505}
-#download{background:#70a5ff;color:#061225}#mark{background:#ffd166;color:#211800}
+button{border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:pointer;font-size:15px}button:disabled{opacity:.45;cursor:not-allowed}
+#start{background:var(--green);color:#07130b}#stop{background:var(--red);color:#1a0505}#download{background:var(--blue);color:#061225}#mark{background:var(--yellow);color:#211800}#overlayToggle{background:#a887ff;color:#100826}
 #markPanel{display:none;margin:14px 0;padding:16px;background:#101722;border:1px solid #31405a;border-radius:12px}
-.markTitle{font-weight:800;font-size:18px;margin-bottom:12px}
-.markHelp{color:#aeb7c7;font-size:13px;margin-bottom:12px}
-.qRow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.qBtn{background:#222b3a;color:#f4f6fa;border:1px solid #3b4860;min-width:62px}.qBtn.selected{background:#70a5ff;color:#061225;border-color:#70a5ff}
-.clockRow{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.clockField{display:flex;flex-direction:column;gap:6px}.clockField label{font-size:13px;color:#aeb7c7;font-weight:700}
-#gameClock{width:145px;background:#0d1118;color:#f4f6fa;border:1px solid #3b4860;border-radius:9px;padding:11px 12px;font-size:20px;font-family:Consolas,monospace}
-#saveMark{background:#4bd37b;color:#07130b}#skipMark{background:#2a3343;color:#f4f6fa;border:1px solid #3b4860}
-.validation{min-height:20px;color:#ff9a9a;font-size:13px;margin-top:8px}
-.meta{font-family:Consolas,monospace;background:#0d1118;border:1px solid #293244;border-radius:10px;padding:12px;line-height:1.65}
-.lastMark{margin-top:10px;color:#ffd166;font-weight:700}.note{color:#aeb7c7;font-size:13px;margin-top:10px}
-@media(max-width:600px){.sticks{grid-template-columns:1fr 1fr}.wrap{padding:12px}h1{font-size:22px}.clockRow{align-items:stretch}#gameClock{width:100%}}
+.markTitle{font-weight:800;font-size:18px;margin-bottom:12px}.markHelp{color:var(--muted);font-size:13px;margin-bottom:12px}
+.qRow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.qBtn{background:#222b3a;color:var(--text);border:1px solid #3b4860;min-width:62px}.qBtn.selected{background:var(--blue);color:#061225;border-color:var(--blue)}
+.clockRow{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.clockField{display:flex;flex-direction:column;gap:6px}.clockField label{font-size:13px;color:var(--muted);font-weight:700}
+#gameClock{width:145px;background:#0d1118;color:var(--text);border:1px solid #3b4860;border-radius:9px;padding:11px 12px;font-size:20px;font-family:Consolas,monospace}
+#saveMark{background:var(--green);color:#07130b}#skipMark{background:#2a3343;color:var(--text);border:1px solid #3b4860}
+.validation{min-height:20px;color:#ff9a9a;font-size:13px;margin-top:8px}.meta{font-family:Consolas,monospace;background:#0d1118;border:1px solid var(--border);border-radius:10px;padding:12px;line-height:1.65}.lastMark{margin-top:10px;color:var(--yellow);font-weight:700}.note{color:var(--muted);font-size:13px;margin-top:10px}
+
+/* Compact live overlay */
+#overlayPanel{display:none;background:rgba(9,11,16,.92);border:2px solid #46536b;border-radius:14px;padding:10px;max-width:470px}
+.overlayTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.overlayTitle{font-size:13px;font-weight:800;letter-spacing:.5px;color:#d8dfeb}.overlayRec{font:700 12px Consolas,monospace;color:#ff8e8e}.overlayRec.on{color:#75e29b}
+.overlayMain{display:grid;grid-template-columns:94px 1fr 94px;gap:10px;align-items:center}
+.stickViz{width:90px;height:90px;border:2px solid #526078;border-radius:50%;position:relative;background:#0c1119}.stickCross:before,.stickCross:after{content:"";position:absolute;background:#2b3547}.stickCross:before{width:1px;height:100%;left:50%;top:0}.stickCross:after{height:1px;width:100%;top:50%;left:0}.stickDot{position:absolute;width:16px;height:16px;border-radius:50%;background:#f4f6fa;left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px #111}.stickName{text-align:center;font:700 11px Arial,sans-serif;color:var(--muted);margin-top:4px}
+.centerPad{display:grid;gap:8px}.shoulders{display:grid;grid-template-columns:1fr 1fr;gap:7px}.miniBtn{background:#1c2432;border:1px solid #3a465b;border-radius:8px;padding:7px 5px;text-align:center;font-weight:800;font-size:12px}.miniBtn.down{background:#1d5736;border-color:#58e391}.trigMini{background:#141923;border:1px solid #3a465b;border-radius:8px;padding:6px}.trigLabel{display:flex;justify-content:space-between;font:700 11px Arial,sans-serif;color:#d7deea}.trigTrack{height:6px;margin-top:5px;background:#283143;border-radius:5px;overflow:hidden}.trigFill{height:100%;background:#e7edf8;width:0}
+.face{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.face .miniBtn{font-size:14px;padding:9px 4px}.face .miniBtn.down{background:#245d3d}
+.overlayBottom{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.overlayBottom button{font-size:12px;padding:8px 10px}.overlayMark{margin-top:8px;font:700 12px Consolas,monospace;color:var(--yellow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overlayHint{display:none;color:#aeb7c7;font-size:12px;margin-top:6px}
+
+body.overlay-mode{background:transparent}
+body.overlay-mode .wrap{max-width:none;padding:8px;margin:0}
+body.overlay-mode h1,body.overlay-mode .sub,body.overlay-mode #status,body.overlay-mode #buttons,body.overlay-mode .grid:not(#buttons),body.overlay-mode .sticks,body.overlay-mode .controls,body.overlay-mode .meta,body.overlay-mode .note{display:none!important}
+body.overlay-mode #overlayPanel{display:block}
+body.overlay-mode #markPanel{max-width:470px;margin:8px 0 0;padding:10px}
+body.overlay-mode .markTitle{font-size:15px;margin-bottom:7px}.overlay-mode .markHelp{display:none}.overlay-mode .qRow{margin-bottom:8px}.overlay-mode .qBtn{min-width:48px;padding:8px 10px}.overlay-mode #gameClock{font-size:18px;padding:8px 9px}.overlay-mode #saveMark,.overlay-mode #skipMark{padding:8px 10px;font-size:12px}
+body.overlay-mode .overlayHint{display:block}
+@media(max-width:600px){.sticks{grid-template-columns:1fr 1fr}.wrap{padding:12px}h1{font-size:22px}.clockRow{align-items:stretch}#gameClock{width:100%}.overlayMain{grid-template-columns:78px 1fr 78px}.stickViz{width:74px;height:74px}.stickDot{width:14px;height:14px}}
 </style>
 </head>
 <body><div class="wrap">
-<h1>WURD Madden Controller Input Recorder <small>v5</small></h1>
-<div class="sub">Full-game controller logging with quarter + Madden game clock markers for easy video matching.</div>
+<h1>WURD Madden Controller Input Recorder <small>v6</small></h1>
+<div class="sub">Full-game input logging + compact live overlay for screen-recording Chiaki-ng gameplay.</div>
 <div id="status" class="status waiting">Waiting for controller...</div>
 
 <div class="grid" id="buttons"></div>
@@ -55,187 +68,94 @@ button:disabled{opacity:.45;cursor:not-allowed}
  <button id="mark" disabled>MARK LAST PLAY</button>
  <button id="stop" disabled>Stop Recording</button>
  <button id="download" disabled>Download Log</button>
+ <button id="overlayToggle">Overlay Mode</button>
+</div>
+
+<div id="overlayPanel" aria-label="Controller overlay">
+ <div class="overlayTop"><div class="overlayTitle">WURD INPUT OVERLAY</div><div id="overlayRec" class="overlayRec">NOT RECORDING</div></div>
+ <div class="overlayMain">
+  <div><div class="stickViz stickCross"><div id="olsDot" class="stickDot"></div></div><div class="stickName">LEFT STICK</div></div>
+  <div class="centerPad">
+   <div class="shoulders"><div id="ol1" class="miniBtn">L1</div><div id="or1" class="miniBtn">R1</div></div>
+   <div class="shoulders">
+    <div class="trigMini"><div class="trigLabel"><span>L2</span><span id="ol2Pct">0%</span></div><div class="trigTrack"><div id="ol2Fill" class="trigFill"></div></div></div>
+    <div class="trigMini"><div class="trigLabel"><span>R2</span><span id="or2Pct">0%</span></div><div class="trigTrack"><div id="or2Fill" class="trigFill"></div></div></div>
+   </div>
+   <div class="face">
+    <div id="otriangle" class="miniBtn">△</div><div id="ocircle" class="miniBtn">○</div>
+    <div id="osquare" class="miniBtn">□</div><div id="ox" class="miniBtn">✕</div>
+   </div>
+  </div>
+  <div><div class="stickViz stickCross"><div id="orsDot" class="stickDot"></div></div><div class="stickName">RIGHT STICK</div></div>
+ </div>
+ <div class="overlayBottom">
+  <button id="oStart">Start</button><button id="oMark" disabled>MARK LAST PLAY</button><button id="oStop" disabled>Stop</button><button id="oExit">Exit Overlay</button>
+ </div>
+ <div class="overlayMark">Last: <span id="oLastMark">—</span></div>
+ <div class="overlayHint">Resize this browser window small and place it over a corner of Chiaki-ng before screen recording.</div>
 </div>
 
 <div id="markPanel">
  <div class="markTitle">Enter the Madden clock for the play you just marked</div>
  <div class="markHelp">Quarter is remembered after you save a mark, so during the same quarter you usually only need to type the game clock.</div>
  <div class="qRow" id="quarterButtons">
-  <button class="qBtn" data-q="1">Q1</button>
-  <button class="qBtn" data-q="2">Q2</button>
-  <button class="qBtn" data-q="3">Q3</button>
-  <button class="qBtn" data-q="4">Q4</button>
-  <button class="qBtn" data-q="OT">OT</button>
+  <button class="qBtn" data-q="1">Q1</button><button class="qBtn" data-q="2">Q2</button><button class="qBtn" data-q="3">Q3</button><button class="qBtn" data-q="4">Q4</button><button class="qBtn" data-q="OT">OT</button>
  </div>
  <div class="clockRow">
-  <div class="clockField">
-   <label for="gameClock">GAME CLOCK</label>
-   <input id="gameClock" type="text" inputmode="numeric" autocomplete="off" placeholder="6:42" maxlength="5" aria-describedby="clockValidation">
-  </div>
-  <button id="saveMark">Save Play Info</button>
-  <button id="skipMark">Leave Unlabeled</button>
+  <div class="clockField"><label for="gameClock">GAME CLOCK</label><input id="gameClock" type="text" inputmode="numeric" autocomplete="off" placeholder="6:42" maxlength="5" aria-describedby="clockValidation"></div>
+  <button id="saveMark">Save Play Info</button><button id="skipMark">Leave Unlabeled</button>
  </div>
  <div id="clockValidation" class="validation" aria-live="polite"></div>
 </div>
 
 <div class="meta">
- <div>Recording: <span id="rec">NO</span></div>
- <div>Started: <span id="started">—</span></div>
- <div>Elapsed: <span id="elapsed">00:00:00.000</span></div>
- <div>Events: <span id="events">0</span> &nbsp; Marks: <span id="marks">0</span></div>
- <div class="lastMark">Last marked: <span id="lastMark">—</span></div>
+ <div>Recording: <span id="rec">NO</span></div><div>Started: <span id="started">—</span></div><div>Elapsed: <span id="elapsed">00:00:00.000</span></div>
+ <div>Events: <span id="events">0</span> &nbsp; Marks: <span id="marks">0</span></div><div class="lastMark">Last marked: <span id="lastMark">—</span></div>
 </div>
-<div class="note">Press MARK LAST PLAY after an interesting play, then save the quarter and game clock shown in Madden. Example: PLAY 5 | Q2 | 6:42.</div>
+<div class="note">Use Overlay Mode while screen-recording Chiaki-ng. The CSV recorder and quarter + game-clock markers work exactly like v5.</div>
 </div>
 <script>
-/* WURD Madden Controller Input Recorder v5
-   2026-10-08: Replaces play-type tags with quarter + Madden game clock markers. */
+/* WURD Madden Controller Input Recorder v6
+   2026-10-08: Adds compact live overlay mode while preserving v5 CSV + quarter/game-clock marking. */
 const DEADZONE=.06, STICK_DELTA=.025, TRIGGER_DELTA=.01;
-const defs=[
- ['x','✕ X',0],['circle','○ Circle',1],['square','□ Square',2],['triangle','△ Triangle',3],
- ['l1','L1',4],['r1','R1',5],['up','D-Pad Up',12],['down','D-Pad Down',13],
- ['left','D-Pad Left',14],['right','D-Pad Right',15]
-];
-const buttonBox=document.getElementById('buttons');
-const cards={};
-defs.forEach(([k,label])=>{
- const d=document.createElement('div'); d.className='card';
- d.innerHTML=`<div class="label">${label}</div><div class="value">UP</div>`;
- buttonBox.appendChild(d); cards[k]=d;
-});
+const defs=[['x','✕ X',0],['circle','○ Circle',1],['square','□ Square',2],['triangle','△ Triangle',3],['l1','L1',4],['r1','R1',5],['up','D-Pad Up',12],['down','D-Pad Down',13],['left','D-Pad Left',14],['right','D-Pad Right',15]];
+const buttonBox=document.getElementById('buttons'),cards={};
+defs.forEach(([k,label])=>{const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="label">${label}</div><div class="value">UP</div>`;buttonBox.appendChild(d);cards[k]=d});
 const $=id=>document.getElementById(id);
-let gpIndex=null,recording=false,startPerf=0,startEpoch=0,rows=[],previous=null,markCount=0;
-let currentMarkIndex=null,currentMarkNumber=0,selectedQuarter='',lastQuarter='';
-
-function gp(){
- const list=navigator.getGamepads?navigator.getGamepads():[];
- if(gpIndex!==null&&list[gpIndex]) return list[gpIndex];
- for(const g of list) if(g){gpIndex=g.index;return g}
- return null;
-}
-function axis(v){return Math.abs(v||0)<DEADZONE?0:(v||0)}
-function pressed(g,i){return !!g.buttons[i]?.pressed}
-function val(g,i){return +(g.buttons[i]?.value||0)}
-function snap(g){
- return {
-  x:pressed(g,0),circle:pressed(g,1),square:pressed(g,2),triangle:pressed(g,3),
-  l1:pressed(g,4),l2:val(g,6),r1:pressed(g,5),r2:val(g,7),
-  up:pressed(g,12),down:pressed(g,13),left:pressed(g,14),right:pressed(g,15),
-  lx:axis(g.axes[0]),ly:axis(g.axes[1]),rx:axis(g.axes[2]),ry:axis(g.axes[3])
- };
-}
-function pad(n){return String(n).padStart(2,'0')}
-function elapsed(ms){
- const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),x=Math.floor(ms%1000);
- return `${pad(h)}:${pad(m)}:${pad(s)}.${String(x).padStart(3,'0')}`;
-}
-function localStamp(epoch){
- const d=new Date(epoch);
- return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,'0')}`;
-}
-function changed(a,b){
- if(!b)return true;
- for(const k of ['x','circle','square','triangle','l1','r1','up','down','left','right']) if(a[k]!==b[k])return true;
- if(Math.abs(a.l2-b.l2)>=TRIGGER_DELTA||Math.abs(a.r2-b.r2)>=TRIGGER_DELTA)return true;
- for(const k of ['lx','ly','rx','ry'])if(Math.abs(a[k]-b[k])>=STICK_DELTA)return true;
- return false;
-}
-function csvRow(type,s,perfNow,label='',quarter='',gameClock=''){
- const ms=perfNow-startPerf,epoch=startEpoch+ms;
- return [type,Math.round(ms),elapsed(ms),localStamp(epoch),new Date(epoch).toISOString(),label,quarter,gameClock,
-  +s.x,+s.circle,+s.square,+s.triangle,+s.l1,s.l2.toFixed(3),+s.r1,s.r2.toFixed(3),
-  +s.up,+s.down,+s.left,+s.right,s.lx.toFixed(3),s.ly.toFixed(3),s.rx.toFixed(3),s.ry.toFixed(3)];
-}
+let gpIndex=null,recording=false,startPerf=0,startEpoch=0,rows=[],previous=null,markCount=0,currentMarkIndex=null,currentMarkNumber=0,selectedQuarter='',lastQuarter='';
+function gp(){const list=navigator.getGamepads?navigator.getGamepads():[];if(gpIndex!==null&&list[gpIndex])return list[gpIndex];for(const g of list)if(g){gpIndex=g.index;return g}return null}
+function axis(v){return Math.abs(v||0)<DEADZONE?0:(v||0)} function pressed(g,i){return!!g.buttons[i]?.pressed} function val(g,i){return +(g.buttons[i]?.value||0)}
+function snap(g){return{x:pressed(g,0),circle:pressed(g,1),square:pressed(g,2),triangle:pressed(g,3),l1:pressed(g,4),l2:val(g,6),r1:pressed(g,5),r2:val(g,7),up:pressed(g,12),down:pressed(g,13),left:pressed(g,14),right:pressed(g,15),lx:axis(g.axes[0]),ly:axis(g.axes[1]),rx:axis(g.axes[2]),ry:axis(g.axes[3])}}
+function pad(n){return String(n).padStart(2,'0')} function elapsed(ms){const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),x=Math.floor(ms%1000);return`${pad(h)}:${pad(m)}:${pad(s)}.${String(x).padStart(3,'0')}`}
+function localStamp(epoch){const d=new Date(epoch);return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3,'0')}`}
+function changed(a,b){if(!b)return true;for(const k of ['x','circle','square','triangle','l1','r1','up','down','left','right'])if(a[k]!==b[k])return true;if(Math.abs(a.l2-b.l2)>=TRIGGER_DELTA||Math.abs(a.r2-b.r2)>=TRIGGER_DELTA)return true;for(const k of ['lx','ly','rx','ry'])if(Math.abs(a[k]-b[k])>=STICK_DELTA)return true;return false}
+function csvRow(type,s,perfNow,label='',quarter='',gameClock=''){const ms=perfNow-startPerf,epoch=startEpoch+ms;return[type,Math.round(ms),elapsed(ms),localStamp(epoch),new Date(epoch).toISOString(),label,quarter,gameClock,+s.x,+s.circle,+s.square,+s.triangle,+s.l1,s.l2.toFixed(3),+s.r1,s.r2.toFixed(3),+s.up,+s.down,+s.left,+s.right,s.lx.toFixed(3),s.ly.toFixed(3),s.rx.toFixed(3),s.ry.toFixed(3)]}
+function moveDot(id,x,y){const el=$(id);el.style.left=`${50+x*38}%`;el.style.top=`${50+y*38}%`}
+function setDown(id,on){$(id).classList.toggle('down',!!on)}
 function render(s){
  defs.forEach(([k])=>{cards[k].classList.toggle('down',s[k]);cards[k].querySelector('.value').textContent=s[k]?'DOWN':'UP'});
- const l=Math.round(s.l2*100),r=Math.round(s.r2*100);
- $('l2').textContent=l+'%';$('r2').textContent=r+'%';$('l2bar').style.width=l+'%';$('r2bar').style.width=r+'%';
- $('ls').textContent=`X ${s.lx>=0?'+':''}${s.lx.toFixed(3)}   Y ${s.ly>=0?'+':''}${s.ly.toFixed(3)}`;
- $('rs').textContent=`X ${s.rx>=0?'+':''}${s.rx.toFixed(3)}   Y ${s.ry>=0?'+':''}${s.ry.toFixed(3)}`;
+ const l=Math.round(s.l2*100),r=Math.round(s.r2*100);$('l2').textContent=l+'%';$('r2').textContent=r+'%';$('l2bar').style.width=l+'%';$('r2bar').style.width=r+'%';$('ls').textContent=`X ${s.lx>=0?'+':''}${s.lx.toFixed(3)}   Y ${s.ly>=0?'+':''}${s.ly.toFixed(3)}`;$('rs').textContent=`X ${s.rx>=0?'+':''}${s.rx.toFixed(3)}   Y ${s.ry>=0?'+':''}${s.ry.toFixed(3)}`;
+ moveDot('olsDot',s.lx,s.ly);moveDot('orsDot',s.rx,s.ry);setDown('ol1',s.l1);setDown('or1',s.r1);setDown('ox',s.x);setDown('ocircle',s.circle);setDown('osquare',s.square);setDown('otriangle',s.triangle);$('ol2Pct').textContent=l+'%';$('or2Pct').textContent=r+'%';$('ol2Fill').style.width=l+'%';$('or2Fill').style.width=r+'%';
 }
-function loop(t){
- const g=gp();
- if(g){
-  $('status').textContent='Controller connected: '+g.id;$('status').className='status connected';
-  const s=snap(g);render(s);
-  if(recording){
-   $('elapsed').textContent=elapsed(t-startPerf);
-   if(changed(s,previous)){rows.push(csvRow('INPUT',s,t));previous={...s};$('events').textContent=rows.length}
-  }
- }else{$('status').textContent='Waiting for controller...';$('status').className='status waiting'}
- requestAnimationFrame(loop);
+function syncRecordButtons(){
+ $('oStart').disabled=recording;$('oStop').disabled=!recording;$('oMark').disabled=!recording;$('overlayRec').textContent=recording?'RECORDING':'NOT RECORDING';$('overlayRec').classList.toggle('on',recording)
 }
-function selectQuarter(q){
- selectedQuarter=q;
- document.querySelectorAll('.qBtn').forEach(b=>b.classList.toggle('selected',b.dataset.q===q));
-}
-function normalizeClock(raw){
- const text=String(raw||'').trim();
- let m=text.match(/^(\d{1,2}):(\d{1,2})$/);
- if(!m){
-  const digits=text.replace(/\D/g,'');
-  if(digits.length>=2&&digits.length<=4){
-   const sec=digits.slice(-2),min=digits.slice(0,-2)||'0';
-   m=[text,min,sec];
-  }
- }
- if(!m)return null;
- const min=Number(m[1]),sec=Number(m[2]);
- if(!Number.isInteger(min)||!Number.isInteger(sec)||min<0||min>15||sec<0||sec>59)return null;
- return `${min}:${pad(sec)}`;
-}
-function closeMarkPanel(){
- $('markPanel').style.display='none';$('clockValidation').textContent='';$('gameClock').value='';currentMarkIndex=null;currentMarkNumber=0;
-}
-function refreshLastMark(label){$('lastMark').textContent=label||'—'}
+function loop(t){const g=gp();if(g){$('status').textContent='Controller connected: '+g.id;$('status').className='status connected';const s=snap(g);render(s);if(recording){$('elapsed').textContent=elapsed(t-startPerf);if(changed(s,previous)){rows.push(csvRow('INPUT',s,t));previous={...s};$('events').textContent=rows.length}}}else{$('status').textContent='Waiting for controller...';$('status').className='status waiting'}requestAnimationFrame(loop)}
+function selectQuarter(q){selectedQuarter=q;document.querySelectorAll('.qBtn').forEach(b=>b.classList.toggle('selected',b.dataset.q===q))}
+function normalizeClock(raw){const text=String(raw||'').trim();let m=text.match(/^(\d{1,2}):(\d{1,2})$/);if(!m){const digits=text.replace(/\D/g,'');if(digits.length>=2&&digits.length<=4){const sec=digits.slice(-2),min=digits.slice(0,-2)||'0';m=[text,min,sec]}}if(!m)return null;const min=Number(m[1]),sec=Number(m[2]);if(!Number.isInteger(min)||!Number.isInteger(sec)||min<0||min>15||sec<0||sec>59)return null;return`${min}:${pad(sec)}`}
+function closeMarkPanel(){$('markPanel').style.display='none';$('clockValidation').textContent='';$('gameClock').value='';currentMarkIndex=null;currentMarkNumber=0}
+function refreshLastMark(label){$('lastMark').textContent=label||'—';$('oLastMark').textContent=label||'—'}
+function startRecording(){const g=gp();if(!g){alert('Connect or press a button on the controller first.');return}rows=[];markCount=0;previous=null;currentMarkIndex=null;currentMarkNumber=0;selectedQuarter='';lastQuarter='';startPerf=performance.now();startEpoch=Date.now();recording=true;const s=snap(g);rows.push(csvRow('START',s,startPerf,'GAME RECORDING START'));previous={...s};$('started').textContent=localStamp(startEpoch);$('rec').textContent='YES';$('events').textContent=rows.length;$('marks').textContent='0';refreshLastMark('—');$('markPanel').style.display='none';$('start').disabled=true;$('stop').disabled=false;$('mark').disabled=false;$('download').disabled=true;syncRecordButtons()}
+function markLastPlay(){if(!recording)return;const g=gp();if(!g)return;if(currentMarkIndex!==null)closeMarkPanel();markCount++;currentMarkNumber=markCount;rows.push(csvRow('MARK',snap(g),performance.now(),`PLAY ${markCount}`));currentMarkIndex=rows.length-1;$('marks').textContent=markCount;$('events').textContent=rows.length;refreshLastMark(`PLAY ${markCount} — waiting for Q + clock`);selectedQuarter=lastQuarter||'';selectQuarter(selectedQuarter);$('gameClock').value='';$('clockValidation').textContent='';$('markPanel').style.display='block';setTimeout(()=>$('gameClock').focus(),0)}
+function stopRecording(){if(!recording)return;const g=gp();if(g)rows.push(csvRow('STOP',snap(g),performance.now(),'GAME RECORDING STOP'));recording=false;closeMarkPanel();$('rec').textContent='NO';$('start').disabled=false;$('stop').disabled=true;$('mark').disabled=true;$('download').disabled=false;$('events').textContent=rows.length;syncRecordButtons()}
 
-document.querySelectorAll('.qBtn').forEach(btn=>btn.addEventListener('click',()=>selectQuarter(btn.dataset.q)));
-$('gameClock').addEventListener('keydown',e=>{if(e.key==='Enter'){$('saveMark').click()}});
-
-$('start').onclick=()=>{
- const g=gp();if(!g){alert('Connect or press a button on the controller first.');return}
- rows=[];markCount=0;previous=null;currentMarkIndex=null;currentMarkNumber=0;selectedQuarter='';lastQuarter='';startPerf=performance.now();startEpoch=Date.now();recording=true;
- const s=snap(g);rows.push(csvRow('START',s,startPerf,'GAME RECORDING START'));previous={...s};
- $('started').textContent=localStamp(startEpoch);$('rec').textContent='YES';$('events').textContent=rows.length;$('marks').textContent='0';refreshLastMark('—');$('markPanel').style.display='none';
- $('start').disabled=true;$('stop').disabled=false;$('mark').disabled=false;$('download').disabled=true;
-};
-$('mark').onclick=()=>{
- if(!recording)return;const g=gp();if(!g)return;
- // If a previous mark was left open, leave it as an unlabeled mark rather than losing it.
- if(currentMarkIndex!==null)closeMarkPanel();
- markCount++;currentMarkNumber=markCount;
- rows.push(csvRow('MARK',snap(g),performance.now(),`PLAY ${markCount}`));currentMarkIndex=rows.length-1;
- $('marks').textContent=markCount;$('events').textContent=rows.length;refreshLastMark(`PLAY ${markCount} — waiting for Q + clock`);
- selectedQuarter=lastQuarter||'';selectQuarter(selectedQuarter);
- $('gameClock').value='';$('clockValidation').textContent='';$('markPanel').style.display='block';
- setTimeout(()=>$('gameClock').focus(),0);
-};
-$('saveMark').onclick=()=>{
- if(currentMarkIndex===null)return;
- if(!selectedQuarter){$('clockValidation').textContent='Choose the quarter first.';return}
- const clock=normalizeClock($('gameClock').value);
- if(!clock){$('clockValidation').textContent='Enter the Madden clock as M:SS, for example 6:42.';return}
- const qLabel=selectedQuarter==='OT'?'OT':`Q${selectedQuarter}`;
- const label=`PLAY ${currentMarkNumber} | ${qLabel} | ${clock}`;
- rows[currentMarkIndex][5]=label;rows[currentMarkIndex][6]=selectedQuarter;rows[currentMarkIndex][7]=clock;
- lastQuarter=selectedQuarter;refreshLastMark(label);closeMarkPanel();
-};
-$('skipMark').onclick=()=>{
- if(currentMarkIndex===null)return;
- refreshLastMark(`PLAY ${currentMarkNumber} — unlabeled`);closeMarkPanel();
-};
-$('stop').onclick=()=>{
- if(!recording)return;const g=gp();if(g)rows.push(csvRow('STOP',snap(g),performance.now(),'GAME RECORDING STOP'));
- recording=false;closeMarkPanel();$('rec').textContent='NO';$('start').disabled=false;$('stop').disabled=true;$('mark').disabled=true;$('download').disabled=false;$('events').textContent=rows.length;
-};
-$('download').onclick=()=>{
- const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','quarter','game_clock','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];
- const esc=v=>`"${String(v).replaceAll('"','""')}"`;
- const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');
- const d=new Date(startEpoch),name=`controller_input_v5_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;
- const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-};
-window.addEventListener('gamepadconnected',e=>gpIndex=e.gamepad.index);
-window.addEventListener('gamepaddisconnected',e=>{if(gpIndex===e.gamepad.index)gpIndex=null});
-requestAnimationFrame(loop);
+document.querySelectorAll('.qBtn').forEach(btn=>btn.addEventListener('click',()=>selectQuarter(btn.dataset.q)));$('gameClock').addEventListener('keydown',e=>{if(e.key==='Enter')$('saveMark').click()});
+$('start').onclick=startRecording;$('oStart').onclick=startRecording;$('mark').onclick=markLastPlay;$('oMark').onclick=markLastPlay;$('stop').onclick=stopRecording;$('oStop').onclick=stopRecording;
+$('saveMark').onclick=()=>{if(currentMarkIndex===null)return;if(!selectedQuarter){$('clockValidation').textContent='Choose the quarter first.';return}const clock=normalizeClock($('gameClock').value);if(!clock){$('clockValidation').textContent='Enter the Madden clock as M:SS, for example 6:42.';return}const qLabel=selectedQuarter==='OT'?'OT':`Q${selectedQuarter}`;const label=`PLAY ${currentMarkNumber} | ${qLabel} | ${clock}`;rows[currentMarkIndex][5]=label;rows[currentMarkIndex][6]=selectedQuarter;rows[currentMarkIndex][7]=clock;lastQuarter=selectedQuarter;refreshLastMark(label);closeMarkPanel()};
+$('skipMark').onclick=()=>{if(currentMarkIndex===null)return;refreshLastMark(`PLAY ${currentMarkNumber} — unlabeled`);closeMarkPanel()};
+$('download').onclick=()=>{const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','quarter','game_clock','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];const esc=v=>`"${String(v).replaceAll('"','""')}"`;const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');const d=new Date(startEpoch),name=`controller_input_v6_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+function enterOverlay(){document.body.classList.add('overlay-mode');$('overlayToggle').textContent='Exit Overlay';$('overlayPanel').style.display='block';syncRecordButtons()}
+function exitOverlay(){document.body.classList.remove('overlay-mode');$('overlayToggle').textContent='Overlay Mode';$('overlayPanel').style.display='none'}
+$('overlayToggle').onclick=()=>document.body.classList.contains('overlay-mode')?exitOverlay():enterOverlay();$('oExit').onclick=exitOverlay;
+window.addEventListener('gamepadconnected',e=>gpIndex=e.gamepad.index);window.addEventListener('gamepaddisconnected',e=>{if(gpIndex===e.gamepad.index)gpIndex=null});syncRecordButtons();requestAnimationFrame(loop);
 </script></body></html>
