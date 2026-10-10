@@ -1,4 +1,4 @@
-// VERSION 35: restored pre-defense-change behavior from Version 32
+// VERSION 36: throw meter ~10% faster; matching lob/touch/bullet hold thresholds
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
 // Safe-lead guidance has been removed. Route and cut-depth controls are injected by this script.
@@ -80,9 +80,9 @@
     // Keep this independent of drill length so Infinite practice can always exit.
     const PS_HOME_BUTTON_INDEX = 16;
     const WURD_HOME_URL = "/";
-    const THROW_METER_DURATION_MS = 820;
-    const LOB_MAX_HOLD_MS = 165;
-    const TOUCH_MAX_HOLD_MS = 500;
+    const THROW_METER_DURATION_MS = 740;
+    const LOB_MAX_HOLD_MS = 149;
+    const TOUCH_MAX_HOLD_MS = 451;
     // Tiny Madden-like hesitation before the catch meter moves on 25+ yard throws.
     // This is intentionally subtle: just enough to remind the user that deep catches hesitate.
     const DEEP_CATCH_METER_PAUSE_MS = 90;
