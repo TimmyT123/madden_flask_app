@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ stick calibration v20261008-0900
+// WURD Knife Practice DMZ perspective trainer v20261018-0.2
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
@@ -79,6 +79,124 @@ const SPEED_SETTINGS = {
     fast: { moving: 40, visible: 1550, peekHold: 820 },
     elite: { moving: 51, visible: 1150, peekHold: 590 },
 };
+
+// Version 0.2: projected 3D training space. Approximate, not DMZ game physics.
+const PERSPECTIVE_FOV_DEG = 75;
+const CAMERA_HEIGHT_M = 1.7;
+const ENEMY_HEIGHT_M = 1.75;
+const DISTANCES_M = [5, 10, 20, 40];
+const WALK_METERS_PER_SECOND = 4.0;
+const VIEW_TURN_DEG_PER_SECOND = 155; // adjustable through existing Aim Speed
+const PERSPECTIVE_STORAGE_KEY = "wurdKnifePerspectiveEnabled";
+let perspectiveEnabled = true;
+let cameraX = 0, cameraZ = 0, cameraYaw = 0, cameraPitch = 0;
+let perspectiveCanvas = null, perspectiveCtx = null, distanceDisplay = null;
+let perspectiveToggle = null;
+
+function setupPerspectiveUI() {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "margin:8px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap";
+    const label = document.createElement("label");
+    perspectiveToggle = document.createElement("input");
+    perspectiveToggle.type = "checkbox";
+    try { perspectiveEnabled = localStorage.getItem(PERSPECTIVE_STORAGE_KEY) !== "false"; } catch {}
+    perspectiveToggle.checked = perspectiveEnabled;
+    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.2)"));
+    perspectiveToggle.addEventListener("change", () => {
+        perspectiveEnabled = perspectiveToggle.checked;
+        try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, String(perspectiveEnabled)); } catch {}
+        startPractice();
+    });
+    const note = document.createElement("small");
+    note.textContent = "Distance, true-size targets, camera turn and strafing (experimental)";
+    wrap.append(label, note);
+    gameArea.parentElement.insertBefore(wrap, gameArea);
+    // Put canvas behind targets, without modifying the HTML file.
+    if (getComputedStyle(arena).position === "static") arena.style.position = "relative";
+    perspectiveCanvas = document.createElement("canvas");
+    perspectiveCanvas.setAttribute("aria-hidden", "true");
+    perspectiveCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0";
+    arena.insertBefore(perspectiveCanvas, arena.firstChild);
+    const style=document.createElement("style");
+    style.textContent=`.knife-perspective #targetLayer,.knife-perspective #knifeLayer{z-index:2!important}.knife-perspective #crosshair{z-index:5!important}.knife-perspective .target{transition:none!important}`;
+    document.head.appendChild(style);
+    distanceDisplay = document.createElement("div");
+    distanceDisplay.style.cssText = "position:absolute;right:12px;top:12px;z-index:9;background:#091a23cc;color:white;font:600 14px system-ui;padding:5px 9px;border-radius:6px;pointer-events:none";
+    arena.appendChild(distanceDisplay);
+    syncPerspectiveUI();
+}
+function syncPerspectiveUI() {
+    if (perspectiveCanvas) perspectiveCanvas.style.display = perspectiveEnabled ? "block" : "none";
+    if (distanceDisplay) distanceDisplay.style.display = perspectiveEnabled ? "block" : "none";
+    // Hide flat background when perspective mode is in use, leaving existing targets/UI intact.
+    arena.classList.toggle("knife-perspective", perspectiveEnabled);
+}
+function perspectiveProject(x, z, heightM) {
+    const rect = arena.getBoundingClientRect();
+    const w = rect.width || 800, h = rect.height || 450;
+    const dx = x - cameraX, dz = z - cameraZ;
+    const cos = Math.cos(cameraYaw), sin = Math.sin(cameraYaw);
+    const right = dx*cos - dz*sin;
+    const forward = dx*sin + dz*cos;
+    if (forward <= 0.3) return null;
+    const focal = (w / 2) / Math.tan(PERSPECTIVE_FOV_DEG*Math.PI/360);
+    const sx = w/2 + (right / forward)*focal;
+    const sy = h/2 - ((heightM-CAMERA_HEIGHT_M)/forward)*focal + Math.tan(cameraPitch)*focal;
+    return {x:sx,y:sy,depth:forward,focal,w,h};
+}
+function renderPerspectiveScene() {
+    if (!perspectiveEnabled || !perspectiveCanvas) return;
+    const rect = arena.getBoundingClientRect();
+    const w = Math.max(1,Math.round(rect.width)), h = Math.max(1,Math.round(rect.height));
+    if (perspectiveCanvas.width !== w || perspectiveCanvas.height !== h) {
+        perspectiveCanvas.width = w; perspectiveCanvas.height = h;
+    }
+    const c = perspectiveCanvas.getContext("2d");
+    const horizon = perspectiveProject(cameraX, cameraZ+50, CAMERA_HEIGHT_M);
+    const hy = horizon ? Math.max(-h,Math.min(h*2,horizon.y)) : h/2;
+    c.fillStyle="#172b3e";c.fillRect(0,0,w,h);
+    c.fillStyle="#293a35";c.fillRect(0,hy,w,h-hy);
+    c.strokeStyle="rgba(190,212,194,.28)";c.lineWidth=1;
+    function line(a,b) {if(!a||!b)return;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();}
+    // Road/grid recedes to the vanishing point and translates under movement.
+    for(let x=-120;x<=120;x+=5) line(perspectiveProject(x, cameraZ+1,0),perspectiveProject(x,cameraZ+110,0));
+    for(let z=Math.floor(cameraZ/5)*5+5;z<cameraZ+110;z+=5)
+      line(perspectiveProject(cameraX-120,z,0),perspectiveProject(cameraX+120,z,0));
+    // Simple depth-correct cover markers for near/far reference.
+    c.fillStyle="rgba(45,57,66,.85)";
+    for (const marker of [{x:-10,z:12},{x:12,z:24},{x:-18,z:42}]) {
+        const a=perspectiveProject(marker.x,marker.z,2.2), b=perspectiveProject(marker.x+3,marker.z,0);
+        if(a&&b){c.fillRect(a.x,a.y,Math.max(1,b.x-a.x),Math.max(1,b.y-a.y));}
+    }
+}
+function placePerspectiveTarget() {
+    if (!perspectiveEnabled || !activeTarget) return;
+    const t=activeTarget;
+    const p=perspectiveProject(t.worldX,t.worldZ,ENEMY_HEIGHT_M*.53);
+    if (!p || p.depth > 140) {t.element.style.display="none";distanceDisplay.textContent="Target out of view";return;}
+    t.element.style.display="";
+    const desiredHeight=p.focal*ENEMY_HEIGHT_M/p.depth;
+    const baselineHeight=t.element.offsetHeight || 90;
+    const scale=Math.max(.035,Math.min(6,desiredHeight/baselineHeight));
+    // Target CSS already uses left/top percentages; undo inherited offsets with inline transform.
+    t.element.style.left=`${p.x/p.w*100}%`;
+    t.element.style.top=`${p.y/p.h*100}%`;
+    t.element.style.transform=`translate(-50%,-50%) scale(${scale})`;
+    t.element.style.transformOrigin="center center";
+    distanceDisplay.textContent=`Target: ${Math.round(Math.hypot(t.worldX-cameraX,t.worldZ-cameraZ))} m`;
+}
+function updatePerspectiveInput(moveX,moveY,aimX,aimY,deltaMs) {
+    const dt=deltaMs/1000;
+    const yawDelta=aimX*(getAimSpeed()/DEFAULT_AIM_SPEED)*VIEW_TURN_DEG_PER_SECOND*Math.PI/180*dt;
+    cameraYaw+=yawDelta;
+    cameraPitch=clamp(cameraPitch+aimY*(getAimSpeed()/DEFAULT_AIM_SPEED)*VIEW_TURN_DEG_PER_SECOND*Math.PI/180*dt,-1.1,1.1);
+    const cos=Math.cos(cameraYaw),sin=Math.sin(cameraYaw);
+    cameraX+=(moveX*cos-moveY*sin)*WALK_METERS_PER_SECOND*dt;
+    cameraZ+=(-moveX*sin-moveY*cos)*WALK_METERS_PER_SECOND*dt;
+    // Stick up (negative Y) moves camera forward (+Z), including rotated headings.
+    renderPerspectiveScene();
+    placePerspectiveTarget();
+}
 
 const WORLD_LIMIT_X = 18;
 const WORLD_LIMIT_Y = 9;
@@ -280,11 +398,14 @@ function startPractice() {
     worldOffsetY = 0;
     aimWorldOffsetX = 0;
     aimWorldOffsetY = 0;
+    cameraX = 0; cameraZ = 0; cameraYaw = 0; cameraPitch = 0;
+    syncPerspectiveUI();
 
     crosshairX = 50;
     crosshairY = 50;
     renderCrosshair();
     renderWorldOffset();
+    renderPerspectiveScene();
     updateScoreboard();
     updateKnifeReady(true);
     hideHitMarker();
@@ -377,6 +498,7 @@ function spawnNextTarget() {
         throwable: true,
         resolved: false,
         sizePadding,
+        worldX: 0, worldZ: 20, worldVelocityX: 0,
     };
 
     if (actualDrill === "moving") {
@@ -406,6 +528,18 @@ function spawnNextTarget() {
         setFeedback("Target up — aim, hold R1, then release it to throw.", "info");
     }
 
+    if (perspectiveEnabled) {
+        const meters = chooseRandom(DISTANCES_M);
+        activeTarget.worldZ = meters;
+        // Lateral spread restricted by distance so most enemies initially appear onscreen.
+        activeTarget.worldX = randomBetween(-0.37*meters,0.37*meters);
+        activeTarget.worldVelocityX = actualDrill === "moving" ? (Math.random() < .5 ? -1 : 1)*({slow:1.6,normal:2.4,fast:3.3,elite:4.2}[targetSpeedSelect.value] || 2.4) : 0;
+        if(actualDrill === "peek") {
+            activeTarget.peekStartX = activeTarget.worldX;
+            activeTarget.peekSlideM = Math.min(1.8,meters*.12);
+        }
+        renderPerspectiveScene();
+    }
     renderTarget();
 }
 
@@ -476,7 +610,7 @@ function updateInput(deltaMs) {
     const rawMoveX = gamepad.axes[LEFT_STICK_X_AXIS] || 0;
     const rawMoveY = gamepad.axes[LEFT_STICK_Y_AXIS] || 0;
     const moveVector = applyRadialDeadzone(rawMoveX, rawMoveY, LEFT_STICK_MIN, LEFT_STICK_MAX);
-    moveWorld(moveVector.x, moveVector.y, deltaMs);
+    if (!perspectiveEnabled) moveWorld(moveVector.x, moveVector.y, deltaMs);
 
     const rawAimX = gamepad.axes[RIGHT_STICK_X_AXIS] || 0;
     const rawAimY = gamepad.axes[RIGHT_STICK_Y_AXIS] || 0;
@@ -487,7 +621,8 @@ function updateInput(deltaMs) {
     crosshairX = 50;
     crosshairY = 50;
     renderCrosshair();
-    moveAimWorld(aimVector.x, aimVector.y, deltaMs);
+    if (perspectiveEnabled) updatePerspectiveInput(moveVector.x, moveVector.y, aimVector.x, aimVector.y, deltaMs);
+    else moveAimWorld(aimVector.x, aimVector.y, deltaMs);
 
     const moveMagnitude = Math.hypot(moveVector.x, moveVector.y);
     const aimMagnitude = Math.hypot(aimVector.x, aimVector.y);
@@ -589,6 +724,12 @@ function updateTarget(timestamp, deltaMs) {
     if (!activeTarget || activeTarget.resolved || roundLocked) return;
 
     if (activeTarget.kind === "moving") {
+        if (perspectiveEnabled) {
+            activeTarget.worldX += activeTarget.worldVelocityX*(deltaMs/1000);
+            placePerspectiveTarget();
+            if (Math.abs(activeTarget.worldX)>activeTarget.worldZ*1.3) handleTargetEscape("The moving target escaped.");
+            return;
+        }
         activeTarget.x += activeTarget.vx * (deltaMs / 1000);
         renderTarget();
 
@@ -619,6 +760,12 @@ function updateTarget(timestamp, deltaMs) {
             return;
         }
 
+        if (perspectiveEnabled) {
+            const t = activeTarget;
+            // Move in/out of cover along the actual X axis, using original peek timings.
+            const slideFraction=(t.worldZ/20);
+            t.worldX=t.peekStartX+(t.x-t.hiddenX)/10*t.peekSlideM*slideFraction;
+        }
         renderTarget();
         return;
     }
@@ -664,6 +811,7 @@ function evaluateHit() {
 
     const arenaRect = arena.getBoundingClientRect();
     const targetRect = activeTarget.element.getBoundingClientRect();
+    if (perspectiveEnabled && activeTarget.element.style.display === "none") return {hit:false,center:false};
     const aimX = arenaRect.left + (crosshairX / 100) * arenaRect.width;
     const aimY = arenaRect.top + (crosshairY / 100) * arenaRect.height;
     const targetCenterX = targetRect.left + targetRect.width / 2;
@@ -843,6 +991,7 @@ function renderTarget() {
     if (!activeTarget?.element) return;
     activeTarget.element.style.left = `${activeTarget.x}%`;
     activeTarget.element.style.top = `${activeTarget.y}%`;
+    if (perspectiveEnabled) placePerspectiveTarget();
 }
 
 function clearTarget() {
@@ -1134,6 +1283,7 @@ function clamp(value, minimum, maximum) {
 window.addEventListener("resize", renderWorldOffset);
 document.addEventListener("fullscreenchange", renderWorldOffset);
 
+setupPerspectiveUI();
 setupAimSpeedControl();
 setupMoveSpeedControl();
 renderCrosshair();
