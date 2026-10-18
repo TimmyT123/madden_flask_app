@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ perspective trainer v20261018-0.8
+// WURD Knife Practice DMZ perspective trainer v20261018-1.0
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
@@ -281,7 +281,7 @@ function setupPerspectiveUI() {
     perspectiveToggle.type = "checkbox";
     try { perspectiveEnabled = localStorage.getItem(PERSPECTIVE_STORAGE_KEY) !== "false"; } catch {}
     perspectiveToggle.checked = perspectiveEnabled;
-    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.8)"));
+    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v1.0)"));
     perspectiveToggle.addEventListener("change", () => {
         perspectiveEnabled = perspectiveToggle.checked;
         try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, String(perspectiveEnabled)); } catch {}
@@ -372,22 +372,70 @@ function perspectiveProject(x, z, heightM) {
 function renderPerspectiveScene() {
     if (!perspectiveEnabled || !perspectiveCanvas) return;
     const rect = arena.getBoundingClientRect();
-    const w = Math.max(1,Math.round(rect.width)), h = Math.max(1,Math.round(rect.height));
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
     if (perspectiveCanvas.width !== w || perspectiveCanvas.height !== h) {
-        perspectiveCanvas.width = w; perspectiveCanvas.height = h;
+        perspectiveCanvas.width = w;
+        perspectiveCanvas.height = h;
     }
     const c = perspectiveCanvas.getContext("2d");
-    const horizon = perspectiveProject(cameraX, cameraZ+50, CAMERA_HEIGHT_M);
-    const hy = horizon ? Math.max(-h,Math.min(h*2,horizon.y)) : h/2;
-    c.fillStyle="#172b3e";c.fillRect(0,0,w,h);
-    c.fillStyle="#293a35";c.fillRect(0,hy,w,h-hy);
-    c.strokeStyle="rgba(190,212,194,.28)";c.lineWidth=1;
-    function line(a,b) {if(!a||!b)return;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();}
-    // Road/grid recedes to the vanishing point and translates under movement.
-    for(let x=-120;x<=120;x+=5) line(perspectiveProject(x, cameraZ+1,0),perspectiveProject(x,cameraZ+110,0));
-    for(let z=Math.floor(cameraZ/5)*5+5;z<cameraZ+110;z+=5)
-      line(perspectiveProject(cameraX-120,z,0),perspectiveProject(cameraX+120,z,0));
-    // Keep the projected 3D scene free of the three large cover/shield markers.
+    const focal = (w / 2) / Math.tan(PERSPECTIVE_FOV_DEG * Math.PI / 360);
+    // The horizon is camera-relative, not fixed along world +Z.
+    // This works for the entire 360-degree turn, including behind the spawn.
+    const horizonY = h / 2 + Math.tan(cameraPitch) * focal;
+    c.fillStyle = "#172b3e";
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = "#293a35";
+    c.fillRect(0, Math.max(0, horizonY), w, h - Math.max(0, horizonY));
+    c.strokeStyle = "rgba(190,212,194,.28)";
+    c.lineWidth = 1;
+
+    const cos = Math.cos(cameraYaw);
+    const sin = Math.sin(cameraYaw);
+    const near = 0.5;
+    function toCamera(wx, wz) {
+        const dx = wx - cameraX;
+        const dz = wz - cameraZ;
+        return {right: dx * cos - dz * sin, forward: dx * sin + dz * cos};
+    }
+    function drawWorldGroundLine(x1, z1, x2, z2) {
+        let a = toCamera(x1, z1);
+        let b = toCamera(x2, z2);
+        if (a.forward < near && b.forward < near) return;
+        // Clip world line to the near plane so turning 180 degrees doesn't
+        // create inverted lines or streaks from points behind the camera.
+        if (a.forward < near) {
+            const t = (near - a.forward) / (b.forward - a.forward);
+            a = {right: a.right + t * (b.right - a.right), forward: near};
+        } else if (b.forward < near) {
+            const t = (near - b.forward) / (a.forward - b.forward);
+            b = {right: b.right + t * (a.right - b.right), forward: near};
+        }
+        const ax = w / 2 + focal * a.right / a.forward;
+        const bx = w / 2 + focal * b.right / b.forward;
+        const ay = horizonY + focal * CAMERA_HEIGHT_M / a.forward;
+        const by = horizonY + focal * CAMERA_HEIGHT_M / b.forward;
+        if (![ax, bx, ay, by].every(Number.isFinite)) return;
+        c.beginPath();
+        c.moveTo(ax, ay);
+        c.lineTo(bx, by);
+        c.stroke();
+    }
+    // World-anchored grid covering every direction. The origin follows the
+    // player in 5-meter increments, so walking does not cause grid jumping.
+    const spacing = 5;
+    const reach = 120;
+    const minX = Math.floor((cameraX - reach) / spacing) * spacing;
+    const maxX = Math.ceil((cameraX + reach) / spacing) * spacing;
+    const minZ = Math.floor((cameraZ - reach) / spacing) * spacing;
+    const maxZ = Math.ceil((cameraZ + reach) / spacing) * spacing;
+    for (let x = minX; x <= maxX; x += spacing) {
+        drawWorldGroundLine(x, minZ, x, maxZ);
+    }
+    for (let z = minZ; z <= maxZ; z += spacing) {
+        drawWorldGroundLine(minX, z, maxX, z);
+    }
+    // No old 2D shield markers are drawn in the 3D scene.
 }
 function placePerspectiveTarget() {
     if (!perspectiveEnabled || !activeTarget) return;
