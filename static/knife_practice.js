@@ -1023,14 +1023,10 @@ function updateTarget(timestamp, deltaMs) {
             activeTarget.worldZ += activeTarget.worldVelocityZ*(deltaMs/1000);
             placePerspectiveTarget();
             if (isAudioHunt()) {
-                if (timestamp >= activeTarget.deadlineAt) handleTargetEscape("Enemy escaped — listen and react sooner.");
                 return;
             }
-            // Check escape relative to camera direction, even after the player turns.
-            const targetProjection = perspectiveProject(activeTarget.worldX, activeTarget.worldZ, ENEMY_HEIGHT_M * .53);
-            if (!targetProjection || targetProjection.x < -targetProjection.w * .15 || targetProjection.x > targetProjection.w * 1.15) {
-                handleTargetEscape("The moving target escaped.");
-            }
+            // In 3D, keep the enemy active even when it moves out of view.
+            // The player can turn, chase, and knife it later.
             return;
         }
         activeTarget.x += activeTarget.vx * (deltaMs / 1000);
@@ -1059,8 +1055,14 @@ function updateTarget(timestamp, deltaMs) {
             activeTarget.x = lerp(activeTarget.exposedX, activeTarget.hiddenX, progress);
             activeTarget.throwable = progress <= 0.35;
         } else {
-            handleTargetEscape("The target returned behind cover.");
-            return;
+            if (perspectiveEnabled) {
+                // In 3D, keep the peek target out and throwable instead of ending the round.
+                activeTarget.x = activeTarget.exposedX;
+                activeTarget.throwable = true;
+            } else {
+                handleTargetEscape("The target returned behind cover.");
+                return;
+            }
         }
 
         if (perspectiveEnabled) {
@@ -1074,7 +1076,9 @@ function updateTarget(timestamp, deltaMs) {
     }
 
     if (timestamp >= activeTarget.deadlineAt) {
-        handleTargetEscape("Too slow — the target dropped.");
+        if (!perspectiveEnabled) {
+            handleTargetEscape("Too slow — the target dropped.");
+        }
     }
 }
 
@@ -1088,7 +1092,6 @@ function throwKnife() {
 
     roundLocked = true;
     throwsMade += 1;
-    roundsCompleted += 1;
     updateKnifeReady(false);
     animateKnifeThrow();
 
@@ -1135,7 +1138,31 @@ function evaluateHit() {
 function handleThrowResult(didHit, wasCenter, reactionMs, message) {
     if (!activeTarget) return;
 
+    // In 3D, a missed throw should NOT remove the enemy.
+    // Keep the same target alive so the player can try again.
+    if (perspectiveEnabled && !didHit) {
+        activeTarget.resolved = false;
+        placePerspectiveTarget();
+        activeTarget.element.style.animation = "none";
+        activeTarget.element.style.transition = "none";
+        streak = 0;
+        activeTarget.element.classList.add("missed");
+        playSound(wrongSound);
+        setFeedback(message + " Enemy still active — throw again.", "bad");
+        updateScoreboard();
+
+        clearTimeout(nextTargetTimer);
+        nextTargetTimer = setTimeout(() => {
+            if (!activeTarget || activeTarget.resolved || drillComplete) return;
+            activeTarget.element.classList.remove("missed");
+            roundLocked = false;
+            setFeedback("Enemy still active — reacquire and throw again.", "info");
+        }, Math.max(220, KNIFE_RECOVERY_MS));
+        return;
+    }
+
     activeTarget.resolved = true;
+    roundsCompleted += 1;
 
     // In the original 2D page, hit/miss CSS animates target transforms.
     // Keep the exact projected position and scale after the throw in 3D.
