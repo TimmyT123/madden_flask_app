@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ perspective trainer v20261018-0.3
+// WURD Knife Practice DMZ perspective trainer v20261018-0.4
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
@@ -152,7 +152,7 @@ function setupPerspectiveUI() {
     perspectiveToggle.type = "checkbox";
     try { perspectiveEnabled = localStorage.getItem(PERSPECTIVE_STORAGE_KEY) !== "false"; } catch {}
     perspectiveToggle.checked = perspectiveEnabled;
-    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.3)"));
+    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.4)"));
     perspectiveToggle.addEventListener("change", () => {
         perspectiveEnabled = perspectiveToggle.checked;
         try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, String(perspectiveEnabled)); } catch {}
@@ -169,9 +169,27 @@ function setupPerspectiveUI() {
     perspectiveCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0";
     arena.insertBefore(perspectiveCanvas, arena.firstChild);
     const style=document.createElement("style");
-    style.textContent=`.knife-perspective .cover,.knife-perspective .shield,.knife-perspective .obstacle,.knife-perspective [class*="shield"],.knife-perspective [class*="cover-block"]{display:none!important}.knife-perspective #targetLayer,.knife-perspective #knifeLayer{z-index:2!important}.knife-perspective #crosshair{z-index:5!important}.knife-perspective .target{transition:none!important}`;
+    // In the original HTML, the three shield/cover graphics may not use
+    // the class names guessed in v0.3. Hide all decorative arena siblings
+    // instead, explicitly retaining the interactive/HUD elements.
+    style.textContent = `
+      #arena.knife-perspective { background-image:none!important; }
+      #arena.knife-perspective::before,
+      #arena.knife-perspective::after { content:none!important;display:none!important; }
+      #arena.knife-perspective > :not(canvas):not(#targetLayer):not(#knifeLayer)
+        :not(#crosshair):not(#countdown):not(#hitMarker):not(.knife-distance-display) {
+          display:none!important;
+        }
+      #arena.knife-perspective #targetLayer,
+      #arena.knife-perspective #knifeLayer { z-index:2!important; }
+      #arena.knife-perspective #crosshair,
+      #arena.knife-perspective #hitMarker { z-index:5!important; }
+      #arena.knife-perspective #countdown { z-index:6!important; }
+      #arena.knife-perspective .target { transition:none!important; }
+    `;
     document.head.appendChild(style);
     distanceDisplay = document.createElement("div");
+    distanceDisplay.className = "knife-distance-display";
     distanceDisplay.style.cssText = "position:absolute;right:12px;top:12px;z-index:9;background:#091a23cc;color:white;font:600 14px system-ui;padding:5px 9px;border-radius:6px;pointer-events:none";
     arena.appendChild(distanceDisplay);
     syncPerspectiveUI();
