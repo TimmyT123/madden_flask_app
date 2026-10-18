@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ perspective trainer v20261018-0.6
+// WURD Knife Practice DMZ perspective trainer v20261018-0.7
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
@@ -136,6 +136,17 @@ const PERSPECTIVE_FOV_DEG = 75;
 const CAMERA_HEIGHT_M = 1.7;
 const ENEMY_HEIGHT_M = 1.75;
 const DISTANCES_M = [2, 3, 5, 8, 10, 20, 40];
+// Give close targets faster real-world lateral motion, in addition to
+// their naturally faster on-screen motion from perspective projection.
+function distanceMovementMultiplier(distanceM) {
+    if (distanceM <= 2) return 1.7;
+    if (distanceM <= 3) return 1.55;
+    if (distanceM <= 5) return 1.4;
+    if (distanceM <= 8) return 1.25;
+    if (distanceM <= 10) return 1.15;
+    if (distanceM <= 20) return 1.05;
+    return 1.0;
+}
 const WALK_METERS_PER_SECOND = 4.0;
 const VIEW_TURN_DEG_PER_SECOND = 155; // adjustable through existing Aim Speed
 const PERSPECTIVE_STORAGE_KEY = "wurdKnifePerspectiveEnabled";
@@ -152,7 +163,7 @@ function setupPerspectiveUI() {
     perspectiveToggle.type = "checkbox";
     try { perspectiveEnabled = localStorage.getItem(PERSPECTIVE_STORAGE_KEY) !== "false"; } catch {}
     perspectiveToggle.checked = perspectiveEnabled;
-    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.6)"));
+    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.7)"));
     perspectiveToggle.addEventListener("change", () => {
         perspectiveEnabled = perspectiveToggle.checked;
         try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, String(perspectiveEnabled)); } catch {}
@@ -624,7 +635,10 @@ function spawnNextTarget() {
         const lateral = randomBetween(-0.32*meters, 0.32*meters);
         activeTarget.worldX = cameraX + lateral*Math.cos(cameraYaw) + meters*Math.sin(cameraYaw);
         activeTarget.worldZ = cameraZ - lateral*Math.sin(cameraYaw) + meters*Math.cos(cameraYaw);
-        activeTarget.worldVelocityX = actualDrill === "moving" ? (Math.random() < .5 ? -1 : 1)*({slow:1.6,normal:2.4,fast:3.3,elite:4.2}[targetSpeedSelect.value] || 2.4) : 0;
+        const baseLateralSpeed = ({slow:1.6,normal:2.4,fast:3.3,elite:4.2}[targetSpeedSelect.value] || 2.4);
+        activeTarget.worldVelocityX = actualDrill === "moving"
+            ? (Math.random() < .5 ? -1 : 1) * baseLateralSpeed * distanceMovementMultiplier(meters)
+            : 0;
         if(actualDrill === "peek") {
             activeTarget.peekStartX = activeTarget.worldX;
             activeTarget.peekSlideM = Math.min(1.8,meters*.12);
@@ -818,7 +832,11 @@ function updateTarget(timestamp, deltaMs) {
         if (perspectiveEnabled) {
             activeTarget.worldX += activeTarget.worldVelocityX*(deltaMs/1000);
             placePerspectiveTarget();
-            if (Math.abs(activeTarget.worldX)>activeTarget.worldZ*1.3) handleTargetEscape("The moving target escaped.");
+            // Check escape relative to camera direction, even after the player turns.
+            const targetProjection = perspectiveProject(activeTarget.worldX, activeTarget.worldZ, ENEMY_HEIGHT_M * .53);
+            if (!targetProjection || targetProjection.x < -targetProjection.w * .15 || targetProjection.x > targetProjection.w * 1.15) {
+                handleTargetEscape("The moving target escaped.");
+            }
             return;
         }
         activeTarget.x += activeTarget.vx * (deltaMs / 1000);
