@@ -154,6 +154,7 @@ let perspectiveEnabled = true;
 let cameraX = 0, cameraZ = 0, cameraYaw = 0, cameraPitch = 0;
 let perspectiveCanvas = null, perspectiveCtx = null, distanceDisplay = null;
 let perspectiveToggle = null;
+// v0.9: Fix left/right sound orientation for browser Web Audio coordinates.
 // v0.8: optional 360-degree sound hunt. The player must turn to find the target.
 const AUDIO_HUNT_KEY = "wurdKnifeAudioHuntEnabled";
 let audioHuntEnabled = false;
@@ -242,11 +243,22 @@ function playPositionalFootstep() {
         panner.rolloffFactor = 0.85;
         panner.coneInnerAngle = 360;
         panner.coneOuterAngle = 360;
+        // Our visual camera uses +X as screen-right when facing +Z.
+        // Web Audio's listener (+Z forward, +Y up) considers -X its right.
+        // Mirror the SOUND ONLY across the current facing axis so the
+        // footsteps agree with the visible enemy. World/aim are unchanged.
+        const dx = activeTarget.worldX - cameraX;
+        const dz = activeTarget.worldZ - cameraZ;
+        const sin = Math.sin(cameraYaw), cos = Math.cos(cameraYaw);
+        const visualRight = dx * cos - dz * sin;
+        const visualForward = dx * sin + dz * cos;
+        const soundX = cameraX - visualRight * cos + visualForward * sin;
+        const soundZ = cameraZ + visualRight * sin + visualForward * cos;
         if (panner.positionX) {
-            setAudioParam(panner.positionX, activeTarget.worldX);
+            setAudioParam(panner.positionX, soundX);
             setAudioParam(panner.positionY, 0);
-            setAudioParam(panner.positionZ, activeTarget.worldZ);
-        } else if (panner.setPosition) panner.setPosition(activeTarget.worldX, 0, activeTarget.worldZ);
+            setAudioParam(panner.positionZ, soundZ);
+        } else if (panner.setPosition) panner.setPosition(soundX, 0, soundZ);
         src.connect(filter); filter.connect(gain); gain.connect(panner); panner.connect(ctx.destination);
         src.onended = () => { try { src.disconnect(); filter.disconnect(); gain.disconnect(); panner.disconnect(); } catch {} };
         src.start();
