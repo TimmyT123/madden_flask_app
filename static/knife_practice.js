@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ perspective trainer v20261018-0.4
+// WURD Knife Practice DMZ perspective trainer v20261018-0.5
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
@@ -152,7 +152,7 @@ function setupPerspectiveUI() {
     perspectiveToggle.type = "checkbox";
     try { perspectiveEnabled = localStorage.getItem(PERSPECTIVE_STORAGE_KEY) !== "false"; } catch {}
     perspectiveToggle.checked = perspectiveEnabled;
-    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.4)"));
+    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.5)"));
     perspectiveToggle.addEventListener("change", () => {
         perspectiveEnabled = perspectiveToggle.checked;
         try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, String(perspectiveEnabled)); } catch {}
@@ -166,25 +166,30 @@ function setupPerspectiveUI() {
     if (getComputedStyle(arena).position === "static") arena.style.position = "relative";
     perspectiveCanvas = document.createElement("canvas");
     perspectiveCanvas.setAttribute("aria-hidden", "true");
-    perspectiveCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0";
+    perspectiveCanvas.className = "knife-perspective-scene";
+    perspectiveCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1000";
     arena.insertBefore(perspectiveCanvas, arena.firstChild);
     const style=document.createElement("style");
-    // In the original HTML, the three shield/cover graphics may not use
-    // the class names guessed in v0.3. Hide all decorative arena siblings
-    // instead, explicitly retaining the interactive/HUD elements.
+    // v0.5: Put the solid 3D scene above the old arena decorations, but
+    // below the target, knife, and reticle. Do NOT hide unknown children:
+    // v0.4 accidentally concealed the crosshair via a parent selector.
     style.textContent = `
-      #arena.knife-perspective { background-image:none!important; }
+      #arena.knife-perspective { background-image:none!important; isolation:isolate; }
       #arena.knife-perspective::before,
       #arena.knife-perspective::after { content:none!important;display:none!important; }
-      #arena.knife-perspective > :not(canvas):not(#targetLayer):not(#knifeLayer)
-        :not(#crosshair):not(#countdown):not(#hitMarker):not(.knife-distance-display) {
-          display:none!important;
-        }
-      #arena.knife-perspective #targetLayer,
-      #arena.knife-perspective #knifeLayer { z-index:2!important; }
-      #arena.knife-perspective #crosshair,
-      #arena.knife-perspective #hitMarker { z-index:5!important; }
-      #arena.knife-perspective #countdown { z-index:6!important; }
+      #arena.knife-perspective > canvas.knife-perspective-scene {
+        position:absolute!important; inset:0!important;
+        z-index:1000!important; display:block!important;
+      }
+      #arena.knife-perspective #targetLayer { z-index:1010!important; }
+      #arena.knife-perspective #knifeLayer { z-index:1020!important; }
+      #arena.knife-perspective #crosshair {
+        z-index:1050!important; display:block!important;
+        visibility:visible!important; opacity:1!important;
+      }
+      #arena.knife-perspective #hitMarker { z-index:1051!important; }
+      #arena.knife-perspective #countdown { z-index:1052!important; }
+      #arena.knife-perspective .knife-distance-display { z-index:1053!important; }
       #arena.knife-perspective .target { transition:none!important; }
     `;
     document.head.appendChild(style);
@@ -192,6 +197,11 @@ function setupPerspectiveUI() {
     distanceDisplay.className = "knife-distance-display";
     distanceDisplay.style.cssText = "position:absolute;right:12px;top:12px;z-index:9;background:#091a23cc;color:white;font:600 14px system-ui;padding:5px 9px;border-radius:6px;pointer-events:none";
     arena.appendChild(distanceDisplay);
+    // Keep the reticle above the scene without relying on unknown HTML structure.
+    crosshair.style.zIndex = "1050";
+    crosshair.style.visibility = "visible";
+    if (targetLayer) targetLayer.style.zIndex = "1010";
+    if (knifeLayer) knifeLayer.style.zIndex = "1020";
     syncPerspectiveUI();
 }
 function syncPerspectiveUI() {
@@ -199,6 +209,10 @@ function syncPerspectiveUI() {
     if (distanceDisplay) distanceDisplay.style.display = perspectiveEnabled ? "block" : "none";
     // Hide flat background when perspective mode is in use, leaving existing targets/UI intact.
     arena.classList.toggle("knife-perspective", perspectiveEnabled);
+    // Force the scene over old shield artwork. CSS from the webpage can otherwise
+    // paint cover art on top even when its class name is unknown.
+    if (perspectiveCanvas) perspectiveCanvas.style.zIndex = "1000";
+    if (crosshair) crosshair.style.zIndex = perspectiveEnabled ? "1050" : "";
 }
 function perspectiveProject(x, z, heightM) {
     const rect = arena.getBoundingClientRect();
