@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ perspective trainer v20261018-0.7
+// WURD Knife Practice DMZ perspective trainer v20261018-0.8
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
@@ -154,6 +154,112 @@ let perspectiveEnabled = true;
 let cameraX = 0, cameraZ = 0, cameraYaw = 0, cameraPitch = 0;
 let perspectiveCanvas = null, perspectiveCtx = null, distanceDisplay = null;
 let perspectiveToggle = null;
+// v0.8: optional 360-degree sound hunt. The player must turn to find the target.
+const AUDIO_HUNT_KEY = "wurdKnifeAudioHuntEnabled";
+let audioHuntEnabled = false;
+let audioHuntToggle = null;
+let footstepsContext = null;
+let footstepNoiseBuffer = null;
+let nextFootstepAt = 0;
+let activeFootstepVoices = [];
+try { audioHuntEnabled = localStorage.getItem(AUDIO_HUNT_KEY) === "true"; } catch {}
+function isAudioHunt() { return perspectiveEnabled && audioHuntEnabled; }
+function setupAudioHuntUI(wrap) {
+    const label = document.createElement("label");
+    audioHuntToggle = document.createElement("input");
+    audioHuntToggle.type = "checkbox";
+    audioHuntToggle.checked = audioHuntEnabled;
+    label.append(audioHuntToggle, document.createTextNode(" 360° Sound Hunt (headphones)"));
+    const note = document.createElement("small");
+    note.textContent = "Locate enemies by footsteps, including behind you. No directional indicator.";
+    audioHuntToggle.addEventListener("change", () => {
+        audioHuntEnabled = audioHuntToggle.checked;
+        try { localStorage.setItem(AUDIO_HUNT_KEY, String(audioHuntEnabled)); } catch {}
+        if (audioHuntEnabled && !perspectiveEnabled) {
+            perspectiveEnabled = true;
+            perspectiveToggle.checked = true;
+            try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, "true"); } catch {}
+        }
+        startPractice();
+    });
+    wrap.append(label, note);
+}
+function initializeFootstepAudio() {
+    if (!isAudioHunt() || volumePercent === 0) return;
+    try {
+        if (!footstepsContext) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            footstepsContext = new AudioContextClass();
+            const length = Math.max(1, Math.floor(footstepsContext.sampleRate * 0.085));
+            footstepNoiseBuffer = footstepsContext.createBuffer(1, length, footstepsContext.sampleRate);
+            const samples = footstepNoiseBuffer.getChannelData(0);
+            for (let i = 0; i < length; i++) {
+                const envelope = Math.pow(1 - i / length, 2);
+                samples[i] = (Math.random() * 2 - 1) * envelope;
+            }
+        }
+        if (footstepsContext.state === "suspended") footstepsContext.resume().catch(() => {});
+    } catch (error) { console.warn("Footstep audio unavailable:", error); }
+}
+function setAudioParam(param, value) {
+    if (param?.setValueAtTime && footstepsContext) param.setValueAtTime(value, footstepsContext.currentTime);
+}
+function updateAudioListener() {
+    if (!footstepsContext || !isAudioHunt()) return;
+    const listener = footstepsContext.listener;
+    setAudioParam(listener.positionX, cameraX);
+    setAudioParam(listener.positionY, CAMERA_HEIGHT_M);
+    setAudioParam(listener.positionZ, cameraZ);
+    setAudioParam(listener.forwardX, Math.sin(cameraYaw));
+    setAudioParam(listener.forwardY, 0);
+    setAudioParam(listener.forwardZ, Math.cos(cameraYaw));
+    setAudioParam(listener.upX, 0);
+    setAudioParam(listener.upY, 1);
+    setAudioParam(listener.upZ, 0);
+    // Older browser API support.
+    if (!listener.positionX && listener.setPosition) listener.setPosition(cameraX, CAMERA_HEIGHT_M, cameraZ);
+    if (!listener.forwardX && listener.setOrientation)
+        listener.setOrientation(Math.sin(cameraYaw), 0, Math.cos(cameraYaw), 0, 1, 0);
+}
+function playPositionalFootstep() {
+    if (!footstepsContext || footstepsContext.state !== "running" || !footstepNoiseBuffer ||
+        !isAudioHunt() || volumePercent === 0 || !activeTarget || activeTarget.resolved || roundLocked || practicePaused) return;
+    try {
+        const ctx = footstepsContext;
+        const src = ctx.createBufferSource();
+        src.buffer = footstepNoiseBuffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 680 + Math.random() * 280;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.65 * volumePercent / 100;
+        const panner = ctx.createPanner();
+        panner.panningModel = "HRTF";
+        panner.distanceModel = "inverse";
+        panner.refDistance = 2;
+        panner.maxDistance = 55;
+        panner.rolloffFactor = 0.85;
+        panner.coneInnerAngle = 360;
+        panner.coneOuterAngle = 360;
+        if (panner.positionX) {
+            setAudioParam(panner.positionX, activeTarget.worldX);
+            setAudioParam(panner.positionY, 0);
+            setAudioParam(panner.positionZ, activeTarget.worldZ);
+        } else if (panner.setPosition) panner.setPosition(activeTarget.worldX, 0, activeTarget.worldZ);
+        src.connect(filter); filter.connect(gain); gain.connect(panner); panner.connect(ctx.destination);
+        src.onended = () => { try { src.disconnect(); filter.disconnect(); gain.disconnect(); panner.disconnect(); } catch {} };
+        src.start();
+    } catch (error) { console.warn("Footstep playback unavailable:", error); }
+}
+function tickFootsteps(timestamp) {
+    if (!isAudioHunt() || !activeTarget || activeTarget.resolved || roundLocked || practicePaused) return;
+    if (timestamp >= nextFootstepAt) {
+        playPositionalFootstep();
+        nextFootstepAt = timestamp + randomBetween(330, 490);
+    }
+}
+
 
 function setupPerspectiveUI() {
     const wrap = document.createElement("div");
@@ -163,7 +269,7 @@ function setupPerspectiveUI() {
     perspectiveToggle.type = "checkbox";
     try { perspectiveEnabled = localStorage.getItem(PERSPECTIVE_STORAGE_KEY) !== "false"; } catch {}
     perspectiveToggle.checked = perspectiveEnabled;
-    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.7)"));
+    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.8)"));
     perspectiveToggle.addEventListener("change", () => {
         perspectiveEnabled = perspectiveToggle.checked;
         try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, String(perspectiveEnabled)); } catch {}
@@ -172,6 +278,7 @@ function setupPerspectiveUI() {
     const note = document.createElement("small");
     note.textContent = "Distance, true-size targets, camera turn and strafing (experimental)";
     wrap.append(label, note);
+    setupAudioHuntUI(wrap);
     gameArea.parentElement.insertBefore(wrap, gameArea);
     // Put canvas behind targets, without modifying the HTML file.
     if (getComputedStyle(arena).position === "static") arena.style.position = "relative";
@@ -235,6 +342,7 @@ function syncPerspectiveUI() {
     // paint cover art on top even when its class name is unknown.
     if (perspectiveCanvas) perspectiveCanvas.style.zIndex = "1000";
     if (crosshair) crosshair.style.zIndex = perspectiveEnabled ? "1050" : "";
+    if (audioHuntToggle) audioHuntToggle.disabled = !perspectiveEnabled;
 }
 function perspectiveProject(x, z, heightM) {
     const rect = arena.getBoundingClientRect();
@@ -273,7 +381,11 @@ function placePerspectiveTarget() {
     if (!perspectiveEnabled || !activeTarget) return;
     const t=activeTarget;
     const p=perspectiveProject(t.worldX,t.worldZ,ENEMY_HEIGHT_M*.53);
-    if (!p || p.depth > 140) {t.element.style.display="none";distanceDisplay.textContent="Target out of view";return;}
+    if (!p || p.depth > 140 || p.x < -p.w*.3 || p.x > p.w*1.3) {
+        t.element.style.display="none";
+        distanceDisplay.textContent=isAudioHunt() ? "Listen for footsteps — turn to find the enemy" : "Target out of view";
+        return;
+    }
     t.element.style.display="";
     const desiredHeight=p.focal*ENEMY_HEIGHT_M/p.depth;
     const baselineHeight=t.element.offsetHeight || 90;
@@ -283,7 +395,7 @@ function placePerspectiveTarget() {
     t.element.style.top=`${p.y/p.h*100}%`;
     t.element.style.transform=`translate(-50%,-50%) scale(${scale})`;
     t.element.style.transformOrigin="center center";
-    distanceDisplay.textContent=`Target: ${Math.round(Math.hypot(t.worldX-cameraX,t.worldZ-cameraZ))} m`;
+    distanceDisplay.textContent=isAudioHunt() ? "Enemy in sight" : `Target: ${Math.round(Math.hypot(t.worldX-cameraX,t.worldZ-cameraZ))} m`;
 }
 function updatePerspectiveInput(moveX,moveY,aimX,aimY,deltaMs) {
     const dt=deltaMs/1000;
@@ -296,6 +408,7 @@ function updatePerspectiveInput(moveX,moveY,aimX,aimY,deltaMs) {
     // Stick up (negative Y) moves camera forward (+Z), including rotated headings.
     renderPerspectiveScene();
     placePerspectiveTarget();
+    updateAudioListener();
 }
 
 const WORLD_LIMIT_X = 18;
@@ -455,6 +568,7 @@ arena.addEventListener("pointerdown", event => {
 });
 
 function startPractice() {
+    if (isAudioHunt()) initializeFootstepAudio();
     const thisSequence = ++startSequenceId;
 
     practicePaused = false;
@@ -499,6 +613,8 @@ function startPractice() {
     aimWorldOffsetX = 0;
     aimWorldOffsetY = 0;
     cameraX = 0; cameraZ = 0; cameraYaw = 0; cameraPitch = 0;
+    nextFootstepAt = 0;
+    if (isAudioHunt()) { initializeFootstepAudio(); updateAudioListener(); }
     syncPerspectiveUI();
 
     crosshairX = 50;
@@ -598,7 +714,7 @@ function spawnNextTarget() {
         throwable: true,
         resolved: false,
         sizePadding,
-        worldX: 0, worldZ: 20, worldVelocityX: 0,
+        worldX: 0, worldZ: 20, worldVelocityX: 0, worldVelocityZ: 0,
     };
 
     if (actualDrill === "moving") {
@@ -630,16 +746,28 @@ function spawnNextTarget() {
 
     if (perspectiveEnabled) {
         const meters = chooseRandom(DISTANCES_M);
-        // Spawn relative to where the player is facing, not the world's fixed Z axis.
-        // This also prevents nearby respawns from being placed behind the camera.
-        const lateral = randomBetween(-0.32*meters, 0.32*meters);
-        activeTarget.worldX = cameraX + lateral*Math.cos(cameraYaw) + meters*Math.sin(cameraYaw);
-        activeTarget.worldZ = cameraZ - lateral*Math.sin(cameraYaw) + meters*Math.cos(cameraYaw);
+        // Sound Hunt spawns around all 360 degrees, with frequent rear targets.
+        const angleFromView = isAudioHunt()
+            ? (Math.random() < .6 ? (Math.random() < .5 ? -1 : 1) * randomBetween(115, 210)
+                : randomBetween(-110, 110)) * Math.PI / 180
+            : Math.atan2(randomBetween(-.32 * meters, .32 * meters), meters);
+        const bearing = cameraYaw + angleFromView;
+        activeTarget.worldX = cameraX + meters * Math.sin(bearing);
+        activeTarget.worldZ = cameraZ + meters * Math.cos(bearing);
         const baseLateralSpeed = ({slow:1.6,normal:2.4,fast:3.3,elite:4.2}[targetSpeedSelect.value] || 2.4);
-        activeTarget.worldVelocityX = actualDrill === "moving"
-            ? (Math.random() < .5 ? -1 : 1) * baseLateralSpeed * distanceMovementMultiplier(meters)
-            : 0;
-        if(actualDrill === "peek") {
+        const lateralSpeed = (Math.random() < .5 ? -1 : 1) * baseLateralSpeed * distanceMovementMultiplier(meters);
+        activeTarget.worldVelocityX = actualDrill === "moving" ? lateralSpeed * Math.cos(bearing) : 0;
+        activeTarget.worldVelocityZ = actualDrill === "moving" ? -lateralSpeed * Math.sin(bearing) : 0;
+        if (isAudioHunt()) {
+            // Every enemy must be findable and throwable, even if Peek was selected.
+            activeTarget.kind = actualDrill === "stationary" ? "stationary" : "moving";
+            activeTarget.throwable = true;
+            activeTarget.deadlineAt = now + 14000;
+            nextFootstepAt = now;
+            setFeedback("Listen for footsteps. Turn with the right stick, locate the enemy, then release R1.", "info");
+            initializeFootstepAudio();
+            updateAudioListener();
+        } else if (actualDrill === "peek") {
             activeTarget.peekStartX = activeTarget.worldX;
             activeTarget.peekSlideM = Math.min(1.8,meters*.12);
         }
@@ -669,6 +797,7 @@ function startAnimationLoop() {
 
         updateInput(deltaMs);
         updateTarget(timestamp, deltaMs);
+        tickFootsteps(timestamp);
         animationId = requestAnimationFrame(loop);
     };
 
@@ -831,7 +960,12 @@ function updateTarget(timestamp, deltaMs) {
     if (activeTarget.kind === "moving") {
         if (perspectiveEnabled) {
             activeTarget.worldX += activeTarget.worldVelocityX*(deltaMs/1000);
+            activeTarget.worldZ += activeTarget.worldVelocityZ*(deltaMs/1000);
             placePerspectiveTarget();
+            if (isAudioHunt()) {
+                if (timestamp >= activeTarget.deadlineAt) handleTargetEscape("Enemy escaped — listen and react sooner.");
+                return;
+            }
             // Check escape relative to camera direction, even after the player turns.
             const targetProjection = perspectiveProject(activeTarget.worldX, activeTarget.worldZ, ENEMY_HEIGHT_M * .53);
             if (!targetProjection || targetProjection.x < -targetProjection.w * .15 || targetProjection.x > targetProjection.w * 1.15) {
