@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ perspective trainer v20261018-0.2
+// WURD Knife Practice DMZ perspective trainer v20261018-0.3
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
@@ -41,6 +41,57 @@ perfectSound.volume = 0.55;
 
 const wrongSound = new Audio("/static/sounds/wrong.mp3");
 wrongSound.volume = 0.42;
+const AUDIO_VOLUME_KEY = "wurdKnifePracticeVolumePercent";
+let volumePercent = 100;
+try {
+    const savedVolume = localStorage.getItem(AUDIO_VOLUME_KEY);
+    if (savedVolume !== null && Number.isFinite(Number(savedVolume))) {
+        volumePercent = Math.round(Math.max(0, Math.min(100, Number(savedVolume))));
+    }
+} catch { /* Browser storage may be unavailable. */ }
+function updateKnifeAudioVolume() {
+    perfectSound.volume = 0.55 * volumePercent / 100;
+    wrongSound.volume = 0.42 * volumePercent / 100;
+    perfectSound.muted = wrongSound.muted = volumePercent === 0;
+}
+function setupKnifeAudioUI() {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "margin:8px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap";
+    const name = document.createElement("label");
+    name.textContent = "Practice sound: ";
+    const slider = document.createElement("input");
+    slider.type = "range"; slider.min = "0"; slider.max = "100"; slider.step = "5";
+    slider.value = String(volumePercent);
+    slider.setAttribute("aria-label", "Practice volume");
+    const value = document.createElement("span");
+    const muteLabel = document.createElement("label");
+    const mute = document.createElement("input");
+    mute.type = "checkbox";
+    let previousAudible = volumePercent || 100;
+    const refresh = () => {
+        value.textContent = volumePercent === 0 ? "Muted" : `${volumePercent}%`;
+        slider.value = String(volumePercent);
+        mute.checked = volumePercent === 0;
+        updateKnifeAudioVolume();
+        try { localStorage.setItem(AUDIO_VOLUME_KEY, String(volumePercent)); } catch {}
+    };
+    slider.addEventListener("input", () => {
+        volumePercent = Number(slider.value);
+        if (volumePercent > 0) previousAudible = volumePercent;
+        refresh();
+    });
+    mute.addEventListener("change", () => {
+        if (mute.checked) { if (volumePercent > 0) previousAudible = volumePercent; volumePercent = 0; }
+        else volumePercent = previousAudible;
+        refresh();
+    });
+    name.appendChild(slider);
+    muteLabel.append(mute, document.createTextNode(" Mute"));
+    wrap.append(name, value, muteLabel);
+    gameArea.parentElement.insertBefore(wrap, gameArea);
+    refresh();
+}
+
 
 // Standard browser Gamepad mapping for a DualSense controller.
 const LEFT_STICK_X_AXIS = 0;
@@ -101,7 +152,7 @@ function setupPerspectiveUI() {
     perspectiveToggle.type = "checkbox";
     try { perspectiveEnabled = localStorage.getItem(PERSPECTIVE_STORAGE_KEY) !== "false"; } catch {}
     perspectiveToggle.checked = perspectiveEnabled;
-    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.2)"));
+    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.3)"));
     perspectiveToggle.addEventListener("change", () => {
         perspectiveEnabled = perspectiveToggle.checked;
         try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, String(perspectiveEnabled)); } catch {}
@@ -118,7 +169,7 @@ function setupPerspectiveUI() {
     perspectiveCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0";
     arena.insertBefore(perspectiveCanvas, arena.firstChild);
     const style=document.createElement("style");
-    style.textContent=`.knife-perspective #targetLayer,.knife-perspective #knifeLayer{z-index:2!important}.knife-perspective #crosshair{z-index:5!important}.knife-perspective .target{transition:none!important}`;
+    style.textContent=`.knife-perspective .cover,.knife-perspective .shield,.knife-perspective .obstacle,.knife-perspective [class*="shield"],.knife-perspective [class*="cover-block"]{display:none!important}.knife-perspective #targetLayer,.knife-perspective #knifeLayer{z-index:2!important}.knife-perspective #crosshair{z-index:5!important}.knife-perspective .target{transition:none!important}`;
     document.head.appendChild(style);
     distanceDisplay = document.createElement("div");
     distanceDisplay.style.cssText = "position:absolute;right:12px;top:12px;z-index:9;background:#091a23cc;color:white;font:600 14px system-ui;padding:5px 9px;border-radius:6px;pointer-events:none";
@@ -162,12 +213,7 @@ function renderPerspectiveScene() {
     for(let x=-120;x<=120;x+=5) line(perspectiveProject(x, cameraZ+1,0),perspectiveProject(x,cameraZ+110,0));
     for(let z=Math.floor(cameraZ/5)*5+5;z<cameraZ+110;z+=5)
       line(perspectiveProject(cameraX-120,z,0),perspectiveProject(cameraX+120,z,0));
-    // Simple depth-correct cover markers for near/far reference.
-    c.fillStyle="rgba(45,57,66,.85)";
-    for (const marker of [{x:-10,z:12},{x:12,z:24},{x:-18,z:42}]) {
-        const a=perspectiveProject(marker.x,marker.z,2.2), b=perspectiveProject(marker.x+3,marker.z,0);
-        if(a&&b){c.fillRect(a.x,a.y,Math.max(1,b.x-a.x),Math.max(1,b.y-a.y));}
-    }
+    // Keep the projected 3D scene free of the three large cover/shield markers.
 }
 function placePerspectiveTarget() {
     if (!perspectiveEnabled || !activeTarget) return;
@@ -189,7 +235,7 @@ function updatePerspectiveInput(moveX,moveY,aimX,aimY,deltaMs) {
     const dt=deltaMs/1000;
     const yawDelta=aimX*(getAimSpeed()/DEFAULT_AIM_SPEED)*VIEW_TURN_DEG_PER_SECOND*Math.PI/180*dt;
     cameraYaw+=yawDelta;
-    cameraPitch=clamp(cameraPitch+aimY*(getAimSpeed()/DEFAULT_AIM_SPEED)*VIEW_TURN_DEG_PER_SECOND*Math.PI/180*dt,-1.1,1.1);
+    cameraPitch=clamp(cameraPitch-aimY*(getAimSpeed()/DEFAULT_AIM_SPEED)*VIEW_TURN_DEG_PER_SECOND*Math.PI/180*dt,-1.1,1.1);
     const cos=Math.cos(cameraYaw),sin=Math.sin(cameraYaw);
     cameraX+=(moveX*cos-moveY*sin)*WALK_METERS_PER_SECOND*dt;
     cameraZ+=(-moveX*sin-moveY*cos)*WALK_METERS_PER_SECOND*dt;
@@ -1152,6 +1198,7 @@ function setFeedback(message, type) {
 }
 
 function playSound(sound) {
+    if (volumePercent === 0) return;
     sound.currentTime = 0;
     sound.play().catch(error => {
         console.log("Practice sound failed:", error);
@@ -1284,6 +1331,7 @@ window.addEventListener("resize", renderWorldOffset);
 document.addEventListener("fullscreenchange", renderWorldOffset);
 
 setupPerspectiveUI();
+setupKnifeAudioUI();
 setupAimSpeedControl();
 setupMoveSpeedControl();
 renderCrosshair();
