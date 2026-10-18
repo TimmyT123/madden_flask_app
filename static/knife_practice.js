@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ perspective trainer v20261018-0.5
+// WURD Knife Practice DMZ perspective trainer v20261018-0.6
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
 
@@ -135,7 +135,7 @@ const SPEED_SETTINGS = {
 const PERSPECTIVE_FOV_DEG = 75;
 const CAMERA_HEIGHT_M = 1.7;
 const ENEMY_HEIGHT_M = 1.75;
-const DISTANCES_M = [5, 10, 20, 40];
+const DISTANCES_M = [2, 3, 5, 8, 10, 20, 40];
 const WALK_METERS_PER_SECOND = 4.0;
 const VIEW_TURN_DEG_PER_SECOND = 155; // adjustable through existing Aim Speed
 const PERSPECTIVE_STORAGE_KEY = "wurdKnifePerspectiveEnabled";
@@ -152,7 +152,7 @@ function setupPerspectiveUI() {
     perspectiveToggle.type = "checkbox";
     try { perspectiveEnabled = localStorage.getItem(PERSPECTIVE_STORAGE_KEY) !== "false"; } catch {}
     perspectiveToggle.checked = perspectiveEnabled;
-    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.5)"));
+    label.append(perspectiveToggle, document.createTextNode(" 3D Perspective (v0.6)"));
     perspectiveToggle.addEventListener("change", () => {
         perspectiveEnabled = perspectiveToggle.checked;
         try { localStorage.setItem(PERSPECTIVE_STORAGE_KEY, String(perspectiveEnabled)); } catch {}
@@ -191,6 +191,17 @@ function setupPerspectiveUI() {
       #arena.knife-perspective #countdown { z-index:1052!important; }
       #arena.knife-perspective .knife-distance-display { z-index:1053!important; }
       #arena.knife-perspective .target { transition:none!important; }
+      /* 2D hit/miss animations can replace the 3D perspective scale,
+         briefly making the enemy appear to jump toward the camera. */
+      #arena.knife-perspective .target.hit,
+      #arena.knife-perspective .target.missed,
+      #arena.knife-perspective .target.escaped {
+        animation:none!important;
+        transition:none!important;
+        opacity:.6;
+      }
+      #arena.knife-perspective .target.hit { opacity:.35; }
+
     `;
     document.head.appendChild(style);
     distanceDisplay = document.createElement("div");
@@ -608,9 +619,11 @@ function spawnNextTarget() {
 
     if (perspectiveEnabled) {
         const meters = chooseRandom(DISTANCES_M);
-        activeTarget.worldZ = meters;
-        // Lateral spread restricted by distance so most enemies initially appear onscreen.
-        activeTarget.worldX = randomBetween(-0.37*meters,0.37*meters);
+        // Spawn relative to where the player is facing, not the world's fixed Z axis.
+        // This also prevents nearby respawns from being placed behind the camera.
+        const lateral = randomBetween(-0.32*meters, 0.32*meters);
+        activeTarget.worldX = cameraX + lateral*Math.cos(cameraYaw) + meters*Math.sin(cameraYaw);
+        activeTarget.worldZ = cameraZ - lateral*Math.sin(cameraYaw) + meters*Math.cos(cameraYaw);
         activeTarget.worldVelocityX = actualDrill === "moving" ? (Math.random() < .5 ? -1 : 1)*({slow:1.6,normal:2.4,fast:3.3,elite:4.2}[targetSpeedSelect.value] || 2.4) : 0;
         if(actualDrill === "peek") {
             activeTarget.peekStartX = activeTarget.worldX;
@@ -911,6 +924,14 @@ function handleThrowResult(didHit, wasCenter, reactionMs, message) {
     if (!activeTarget) return;
 
     activeTarget.resolved = true;
+
+    // In the original 2D page, hit/miss CSS animates target transforms.
+    // Keep the exact projected position and scale after the throw in 3D.
+    if (perspectiveEnabled) {
+        placePerspectiveTarget();
+        activeTarget.element.style.animation = "none";
+        activeTarget.element.style.transition = "none";
+    }
 
     if (didHit) {
         hits += 1;
