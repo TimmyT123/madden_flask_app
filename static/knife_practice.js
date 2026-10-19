@@ -1,3 +1,4 @@
+// WURD Knife Practice DMZ v1.2 (2026-10-19) — enemies continue moving and making sound during 3D throws.
 // WURD Knife Practice DMZ perspective trainer v20261018-1.0
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
@@ -225,7 +226,7 @@ function updateAudioListener() {
 }
 function playPositionalFootstep() {
     if (!footstepsContext || footstepsContext.state !== "running" || !footstepNoiseBuffer ||
-        !isAudioHunt() || volumePercent === 0 || !activeTarget || activeTarget.resolved || roundLocked || practicePaused) return;
+        !isAudioHunt() || volumePercent === 0 || !activeTarget || activeTarget.resolved || (roundLocked && !perspectiveEnabled) || practicePaused) return;
     try {
         const ctx = footstepsContext;
         const src = ctx.createBufferSource();
@@ -265,7 +266,7 @@ function playPositionalFootstep() {
     } catch (error) { console.warn("Footstep playback unavailable:", error); }
 }
 function tickFootsteps(timestamp) {
-    if (!isAudioHunt() || !activeTarget || activeTarget.resolved || roundLocked || practicePaused) return;
+    if (!isAudioHunt() || !activeTarget || activeTarget.resolved || (roundLocked && !perspectiveEnabled) || practicePaused) return;
     if (timestamp >= nextFootstepAt) {
         playPositionalFootstep();
         nextFootstepAt = timestamp + randomBetween(330, 490);
@@ -1015,7 +1016,7 @@ function renderWorldOffset() {
 }
 
 function updateTarget(timestamp, deltaMs) {
-    if (!activeTarget || activeTarget.resolved || roundLocked) return;
+    if (!activeTarget || activeTarget.resolved || (roundLocked && !perspectiveEnabled)) return;
 
     if (activeTarget.kind === "moving") {
         if (perspectiveEnabled) {
