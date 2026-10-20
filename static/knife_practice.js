@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ v1.3 (2026-10-20) — higher aim-speed ceiling, stable controller status, quieter miss sound.
+// WURD Knife Practice DMZ v1.4 (2026-10-20) — faster moving targets and real in-flight lead-throw hit checks.
 // WURD Knife Practice DMZ perspective trainer v20261018-1.0
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
@@ -118,6 +118,8 @@ const MIN_MOVE_SPEED = 10;
 const MAX_MOVE_SPEED = 300;
 let moveSpeedInput = null;
 const KNIFE_RECOVERY_MS = 570;
+const KNIFE_FLIGHT_SPEED_MPS = 85; // 3D: hit test occurs when the knife reaches the enemy.
+let pendingKnifeFlight = null;
 const NEXT_TARGET_DELAY_MS = 560;
 const AIM_SPEED_STORAGE_KEY = "wurdKnifePracticeAimSpeed";
 const DEFAULT_AIM_SPEED = 200;
@@ -126,10 +128,10 @@ const MAX_AIM_SPEED = 1000;
 // Left-stick movement speed is independent of right-stick Aim Speed.
 
 const SPEED_SETTINGS = {
-    slow: { moving: 21, visible: 2600, peekHold: 1450 },
-    normal: { moving: 30, visible: 2050, peekHold: 1100 },
-    fast: { moving: 40, visible: 1550, peekHold: 820 },
-    elite: { moving: 51, visible: 1150, peekHold: 590 },
+    slow: { moving: 30, visible: 2600, peekHold: 1450 },
+    normal: { moving: 45, visible: 2050, peekHold: 1100 },
+    fast: { moving: 60, visible: 1550, peekHold: 820 },
+    elite: { moving: 78, visible: 1150, peekHold: 590 },
 };
 
 // Version 0.2: projected 3D training space. Approximate, not DMZ game physics.
@@ -641,6 +643,7 @@ function startPractice() {
     stopAnimationLoop();
     clearTarget();
     knifeLayer.innerHTML = "";
+    pendingKnifeFlight = null;
 
     gameRunning = false;
     drillComplete = false;
@@ -815,7 +818,7 @@ function spawnNextTarget() {
         const bearing = cameraYaw + angleFromView;
         activeTarget.worldX = cameraX + meters * Math.sin(bearing);
         activeTarget.worldZ = cameraZ + meters * Math.cos(bearing);
-        const baseLateralSpeed = ({slow:1.6,normal:2.4,fast:3.3,elite:4.2}[targetSpeedSelect.value] || 2.4);
+        const baseLateralSpeed = ({slow:2.4,normal:3.6,fast:5.0,elite:6.5}[targetSpeedSelect.value] || 2.4);
         const lateralSpeed = (Math.random() < .5 ? -1 : 1) * baseLateralSpeed * distanceMovementMultiplier(meters);
         activeTarget.worldVelocityX = actualDrill === "moving" ? lateralSpeed * Math.cos(bearing) : 0;
         activeTarget.worldVelocityZ = actualDrill === "moving" ? -lateralSpeed * Math.sin(bearing) : 0;
@@ -858,6 +861,7 @@ function startAnimationLoop() {
 
         updateInput(deltaMs);
         updateTarget(timestamp, deltaMs);
+        updateKnifeFlight(deltaMs);
         tickFootsteps(timestamp);
         animationId = requestAnimationFrame(loop);
     };
@@ -1100,6 +1104,24 @@ function throwKnife() {
     totalReactionMs += reactionMs;
     reactionCount += 1;
 
+    if (perspectiveEnabled) {
+        // Capture the aim and camera AT RELEASE, not when the knife arrives.
+        // The world and enemy continue to move during flight.
+        const dx = activeTarget.worldX - cameraX;
+        const dz = activeTarget.worldZ - cameraZ;
+        const distance = Math.hypot(dx, dz);
+        pendingKnifeFlight = {
+            target: activeTarget,
+            elapsedMs: 0,
+            durationMs: Math.max(45, distance / KNIFE_FLIGHT_SPEED_MPS * 1000),
+            cameraX, cameraZ, cameraYaw, cameraPitch,
+            aimX: crosshairX, aimY: crosshairY,
+            reactionMs,
+            throwable: activeTarget.throwable,
+        };
+        return;
+    }
+
     const hitResult = evaluateHit();
 
     if (!activeTarget.throwable) {
@@ -1110,6 +1132,51 @@ function throwKnife() {
             : `Hit — ${reactionMs} ms.`);
     } else {
         handleThrowResult(false, false, reactionMs, "Miss. Settle the crosshair before releasing R1.");
+    }
+}
+
+// Evaluate the enemy at IMPACT against the knife's original launch ray.
+// Turning the camera after throwing does not steer an already-thrown knife.
+function updateKnifeFlight(deltaMs) {
+    const flight = pendingKnifeFlight;
+    if (!flight) return;
+    if (!activeTarget || activeTarget !== flight.target || activeTarget.resolved) {
+        pendingKnifeFlight = null;
+        return;
+    }
+    flight.elapsedMs += deltaMs;
+    if (flight.elapsedMs < flight.durationMs) return;
+    pendingKnifeFlight = null;
+
+    const t = flight.target;
+    const rect = arena.getBoundingClientRect();
+    const w = rect.width || 800;
+    const h = rect.height || 450;
+    const focal = (w / 2) / Math.tan(PERSPECTIVE_FOV_DEG * Math.PI / 360);
+    const dx = t.worldX - flight.cameraX;
+    const dz = t.worldZ - flight.cameraZ;
+    const cos = Math.cos(flight.cameraYaw), sin = Math.sin(flight.cameraYaw);
+    const right = dx * cos - dz * sin;
+    const forward = dx * sin + dz * cos;
+    const valid = forward > 0.3;
+    const sx = valid ? w / 2 + focal * right / forward : -999999;
+    const sy = valid ? h / 2 - ((ENEMY_HEIGHT_M * .53 - CAMERA_HEIGHT_M) / forward) * focal + Math.tan(flight.cameraPitch) * focal : -999999;
+    const aimPX = flight.aimX / 100 * w;
+    const aimPY = flight.aimY / 100 * h;
+    // Use the same target silhouette proportions as the 2D hit test.
+    const size = valid ? focal * ENEMY_HEIGHT_M / forward : 0;
+    const rx = Math.max(1, size * .47 * .48);
+    const ry = Math.max(1, size * .49);
+    const distance = Math.hypot((aimPX - sx) / rx, (aimPY - sy) / ry);
+    const didHit = valid && distance <= 1 && flight.throwable;
+    const center = didHit && distance <= .27;
+    const reactionMs = flight.reactionMs;
+    if (!flight.throwable) {
+        handleThrowResult(false, false, reactionMs, "Too early — the target was still behind cover.");
+    } else if (didHit) {
+        handleThrowResult(true, center, reactionMs, center ? "Center hit — lead throw!" : "Hit — lead throw!");
+    } else {
+        handleThrowResult(false, false, reactionMs, "Miss — lead the moving enemy farther ahead.");
     }
 }
 
