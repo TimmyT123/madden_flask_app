@@ -1,4 +1,4 @@
-// WURD Knife Practice DMZ v1.2 (2026-10-19) — enemies continue moving and making sound during 3D throws.
+// WURD Knife Practice DMZ v1.3 (2026-10-20) — higher aim-speed ceiling, stable controller status, quieter miss sound.
 // WURD Knife Practice DMZ perspective trainer v20261018-1.0
 // Starting approximations; actual DMZ rates require in-game measurements.
 "use strict";
@@ -41,7 +41,7 @@ const perfectSound = new Audio("/static/sounds/perfect.mp3");
 perfectSound.volume = 0.55;
 
 const wrongSound = new Audio("/static/sounds/wrong.mp3");
-wrongSound.volume = 0.42;
+wrongSound.volume = 0.16;
 const AUDIO_VOLUME_KEY = "wurdKnifePracticeVolumePercent";
 let volumePercent = 100;
 try {
@@ -52,7 +52,7 @@ try {
 } catch { /* Browser storage may be unavailable. */ }
 function updateKnifeAudioVolume() {
     perfectSound.volume = 0.55 * volumePercent / 100;
-    wrongSound.volume = 0.42 * volumePercent / 100;
+    wrongSound.volume = 0.16 * volumePercent / 100;
     perfectSound.muted = wrongSound.muted = volumePercent === 0;
 }
 function setupKnifeAudioUI() {
@@ -122,7 +122,7 @@ const NEXT_TARGET_DELAY_MS = 560;
 const AIM_SPEED_STORAGE_KEY = "wurdKnifePracticeAimSpeed";
 const DEFAULT_AIM_SPEED = 200;
 const MIN_AIM_SPEED = 25;
-const MAX_AIM_SPEED = 500;
+const MAX_AIM_SPEED = 1000;
 // Left-stick movement speed is independent of right-stick Aim Speed.
 
 const SPEED_SETTINGS = {
@@ -1379,8 +1379,18 @@ function updateInputHelp() {
 }
 
 function showControllerConnected(gamepad) {
-    controllerStatus.textContent = `Controller connected: ${gamepad.id}`;
-    controllerStatus.classList.add("connected");
+    // Avoid DOM rewrites every animation frame (60+ times/sec). A long
+    // gamepad ID changing layout can cause visible full-page flickering.
+    // Keep the label compact and do not change it unless the device changes.
+    const gamepadLabel = /dualsense|wireless controller/i.test(gamepad.id)
+        ? "DualSense" : gamepad.id;
+    const nextStatus = `Controller: ${gamepadLabel} connected`;
+    if (controllerStatus.textContent !== nextStatus) {
+        controllerStatus.textContent = nextStatus;
+    }
+    if (!controllerStatus.classList.contains("connected")) {
+        controllerStatus.classList.add("connected");
+    }
 }
 
 function getActiveGamepad() {
@@ -1556,6 +1566,8 @@ function clearAllTimers() {
 function setupAimSpeedControl() {
     if (!sensitivitySelect) return;
 
+    // Make the HTML input honor the higher limit, even if the template still says 500.
+    sensitivitySelect.max = String(MAX_AIM_SPEED);
     // Restore the exact Aim Speed last used in this browser.
     sensitivitySelect.value = String(loadSavedAimSpeed(DEFAULT_AIM_SPEED));
 
