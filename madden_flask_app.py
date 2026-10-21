@@ -5132,6 +5132,13 @@ def new_orleans_weather_api():
 def new_orleans_trip():
     return render_template("new_orleans.html")
 
+# --- Personal Workout Coach -----------------------------------------
+# Workout schedule, exercise guides, and progress tracking.
+@app.route("/workout")
+def workout():
+    return render_template("workout.html")
+
+
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)
