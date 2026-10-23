@@ -5147,7 +5147,7 @@ def typing():
 # --- Personal Speech Coach -----------------------------------------
 # Work on speech, pronunciation, etc
 @app.route("/speech")
-def typing():
+def speech():
     return render_template("speech.html")
 
 
