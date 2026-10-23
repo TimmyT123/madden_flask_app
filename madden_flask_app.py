@@ -5144,6 +5144,12 @@ def workout():
 def typing():
     return render_template("typing.html")
 
+# --- Personal Speech Coach -----------------------------------------
+# Work on speech, pronunciation, etc
+@app.route("/speech")
+def typing():
+    return render_template("speech.html")
+
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
