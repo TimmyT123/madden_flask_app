@@ -5150,6 +5150,12 @@ def typing():
 def speech():
     return render_template("speech.html")
 
+# --- Personal Memory Coach -----------------------------------------
+# Working on my memory
+@app.route("/memory")
+def memory():
+    return render_template("memory.html")
+
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
