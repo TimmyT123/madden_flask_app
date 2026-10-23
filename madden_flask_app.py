@@ -5138,6 +5138,12 @@ def new_orleans_trip():
 def workout():
     return render_template("workout.html")
 
+# --- Personal Typing Coach -----------------------------------------
+# Learn to type faster and more accurate the best way
+@app.route("/typing")
+def typing():
+    return render_template("typing.html")
+
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
