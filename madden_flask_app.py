@@ -5156,6 +5156,12 @@ def speech():
 def memory():
     return render_template("memory.html")
 
+# --- Personal Spanish Coach -----------------------------------------
+# Working on my Spanish
+@app.route("/spanish")
+def spanish():
+    return render_template("spanish.html")
+
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
