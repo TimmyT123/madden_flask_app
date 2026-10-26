@@ -1,3 +1,4 @@
+// VERSION 38: defenders present before snap and 3D throw meter moved to top HUD.
 // VERSION 37: selectable perspective 3D field, realistic aerial arcs and underneath defender reads.
 // VERSION 36: throw meter ~10% faster; matching lob/touch/bullet hold thresholds
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
@@ -469,6 +470,31 @@
         setTiming("Press Start Drill to run it again.", "good");
     }
 
+    // Place the coverage player before the snap. Keep him fixed through the throw,
+    // rather than creating/teleporting a new LB when the football is released.
+    function createPreSnapLaneDefender(receiver) {
+        const scenario = state.passScenario === "mixed"
+            ? randomChoice(["underneath", "underneath", "deep", "cross"])
+            : state.passScenario;
+        const depth = scenario === "deep" ? 19 : scenario === "cross" ? 9 : 11;
+        const cut = receiver.cutYards;
+        const toSide = receiver.startX < OFFENSE_FIELD_CENTER_X ? -1 : 1;
+        let x = receiver.startX;
+        if (receiver.routeType !== "go" && depth > cut) {
+            const crossing = ["in", "dig", "post"].includes(receiver.routeType);
+            const diagonal = ["post", "corner"].includes(receiver.routeType);
+            x += (crossing ? -toSide : toSide) * (depth - cut) * OFFENSE_PIXELS_PER_YARD * (diagonal ? .7 : 1);
+        }
+        // The defender sits in the anticipated passing lane, not on top of the WR.
+        x = clamp(lerp(OFFENSE_FIELD_CENTER_X, x, .58), OFFENSE_FIELD_LEFT_X + 25, OFFENSE_FIELD_RIGHT_X - 25);
+        return {
+            x, y: OFFENSE_LOS_Y - depth * OFFENSE_PIXELS_PER_YARD,
+            radius: 17, scenario,
+            reachYards: scenario === "deep" ? 4.6 : scenario === "cross" ? 3.4 : 3.7,
+            fraction: .56, checked: false
+        };
+    }
+
     function createOffenseRep() {
         const route = selectedRouteSettings();
         const receiverX = randomRange(350, 650);
@@ -529,7 +555,7 @@
             receiver,
             defender,
             ball: null,
-            underneath: null,
+            underneath: createPreSnapLaneDefender(receiver),
             throwButton: randomChoice(THROW_BUTTONS),
             catchType,
             catchTrainingMode: state.catchTrainingMode,
@@ -1223,23 +1249,20 @@
 
         rep.placementPoints = 40;
 
-        // A lurking defender at an intermediate point on the throw's actual ground track.
-        // 3D ball elevation, rather than a random pick, determines whether he can reach it.
-        // Coverage is selectable for focused touch-over-LB, deep-lob and bullet-cross reps.
-        const scenario = state.passScenario === "mixed"
-            ? randomChoice(["underneath", "underneath", "deep", "cross"])
-            : state.passScenario;
-        rep.scenario = scenario;
-        const laneFraction = scenario === "deep" ? 0.76 : scenario === "cross" ? 0.46 : 0.56;
-        rep.underneath = {
-            x: lerp(rep.qb.x, passTarget.x, laneFraction),
-            y: lerp(rep.qb.y, passTarget.y, laneFraction),
-            radius: 17,
-            fraction: laneFraction,
-            // In this training model, a LB's jump/reach covers roughly 3 yards.
-            reachYards: scenario === "deep" ? 4.6 : scenario === "cross" ? 3.4 : 3.7,
-            checked: false
-        };
+        // Check the actual flight path against the defender who was already there.
+        // Closest-point fraction allows lead throws to miss the defender naturally.
+        const laneDefender = rep.underneath;
+        if (laneDefender) {
+            const dx = passTarget.x - rep.qb.x;
+            const dy = passTarget.y - rep.qb.y;
+            const lengthSquared = dx * dx + dy * dy || 1;
+            laneDefender.fraction = clamp(
+                ((laneDefender.x - rep.qb.x) * dx + (laneDefender.y - rep.qb.y) * dy) / lengthSquared,
+                0.05, 0.98
+            );
+            laneDefender.checked = false;
+            rep.scenario = laneDefender.scenario;
+        }
 
         rep.ball = {
             start: { ...rep.qb },
@@ -1996,7 +2019,7 @@
         if(!rep){ drawCenterMessage("3D User Catch & Pick","Press Start Drill");return; }
         if(rep.kind==="offense"){
             if(!rep.snapped)draw3DRoute(rep);
-            draw3DPlayer(rep.underneath,"#f97316","LB");
+            draw3DPlayer(rep.underneath,"#f97316",rep.underneath?.scenario === "deep" ? "S" : "LB");
             draw3DPlayer(rep.defender,"#ff6171","DB");
             draw3DPlayer(rep.receiver,"#55a8ff",BUTTON_SYMBOLS[rep.throwButton],rep.switched);
             draw3DPlayer(rep.qb,"#e3e8f3","QB");
@@ -2336,7 +2359,11 @@
         const width = 150;
         const height = 12;
         const x = clamp(rep.receiver.x - width / 2, 20, canvas.width - width - 20);
-        const y = clamp(rep.receiver.y - 54, 38, canvas.height - 38);
+        // In perspective view this is a fixed top HUD, clear of the receiver and LB.
+        // Overhead view retains the original receiver-relative positioning.
+        const y = state.viewMode === "3d"
+            ? Math.max(95, Math.round(canvas.height * 0.16))
+            : clamp(rep.receiver.y - 54, 38, canvas.height - 38);
 
         ctx.save();
         ctx.fillStyle = "rgba(4, 9, 13, 0.92)";
