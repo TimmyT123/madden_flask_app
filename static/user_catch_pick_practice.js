@@ -1,3 +1,4 @@
+// VERSION 39: 3D throw meter positioned immediately above receiver button symbol.
 // VERSION 38: defenders present before snap and 3D throw meter moved to top HUD.
 // VERSION 37: selectable perspective 3D field, realistic aerial arcs and underneath defender reads.
 // VERSION 36: throw meter ~10% faster; matching lob/touch/bullet hold thresholds
@@ -2030,7 +2031,11 @@
             const oldX=rep.receiver.x,oldY=rep.receiver.y;
             const sp=project3D(oldX,oldY);
             rep.receiver.x=sp.x;rep.receiver.y=sp.y;
+            // Receiver button text sits at sp.y - r*2.65; keep the entire
+            // throw-meter HUD (including its lower PASS label) above it.
+            rep.throwMeter3DY = sp.y - Math.max(5, 17 * sp.scale) * 2.65 - 44;
             drawThrowMeter(rep);
+            delete rep.throwMeter3DY;
             if(rep.thrown){
                 if(rep.catchType.button && !isDifficultCatchTraining())drawCatchPrompt(rep.receiver,rep.catchType.button);
                 if(rep.catchMeterStarted && !(isShortTapCatch(rep)&&rep.shortMeterHidden))drawCatchMeter(rep);
@@ -2359,10 +2364,10 @@
         const width = 150;
         const height = 12;
         const x = clamp(rep.receiver.x - width / 2, 20, canvas.width - width - 20);
-        // In perspective view this is a fixed top HUD, clear of the receiver and LB.
-        // Overhead view retains the original receiver-relative positioning.
+        // In 3D, follow the receiver and sit just above its button symbol.
+        // Keep the unchanged 2D position.
         const y = state.viewMode === "3d"
-            ? Math.max(95, Math.round(canvas.height * 0.16))
+            ? clamp(rep.throwMeter3DY ?? rep.receiver.y - 70, 35, canvas.height - 90)
             : clamp(rep.receiver.y - 54, 38, canvas.height - 38);
 
         ctx.save();
