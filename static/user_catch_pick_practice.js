@@ -1,3 +1,4 @@
+// VERSION 37: selectable perspective 3D field, realistic aerial arcs and underneath defender reads.
 // VERSION 36: throw meter ~10% faster; matching lob/touch/bullet hold thresholds
 // Short-pass quick-tap timing + 25% hidden short meters + deep pre-hold remain enabled.
 // Catch success now requires BOTH: release in the green timing zone AND receiver inside the target.
@@ -181,7 +182,9 @@
         paused: false,
         pauseStartedAt: 0,
         routeType: "out",
-        routeCutYards: 10
+        routeCutYards: 10,
+        viewMode: "3d",
+        passScenario: "mixed"
     };
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -404,6 +407,8 @@
         }
 
         state.mode = ui.mode.value;
+        state.viewMode = document.getElementById("practiceViewSelect")?.value || "3d";
+        state.passScenario = document.getElementById("passScenarioSelect")?.value || "mixed";
         state.difficultyKey = ui.difficulty.value;
         state.catchMeterMinYards = Number(ui.catchMeterMin?.value ?? 5);
         state.catchTrainingMode = document.getElementById("catchTrainingSelect")?.value || state.catchTrainingMode || "difficult";
@@ -524,6 +529,7 @@
             receiver,
             defender,
             ball: null,
+            underneath: null,
             throwButton: randomChoice(THROW_BUTTONS),
             catchType,
             catchTrainingMode: state.catchTrainingMode,
@@ -918,6 +924,22 @@
         }
 
         updateBall(rep.ball, dt);
+        // Real passing lane read: bullet is fast and flat; touch clears linebackers;
+        // lob gains height but gives the secondary more time to react.
+        if (rep.underneath && !rep.underneath.checked && rep.ball.progress >= rep.underneath.fraction) {
+            rep.underneath.checked = true;
+            const at = rep.underneath.fraction;
+            const groundX = lerp(rep.ball.start.x, rep.ball.target.x, at);
+            const groundY = lerp(rep.ball.start.y, rep.ball.target.y, at);
+            const ballHeightYards = Math.sin(Math.PI * at) * rep.ball.arcHeight / OFFENSE_PIXELS_PER_YARD;
+            const defenderGap = Math.hypot(groundX - rep.underneath.x, groundY - rep.underneath.y);
+            if (defenderGap <= 21 && ballHeightYards <= rep.underneath.reachYards) {
+                rep.resultReason = `Intercepted by underneath defender — ${rep.passType.toUpperCase()} was too low (${ballHeightYards.toFixed(1)} yd arc)`;
+                rep.catchAttempted = true;
+                finishRep(false);
+                return;
+            }
+        }
 
         // Catch-input training cue. Give the user a short, fixed grace period
         // after the throw instead of using a percentage of flight time. This keeps
@@ -1200,6 +1222,24 @@
             : "";
 
         rep.placementPoints = 40;
+
+        // A lurking defender at an intermediate point on the throw's actual ground track.
+        // 3D ball elevation, rather than a random pick, determines whether he can reach it.
+        // Coverage is selectable for focused touch-over-LB, deep-lob and bullet-cross reps.
+        const scenario = state.passScenario === "mixed"
+            ? randomChoice(["underneath", "underneath", "deep", "cross"])
+            : state.passScenario;
+        rep.scenario = scenario;
+        const laneFraction = scenario === "deep" ? 0.76 : scenario === "cross" ? 0.46 : 0.56;
+        rep.underneath = {
+            x: lerp(rep.qb.x, passTarget.x, laneFraction),
+            y: lerp(rep.qb.y, passTarget.y, laneFraction),
+            radius: 17,
+            fraction: laneFraction,
+            // In this training model, a LB's jump/reach covers roughly 3 yards.
+            reachYards: scenario === "deep" ? 4.6 : scenario === "cross" ? 3.4 : 3.7,
+            checked: false
+        };
 
         rep.ball = {
             start: { ...rep.qb },
@@ -1845,6 +1885,10 @@
     }
 
     function draw() {
+        if (state.viewMode === "3d") {
+            drawPerspectiveScene();
+            return;
+        }
         drawField();
 
         if (!state.rep) {
@@ -1856,6 +1900,131 @@
             drawOffense(state.rep);
         } else {
             drawDefense(state.rep);
+        }
+    }
+
+    // Perspective renderer: 3D world projected onto the existing 2D canvas.
+    // The play/route/meter logic stays shared with the original 2D game.
+    function project3D(x, y, heightYards = 0) {
+        const depth = clamp((OFFENSE_LOS_Y - y) / OFFENSE_PIXELS_PER_YARD, -5, 42);
+        const t = (depth + 5) / 47;
+        const horizon = canvas.height * 0.16;
+        const nearY = canvas.height * 0.91;
+        const sy = nearY - (nearY - horizon) * (1 - Math.pow(1 - t, 1.75));
+        const width = lerp(canvas.width * 0.86, canvas.width * 0.23, t);
+        const sx = canvas.width / 2 + ((x - OFFENSE_FIELD_CENTER_X) / 330) * (width / 2);
+        const scale = lerp(1.32, 0.34, t);
+        return { x: sx, y: sy - heightYards * 16 * scale, groundY: sy, scale, width };
+    }
+
+    function draw3DPlayer(player, color, label, selected = false) {
+        if (!player) return;
+        const p = project3D(player.x, player.y);
+        const r = Math.max(5, 17 * p.scale);
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,.38)";
+        ctx.beginPath(); ctx.ellipse(p.x, p.groundY + 3, r * 1.05, r * .28, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = color;
+        ctx.fillRect(p.x - r * .42, p.y - r * 1.7, r * .84, r * 1.45);
+        ctx.beginPath(); ctx.arc(p.x, p.y - r * 1.78, r * .53, 0, Math.PI * 2); ctx.fill();
+        if (selected) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.x,p.y-r*.6,r*1.6,0,Math.PI*2);ctx.stroke(); }
+        ctx.font = `bold ${Math.max(10, Math.round(12*p.scale))}px Arial`;
+        ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+        ctx.fillText(label,p.x,p.y-r*2.65);
+        ctx.restore();
+    }
+
+    function draw3DBall(ball) {
+        if (!ball) return;
+        const t = clamp(ball.progress,0,1);
+        const gx = lerp(ball.start.x,ball.target.x,t);
+        const gy = lerp(ball.start.y,ball.target.y,t);
+        const height = Math.sin(Math.PI*t)*ball.arcHeight/OFFENSE_PIXELS_PER_YARD;
+        const p = project3D(gx,gy,height);
+        const shadow = project3D(gx,gy);
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,.33)";ctx.beginPath();ctx.ellipse(shadow.x,shadow.y,8*shadow.scale,3*shadow.scale,0,0,Math.PI*2);ctx.fill();
+        ctx.translate(p.x,p.y);ctx.rotate(-.35);
+        ctx.fillStyle="#a96733";ctx.strokeStyle="#fff1d2";ctx.lineWidth=1.8;
+        ctx.beginPath();ctx.ellipse(0,0,Math.max(5,10*p.scale),Math.max(3,6*p.scale),0,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.restore();
+    }
+
+    function draw3DRoute(rep) {
+        if (!rep || rep.kind !== "offense") return;
+        const r = rep.receiver;
+        const points = [project3D(r.startX,r.startY)];
+        const cutY = r.startY-r.cutYards*OFFENSE_PIXELS_PER_YARD;
+        if (r.routeType === "go") points.push(project3D(r.startX,OFFENSE_FIELD_TOP_Y));
+        else {
+            points.push(project3D(r.startX,cutY));
+            const side = r.startX < OFFENSE_FIELD_CENTER_X ? -1 : 1;
+            const dir = ["out","corner"].includes(r.routeType) ? side : -side;
+            points.push(project3D(clamp(r.startX+dir*185,OFFENSE_FIELD_LEFT_X,OFFENSE_FIELD_RIGHT_X),
+                ["post","corner"].includes(r.routeType) ? cutY-155: cutY));
+        }
+        ctx.save();ctx.strokeStyle="#ffd166";ctx.lineWidth=3;ctx.setLineDash([9,7]);ctx.beginPath();
+        points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.setLineDash([]);ctx.restore();
+    }
+
+    function draw3DField() {
+        const w=canvas.width,h=canvas.height;
+        ctx.clearRect(0,0,w,h);
+        const sky=ctx.createLinearGradient(0,0,0,h);
+        sky.addColorStop(0,"#101f35");sky.addColorStop(.25,"#233f59");sky.addColorStop(1,"#152d27");
+        ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+        // Field trapezoid, near at the bottom, far at the horizon.
+        const corners=[project3D(OFFENSE_FIELD_LEFT_X,OFFENSE_LOS_Y+62),project3D(OFFENSE_FIELD_RIGHT_X,OFFENSE_LOS_Y+62),project3D(OFFENSE_FIELD_RIGHT_X,OFFENSE_FIELD_TOP_Y),project3D(OFFENSE_FIELD_LEFT_X,OFFENSE_FIELD_TOP_Y)];
+        ctx.fillStyle="#225d3c";ctx.strokeStyle="#c3e4d3";ctx.lineWidth=3;
+        ctx.beginPath();corners.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();ctx.stroke();
+        for(let yd=0;yd<=40;yd+=5){
+            const y=OFFENSE_LOS_Y-yd*OFFENSE_PIXELS_PER_YARD;
+            const a=project3D(OFFENSE_FIELD_LEFT_X,y),b=project3D(OFFENSE_FIELD_RIGHT_X,y);
+            ctx.strokeStyle=yd===0?"#ffd166":yd%10===0?"rgba(255,255,255,.6)":"rgba(255,255,255,.27)";
+            ctx.lineWidth=yd===0?3:1.5;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+            ctx.font=`bold ${Math.max(10,Math.round(12*a.scale))}px Arial`;ctx.textAlign="center";ctx.fillStyle="#fff";
+            ctx.fillText(yd===0?"LOS":String(yd),a.x-19,a.y+4);
+        }
+        ctx.fillStyle="rgba(7,15,25,.75)";ctx.fillRect(10,10,265,55);
+        ctx.font="bold 19px Arial";ctx.fillStyle="#e8f3ff";ctx.textAlign="left";ctx.fillText("3D • FIELD VIEW",22,34);
+        ctx.font="12px Arial";ctx.fillText("Near = QB  •  Far = downfield",22,53);
+    }
+
+    function drawPerspectiveScene() {
+        draw3DField();
+        const rep=state.rep;
+        if(!rep){ drawCenterMessage("3D User Catch & Pick","Press Start Drill");return; }
+        if(rep.kind==="offense"){
+            if(!rep.snapped)draw3DRoute(rep);
+            draw3DPlayer(rep.underneath,"#f97316","LB");
+            draw3DPlayer(rep.defender,"#ff6171","DB");
+            draw3DPlayer(rep.receiver,"#55a8ff",BUTTON_SYMBOLS[rep.throwButton],rep.switched);
+            draw3DPlayer(rep.qb,"#e3e8f3","QB");
+            draw3DBall(rep.ball);
+            if(!rep.snapped)drawPreSnapRoutePanel(rep);
+            // The original 2D meter functions draw HUD elements. Position them
+            // near the projected receiver but don't mutate physics positions.
+            const oldX=rep.receiver.x,oldY=rep.receiver.y;
+            const sp=project3D(oldX,oldY);
+            rep.receiver.x=sp.x;rep.receiver.y=sp.y;
+            drawThrowMeter(rep);
+            if(rep.thrown){
+                if(rep.catchType.button && !isDifficultCatchTraining())drawCatchPrompt(rep.receiver,rep.catchType.button);
+                if(rep.catchMeterStarted && !(isShortTapCatch(rep)&&rep.shortMeterHidden))drawCatchMeter(rep);
+            }
+            rep.receiver.x=oldX;rep.receiver.y=oldY;
+            drawMiniLegend("3D • QB near / routes downfield",rep.thrown?
+                `PASS: ${rep.passType.toUpperCase()} • X=possession  □=RAC  △=aggressive`:
+                "Tap=lob  •  Hold briefly=touch  •  Hold longer=bullet");
+        } else {
+            draw3DPlayer(rep.receiver,"#55a8ff","WR");
+            rep.defenders.forEach((d,i)=>draw3DPlayer(d,i===rep.bestIndex&&currentDifficulty().guideStrength>.7?"#ffd166":"#ff6171","DB",d.selected));
+            draw3DPlayer(rep.qb,"#e3e8f3","QB");draw3DBall(rep.ball);
+            if(rep.switched&&rep.selectedIndex!==null){
+                const d=rep.defenders[rep.selectedIndex];const pt=project3D(d.x,d.y);
+                ctx.fillStyle="#fff";ctx.textAlign="center";ctx.font="bold 14px Arial";ctx.fillText("△ PICK",pt.x,pt.y-38);
+            }
+            drawMiniLegend("Circle = click on","Triangle = intercept");
         }
     }
 
@@ -2413,6 +2582,27 @@
         requestAnimationFrame(loop);
     }
 
+    function ensure3DSelectors() {
+        const host = ui.difficulty?.parentElement || ui.mode?.parentElement || ui.start?.parentElement;
+        if(!host) return;
+        function add(id, title, options, initial, callback) {
+            let el=document.getElementById(id);
+            if(!el){
+                el=document.createElement("select");el.id=id;
+                for(const [value,name] of options){const opt=document.createElement("option");opt.value=value;opt.textContent=name;el.appendChild(opt);}
+                const label=document.createElement("label");label.style.cssText="display:inline-flex;align-items:center;gap:7px;margin-left:10px";
+                label.append(document.createTextNode(title+" "),el);host.appendChild(label);
+            }
+            el.value=initial;el.addEventListener("change",callback);
+        }
+        try {state.viewMode=localStorage.getItem("wurdCatchViewMode") === "2d"?"2d":"3d";}catch(e){}
+        add("practiceViewSelect","Field view",[["3d","3D Perspective"],["2d","2D Overhead"]],state.viewMode, e=>{
+            state.viewMode=e.target.value;
+            try{localStorage.setItem("wurdCatchViewMode",state.viewMode);}catch(e){}
+        });
+        add("passScenarioSelect","Pass coverage",[["mixed","Mixed reads"],["underneath","LB underneath"],["deep","Deep safety"],["cross","Crossing lane"]],"mixed",e=>{state.passScenario=e.target.value;});
+    }
+
     function ensureCatchTrainingSelector() {
         let select = document.getElementById("catchTrainingSelect");
         if (select) return select;
@@ -2497,6 +2687,7 @@
         }
     }
 
+    ensure3DSelectors();
     loadOffenseRouteSettings();
     loadCatchMeterMinimumSetting();
     loadCatchTrainingSetting();
