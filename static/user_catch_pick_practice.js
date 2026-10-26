@@ -1,3 +1,4 @@
+// VERSION 41: clearer, moderate-volume double-pulse warning for late catch-button input.
 // VERSION 40: three slowly roaming linebackers 5–10 yards deep; live pass-lane interceptions.
 // VERSION 39: 3D throw meter positioned immediately above receiver button symbol.
 // VERSION 38: defenders present before snap and 3D throw meter moved to top HUD.
@@ -2593,11 +2594,34 @@
         }
     }
 
-    // Distinct two-tone warning used only when the catch button was not pressed
-    // soon enough after the throw. Keep this different from normal drill beeps.
+    // Catch-input reminder: two short descending alarm pulses, distinct from
+    // the ordinary confirmation beeps. Soft attack/release avoids headphone clicks.
     function lateCatchWarningChirp() {
-        beep(900, 0.10, .18);
-        window.setTimeout(() => beep(125, 0.075, .18), 58);
+        try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            const audio = new AudioContextClass();
+            const start = audio.currentTime;
+            for (const offset of [0, 0.19]) {
+                const oscillator = audio.createOscillator();
+                const gain = audio.createGain();
+                const t = start + offset;
+                oscillator.type = "triangle";
+                oscillator.frequency.setValueAtTime(780, t);
+                oscillator.frequency.exponentialRampToValueAtTime(480, t + 0.135);
+                gain.gain.setValueAtTime(0.0001, t);
+                gain.gain.linearRampToValueAtTime(0.09, t + 0.012);
+                gain.gain.setValueAtTime(0.09, t + 0.085);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+                oscillator.connect(gain);
+                gain.connect(audio.destination);
+                oscillator.start(t);
+                oscillator.stop(t + 0.15);
+            }
+            window.setTimeout(() => audio.close().catch(() => {}), 550);
+        } catch (error) {
+            // Sound is optional when the browser blocks audio.
+        }
     }
 
     function vibrate(duration, magnitude) {
