@@ -1,3 +1,4 @@
+// VERSION 40: three slowly roaming linebackers 5–10 yards deep; live pass-lane interceptions.
 // VERSION 39: 3D throw meter positioned immediately above receiver button symbol.
 // VERSION 38: defenders present before snap and 3D throw meter moved to top HUD.
 // VERSION 37: selectable perspective 3D field, realistic aerial arcs and underneath defender reads.
@@ -496,6 +497,56 @@
         };
     }
 
+    // Three balanced linebackers, all between five and ten yards beyond the LOS.
+    function createLinebackerZone() {
+        return [0, 1, 2].map((i) => {
+            const x = OFFENSE_FIELD_LEFT_X + 132 + i * (OFFENSE_FIELD_RIGHT_X - OFFENSE_FIELD_LEFT_X - 264) / 2;
+            const depth = 5.8 + i * 1.5;
+            return {
+                x, baseX: x, y: OFFENSE_LOS_Y - depth * OFFENSE_PIXELS_PER_YARD,
+                baseY: OFFENSE_LOS_Y - depth * OFFENSE_PIXELS_PER_YARD,
+                phase: i * 1.65, clock: 0, radius: 17, reachYards: 3.5,
+                // The LB patrols a small zone instead of following the ball instantly.
+                checked: false
+            };
+        });
+    }
+
+    function moveLinebackerZone(rep, dt) {
+        if (!rep.linebackers) return;
+        rep.linebackers.forEach((lb, i) => {
+            lb.clock += dt;
+            lb.x = lb.baseX + Math.sin(lb.clock * 0.72 + lb.phase) * 24;
+            lb.y = lb.baseY + Math.sin(lb.clock * 0.43 + lb.phase) * 7;
+        });
+    }
+
+    // Test a ball's actual 3D flight against each defender's reach as it crosses his zone.
+    function checkLinebackerInterception(rep, previousProgress) {
+        if (!rep.linebackers || !rep.ball) return false;
+        const ball = rep.ball;
+        const a = clamp(previousProgress, 0, 1);
+        const b = clamp(ball.progress, 0, 1);
+        for (const lb of rep.linebackers) {
+            // Closest flight-path point to this linebacker's current ground location.
+            const dx = ball.target.x - ball.start.x;
+            const dy = ball.target.y - ball.start.y;
+            const lengthSq = dx * dx + dy * dy || 1;
+            const closest = clamp(((lb.x - ball.start.x) * dx + (lb.y - ball.start.y) * dy) / lengthSq, a, b);
+            const groundX = lerp(ball.start.x, ball.target.x, closest);
+            const groundY = lerp(ball.start.y, ball.target.y, closest);
+            const gap = Math.hypot(groundX - lb.x, groundY - lb.y);
+            const height = Math.sin(Math.PI * closest) * ball.arcHeight / OFFENSE_PIXELS_PER_YARD;
+            if (gap < 24 && height < lb.reachYards && closest > 0.02) {
+                rep.resultReason = `Intercepted by LB — ${rep.passType.toUpperCase()} crossed his zone too low`;
+                rep.catchAttempted = true;
+                finishRep(false);
+                return true;
+            }
+        }
+        return false;
+    }
+
     function createOffenseRep() {
         const route = selectedRouteSettings();
         const receiverX = randomRange(350, 650);
@@ -557,6 +608,7 @@
             defender,
             ball: null,
             underneath: createPreSnapLaneDefender(receiver),
+            linebackers: createLinebackerZone(),
             throwButton: randomChoice(THROW_BUTTONS),
             catchType,
             catchTrainingMode: state.catchTrainingMode,
@@ -888,6 +940,7 @@
             // Receiver and defender run automatically after the snap.
             moveOffenseRoute(rep, dt);
             moveCoverageDefender(rep);
+            moveLinebackerZone(rep, dt);
 
             const l2Held = input.down.has(BUTTONS.L2);
 
@@ -950,10 +1003,13 @@
             return;
         }
 
+        const previousBallProgress = rep.ball.progress;
         updateBall(rep.ball, dt);
+        moveLinebackerZone(rep, dt);
+        if (state.viewMode === "3d" && checkLinebackerInterception(rep, previousBallProgress)) return;
         // Real passing lane read: bullet is fast and flat; touch clears linebackers;
         // lob gains height but gives the secondary more time to react.
-        if (rep.underneath && !rep.underneath.checked && rep.ball.progress >= rep.underneath.fraction) {
+        if (rep.underneath?.scenario === "deep" && !rep.underneath.checked && rep.ball.progress >= rep.underneath.fraction) {
             rep.underneath.checked = true;
             const at = rep.underneath.fraction;
             const groundX = lerp(rep.ball.start.x, rep.ball.target.x, at);
@@ -2020,7 +2076,8 @@
         if(!rep){ drawCenterMessage("3D User Catch & Pick","Press Start Drill");return; }
         if(rep.kind==="offense"){
             if(!rep.snapped)draw3DRoute(rep);
-            draw3DPlayer(rep.underneath,"#f97316",rep.underneath?.scenario === "deep" ? "S" : "LB");
+            if (rep.underneath?.scenario === "deep") draw3DPlayer(rep.underneath,"#ffb347","S");
+            (rep.linebackers || []).forEach((lb) => draw3DPlayer(lb,"#f97316","LB"));
             draw3DPlayer(rep.defender,"#ff6171","DB");
             draw3DPlayer(rep.receiver,"#55a8ff",BUTTON_SYMBOLS[rep.throwButton],rep.switched);
             draw3DPlayer(rep.qb,"#e3e8f3","QB");
