@@ -1,5 +1,5 @@
-# webhook_service_v2.py
-# Version: 2.0
+# webhook_service_v2_1.py
+# Version: 2.1
 # Modified section: schedule webhook parsing — pass Arizona webhook receipt time to schedule parser.
 import os
 import json
@@ -37,6 +37,76 @@ from services.webhook_helpers import (
 )
 
 
+
+
+# v2.1: A historical export may fill files, but must not move website backward.
+# The separate website pointers are updated only AFTER a successfully saved payload.
+# Stage order follows Madden's progression: preseason -> regular -> postseason.
+def _period_rank(season, period):
+    sm = re.fullmatch(r"season_(\d+)", str(season or ""))
+    wm = re.fullmatch(r"(pre|week)_(\d+)", str(period or ""))
+    if not sm or not wm:
+        return None
+    s = int(sm.group(1))
+    phase, n = wm.group(1), int(wm.group(2))
+    if phase == "pre":
+        if not 1 <= n <= 4:
+            return None
+        stage = n
+    else:
+        if not 1 <= n <= 23:
+            return None
+        stage = 4 + n
+    return (s, stage)
+
+
+def _promote_latest_after_save(upload_root, league_id, season, period, league_data):
+    from contextlib import contextmanager
+    # Uses an advisory file lock across Flask workers on Raspberry Pi/Linux.
+    try:
+        import fcntl
+    except ImportError:
+        fcntl = None
+    latest_path = os.path.join(upload_root, "_latest.json")
+    lock_path = os.path.join(upload_root, ".latest_sync.lock")
+    os.makedirs(upload_root, exist_ok=True)
+    with open(lock_path, "a+") as lock:
+        if fcntl:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            current = {}
+            if os.path.isfile(latest_path):
+                try:
+                    with open(latest_path, encoding="utf-8") as f:
+                        current = json.load(f)
+                except (OSError, ValueError):
+                    print("⚠️ Unreadable _latest.json; refusing automatic current-week update")
+                    return
+            incoming_rank = _period_rank(season, period)
+            old_rank = _period_rank(current.get("season"), current.get("week")) if current else None
+            if incoming_rank is None:
+                print("⚠️ Invalid incoming week; no website current-week update")
+                return
+            if current and (str(current.get("league")) != str(league_id) or old_rank is None):
+                print("⚠️ Current league/week ambiguous; manual review required; no promotion")
+                return
+            if old_rank is not None and incoming_rank < old_rank:
+                print(f"📚 Historical export stored ({season}/{period}); current remains {current.get('season')}/{current.get('week')}")
+                return
+            new_current = {"league": str(league_id), "season": season, "week": period}
+            _atomic_write_json(latest_path, new_current)
+            league_data["latest_league"] = str(league_id)
+            league_data["latest_season"] = season
+            league_data["latest_week"] = period
+            # Keep default_week.json coherent for regular/playoff views. Preseason
+            # intentionally doesn't write this pointer (existing behavior).
+            if period.startswith("week_"):
+                default_path = os.path.join(upload_root, str(league_id), "default_week.json")
+                _atomic_write_json(default_path, {"season": season, "week": period})
+            print(f"✅ Website current period → {season}/{period}")
+        finally:
+            if fcntl:
+                fcntl.flock(lock, fcntl.LOCK_UN)
 
 def process_webhook_data(
     data,
@@ -367,55 +437,9 @@ def process_webhook_data(
 
     print(f"📊 PAYLOAD WEEK: {week_index_int_payload}")
 
-    # 🔒 AUTHORITATIVE STATE UPDATE (ONE SOURCE OF TRUTH)
-    if season_index_int is not None and display_week is not None:
-        season_str = f"season_{season_index_int}"
-
-        # 🔒 AUTHORITATIVE STATE UPDATE FOR WEBSITE CURRENT PERIOD
-        if phase and phase.startswith("pre"):
-            pre_week = week_index_int_path if week_index_int_path is not None else week_index_int_payload
-
-            if pre_week is None:
-                print("⚠️ Preseason detected but no valid pre_week for latest state.")
-            else:
-                week_str = f"pre_{pre_week}"
-
-                league_data["latest_league"] = league_id
-                league_data["latest_season"] = season_str
-                league_data["latest_week"] = week_str
-
-                print(
-                    f"🔒 Authoritative set → league={league_id} "
-                    f"season={season_str} week={week_str}",
-                    flush=True
-                )
-
-                latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
-                _atomic_write_json(latest_path, {
-                    "league": league_id,
-                    "season": season_str,
-                    "week": week_str
-                })
-
-        else:
-            week_str = f"week_{display_week}"
-
-            league_data["latest_league"] = league_id
-            league_data["latest_season"] = season_str
-            league_data["latest_week"] = week_str
-
-            print(
-                f"🔒 Authoritative set → league={league_id} "
-                f"season={season_str} week={week_str}",
-                flush=True
-            )
-
-            latest_path = os.path.join(app.config['UPLOAD_FOLDER'], "_latest.json")
-            _atomic_write_json(latest_path, {
-                "league": league_id,
-                "season": season_str,
-                "week": week_str
-            })
+    # v2.1: Do NOT change website current period before data is saved.
+    # Historical week exports are processed normally, then considered for
+    # monotonic promotion after the file write succeeds.
 
     # 8) Destination folder (non-roster)
     if (season_index == "global" and week_index == "global") or \
@@ -459,8 +483,7 @@ def process_webhook_data(
 
             week_dir = f"week_{effective_week}"
 
-            print(f"📌 Auto-updating default_week.json: season_{season_index_int}, week_{effective_week}")
-            update_default_week(season_index_int, effective_week, league_data)
+            # v2.1: default_week updated only if the export is a new current week.
 
     league_folder = os.path.join(app.config['UPLOAD_FOLDER'], league_id, season_dir, week_dir)
     os.makedirs(league_folder, exist_ok=True)
@@ -474,6 +497,13 @@ def process_webhook_data(
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4)
     print(f"✅ Data saved to {output_path}")
+
+    # Only a valid, week-scoped data packet may promote the current week.
+    # Global standings/league payloads cannot safely identify a weekly stage.
+    if season_dir.startswith("season_") and season_dir != "season_global" and (week_dir.startswith("pre_") or week_dir.startswith("week_")):
+        _promote_latest_after_save(app.config["UPLOAD_FOLDER"], league_id,
+                                   season_dir, week_dir, league_data)
+
 
     # Type-specific parse
     if "playerPassingStatInfoList" in data:
