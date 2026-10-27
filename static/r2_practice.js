@@ -1,4 +1,4 @@
-// HB Vision + Moves 3D v0.2 | 2026-10-26
+// HB Vision + Moves 3D v0.3 | 2026-10-26
 // Drop-in replacement for WURD r2_practice.js; HTML page uses /r2-practice.
 'use strict';
 (() => {
