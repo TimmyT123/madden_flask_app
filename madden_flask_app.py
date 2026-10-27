@@ -1,6 +1,6 @@
-# madden_flask_app_v9_4.py
-# Version: 9.4
-# Modified sections: Added live New Orleans Oct. 10-14 weather forecast API with Open-Meteo, NWS point alerts, and 30-minute server cache.
+# madden_flask_app_v9_5.py
+# Version: 9.5
+# Modified sections: Corrected default and hardcoded fallback league IDs to active WURD league 1886931.
 
 from flask import Flask, request, jsonify, url_for, redirect, make_response
 from flask import send_from_directory
@@ -79,7 +79,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-DEFAULT_LEAGUE_ID = "26969931"
+DEFAULT_LEAGUE_ID = "1886931"
 DEFAULT_SEASON = "season_0"
 DEFAULT_WEEK = "week_1"
 
@@ -3201,7 +3201,7 @@ def stats_hash():
 @app.route('/stats')
 def show_stats():
     # Get league/season/week from query or cache
-    league = request.args.get("league") or league_data.get("latest_league") or "26969931"
+    league = request.args.get("league") or league_data.get("latest_league") or "1886931"
 
     if not league_data.get("latest_season") or not league_data.get("latest_week"):
         get_latest_season_week()
@@ -3598,7 +3598,7 @@ def fmt_signed(n):
 
 @app.route("/rookies")
 def rookie_preseason_stats():
-    league = request.args.get("league") or league_data.get("latest_league") or "26969931"
+    league = request.args.get("league") or league_data.get("latest_league") or "1886931"
     season = request.args.get("season") or league_data.get("latest_season") or "season_0"
 
     season = season if str(season).startswith("season_") else f"season_{season}"
@@ -4272,7 +4272,7 @@ DEV_LABELS = {0: "Normal", 1: "Star", 2: "Superstar", 3: "X-Factor"}
 
 @app.route("/rosters")
 def rosters():
-    league = request.args.get("league") or league_data.get("latest_league") or "26969931"
+    league = request.args.get("league") or league_data.get("latest_league") or "1886931"
     team   = request.args.get("team", "NFL")
     pos    = request.args.get("pos", "ALL")
     page   = max(int(request.args.get("page", 1)), 1)
@@ -4459,7 +4459,7 @@ def build_schedule_id_fallback_map(league_id: str, parsed_schedule: list) -> dic
 
 @app.route('/schedule')
 def show_schedule():
-    league_id = request.args.get("league") or league_data.get("latest_league") or "26969931"
+    league_id = request.args.get("league") or league_data.get("latest_league") or "1886931"
 
     season = request.args.get("season") or league_data.get("latest_season") or "season_0"
     week = normalize_period(
