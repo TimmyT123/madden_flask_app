@@ -1,10 +1,10 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WURD HB Vision + Moves 3D v0.6</title><style>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WURD HB Vision + Moves 3D v0.7</title><style>
 :root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}*{box-sizing:border-box}body{margin:0;background:#07111f;color:#ebf4ff}header{padding:17px max(16px,3vw);border-bottom:1px solid #2e4564;background:#0a192b}h1{margin:0;font-size:clamp(22px,3vw,34px)}.sub{color:#9db9d5;margin:6px 0 0}.panel{background:#13273c;border:1px solid #33516e;border-radius:12px;padding:13px}.toolbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:14px auto;max-width:1400px}label{font-size:12px;color:#bfd5ec;display:grid;gap:4px}select,button{background:#203e5d;border:1px solid #4f779c;color:#fff;border-radius:7px;padding:10px 12px;font-size:14px}button{cursor:pointer}button.primary{background:#1266ac;font-weight:bold}button:disabled{opacity:.48;cursor:default}.layout{max-width:1400px;margin:auto;padding:0 14px 22px;display:grid;grid-template-columns:minmax(360px,1fr) 320px;gap:14px}.field{min-height:510px;position:relative;overflow:hidden;background:#0b2032}.field canvas{display:block;width:100%;height: min(70vh,760px);min-height:480px;touch-action:none}.overlay{position:absolute;inset:0;background:#071523e8;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}.overlay[hidden]{display:none}.overlay-inner{max-width:470px;text-align:center}.overlay h2{font-size:27px;color:#fbd27c}.overlay p{font-size:17px;line-height:1.5}.overlay button{margin:7px}.hud{position:absolute;left:14px;top:12px;padding:8px 12px;background:#061422c9;border-radius:9px;font-size:14px;pointer-events:none}.side{display:grid;gap:13px;align-content:start}.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat{background:#08192c;border-radius:9px;padding:12px}.stat strong{display:block;font-size:23px;margin-top:5px}.coach{font-size:16px;line-height:1.5;min-height:145px}.coach strong{font-size:19px}.coach p{margin:9px 0}.muted{color:#a7c2df;font-size:13px}.move-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:10px}.move-grid button{padding:11px 7px}.lesson{max-width:1400px;margin:12px auto;padding:14px;display:grid;gap:10px}.lesson-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap}.lesson-controls label{min-width:175px}.lesson-info{font-size:15px;line-height:1.55;color:#eaf3fe}.lesson-info strong{color:#ffdf8c}.demo-tag{color:#a5f5c8;font-weight:700}.status{font-weight:700;color:#7addf2}.tip{color:#c1daef;font-size:13px;line-height:1.5}.score{color:#ffd37b}.badge{display:inline-block;background:#244f74;border-radius:16px;padding:3px 9px;font-size:12px}.nav{font-size:14px}.nav a{color:#89d0ff}@media(max-width:950px){.layout{grid-template-columns:1fr}.field canvas{height:57vh;min-height:430px}.side{grid-template-columns:1fr 1fr}.side .panel:last-child{grid-column:1/-1}}@media(max-width:600px){.side{grid-template-columns:1fr}.layout{grid-template-columns:minmax(0,1fr)}.field canvas{min-height:400px}}
-</style></head><body><header><h1>HB Vision + Moves 3D <span style="color:#68b7ff">v0.6</span></h1><p class="sub">Control your runner • read defenders • practice juke, spin, truck, stiff arm and R2 timing</p></header>
+</style></head><body><header><h1>HB Vision + Moves 3D <span style="color:#68b7ff">v0.7</span></h1><p class="sub">Control your runner • read moving blocks • beat three defenders • practice juke, spin, truck, stiff arm and R2 timing</p></header>
 <div class="toolbar panel"><label>Drill<select id="drill"><option value="mixed">Mixed reads</option><option value="juke">Juke reads</option><option value="spin">Spin reads</option><option value="truck">Downhill power</option><option value="stiff">Stiff arm on edge</option><option value="none">Run through open gap</option><option value="deadleg">Dead leg / hesitation</option></select></label><label>Speed<select id="speed"><option value="0.68">Learning (slow)</option><option value="1" selected>Normal</option><option value="1.35">Fast</option></select></label><button id="start" class="primary">Start Session</button><button id="pause">Pause</button><button id="reset">Reset</button><span class="status" id="status">Ready</span></div>
 <section class="lesson panel" aria-label="Slow motion move lessons"><strong style="font-size:20px">🎓 Learn Moves — slow-motion coach</strong><div class="lesson-controls"><label>Lesson<select id="lessonSelect"><option value="juke">Juke — square tackler</option><option value="spin">Spin — defender on hip</option><option value="deadleg">Dead leg — over-pursuit</option><option value="truck">Truck — downhill contact</option><option value="stiff">Stiff arm — outside reach</option><option value="none">No move — open lane</option></select></label><button class="primary" id="demoPlay">▶ Watch Demo</button><button id="demoReplay">↻ Replay</button><button id="demoStep">Next explanation →</button><button id="demoTry">Try This Move</button><span class="demo-tag" id="demoStatus">Choose a move to learn</span></div><div class="lesson-info" id="lessonInfo">Pick a move and click <strong>Watch Demo</strong>. The coach will slow it down, show the defender's angle, and explain when and why to use it. The demo stops after each lesson so you can review.</div></section>
-<div class="layout"><section class="field panel"><canvas id="field" aria-label="3D-style running back training field"></canvas><div class="hud" id="hud">HB: 0 yards · R2 released</div><div class="overlay" id="overlay"><div class="overlay-inner"><h2 id="overlayTitle">Ready to run?</h2><p id="overlayText">Move with the left stick. Read the defender, choose a move, and run through the opening. Each play pauses for review.</p><button id="continue" class="primary">Start First Play</button></div></div></section>
-<aside class="side"><div class="panel"><div class="statgrid"><div class="stat">Plays<strong id="plays">0</strong></div><div class="stat">Good reads<strong id="good">0</strong></div><div class="stat">Streak<strong id="streak">0</strong></div><div class="stat">Early R2<strong id="early">0</strong></div></div></div><div class="panel coach"><span class="badge" id="phase">GET READY</span><p><strong id="coachTitle">Your goal</strong></p><p id="coachText">Use the left stick to steer upfield. The defender will react to where you go. Make one move and accelerate once you are clear.</p><p class="tip" id="inputStatus">Controller: searching...</p></div><div class="panel"><strong>Moves (DualSense)</strong><div class="move-grid"><button data-move="jukeL">Juke left · RS ←</button><button data-move="jukeR">Juke right · RS →</button><button data-move="spin">Spin · ○</button><button data-move="truck">Truck · RS ↑</button><button data-move="stiff">Stiff arm · X</button><button data-move="none">No move / burst</button><button data-move="deadleg">Dead leg · RS ↓</button></div><p class="tip">Left stick moves the HB freely. R2 sprints. Keyboard: WASD/arrows move, Q/E jukes, C spin, T truck, F stiff arm, G dead leg, Shift sprints. Enter or controller X continues after a play.</p><p class="nav"><a href="/">WURD Home</a></p></div></aside></div>
+<div class="layout"><section class="field panel"><canvas id="field" aria-label="3D-style running back training field"></canvas><div class="hud" id="hud">HB: 0 yards · R2 released</div><div class="overlay" id="overlay"><div class="overlay-inner"><h2 id="overlayTitle">Ready to run?</h2><p id="overlayText">Move with the left stick. Read your five blockers, hit the opening, and beat three defenders. Running around the entire formation is not a good read.</p><button id="continue" class="primary">Start First Play</button></div></div></section>
+<aside class="side"><div class="panel"><div class="statgrid"><div class="stat">Plays<strong id="plays">0</strong></div><div class="stat">Good reads<strong id="good">0</strong></div><div class="stat">Streak<strong id="streak">0</strong></div><div class="stat">Early R2<strong id="early">0</strong></div></div></div><div class="panel coach"><span class="badge" id="phase">GET READY</span><p><strong id="coachTitle">Your goal</strong></p><p id="coachText">Use the left stick to steer upfield. Read five moving blockers, enter the true crease, beat three pursuing defenders, and accelerate once clear.</p><p class="tip" id="inputStatus">Controller: searching...</p></div><div class="panel"><strong>Moves (DualSense)</strong><div class="move-grid"><button data-move="jukeL">Juke left · RS ←</button><button data-move="jukeR">Juke right · RS →</button><button data-move="spin">Spin · ○</button><button data-move="truck">Truck · RS ↑</button><button data-move="stiff">Stiff arm · X</button><button data-move="none">No move / burst</button><button data-move="deadleg">Dead leg · RS ↓</button></div><p class="tip">Left stick moves the HB freely. R2 sprints. Keyboard: WASD/arrows move, Q/E jukes, C spin, T truck, F stiff arm, G dead leg, Shift sprints. Enter or controller X continues after a play.</p><p class="nav"><a href="/">WURD Home</a></p></div></aside></div>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),canvas=$('field'),ctx=canvas.getContext('2d');
@@ -15,7 +15,7 @@ const lessons={
  deadleg:{title:'Dead leg: beat over-pursuit',why:'A fast downhill defender is racing past your first path; pause briefly, then burst away. The second defender closes the opposite gap.',input:'RS DOWN (G)',plan:'Let #1 overrun the left approach, hesitate, then cut right before #2 arrives.',dir:1},
  truck:{title:'Truck: finish downhill',why:'A smaller tackler is directly in the hole. Square your shoulders and keep momentum. The other defender stays outside.',input:'RS UP (T)',plan:'Run straight into #1 with momentum. Do not veer into #2 on the right.',dir:0},
  stiff:{title:'Stiff arm: defend the edge',why:'A defender reaches from your left side, while another pursues from the middle. Extend the arm at contact distance; keep running.',input:'X (F)',plan:'Stay on the outside path, stiff-arm #1 at your left shoulder, and avoid #2.',dir:1},
- none:{title:'No move: take free yards',why:'The two defenders split apart. A needless move slows you down. Read the crease and run through it.',input:'Left stick UP (W), then R2 once clear',plan:'Run through the open middle between #1 and #2.',dir:0}
+ none:{title:'No move: take free yards',why:'An opening develops between blockers. A needless move slows you down. Read the crease and run through it.',input:'Left stick UP (W), then R2 once clear',plan:'Run through the open middle between #1 and #2.',dir:0}
 };
 const scenes={
  juke:[{x:.3,z:12,role:'PURSUE',speed:2.4},{x:5.4,z:17,role:'CONTAIN',speed:1.35}],
@@ -25,18 +25,25 @@ const scenes={
  stiff:[{x:-3.2,z:12,role:'REACH',speed:2.1},{x:3.8,z:19,role:'PURSUIT',speed:1.45}],
  none:[{x:-5.8,z:13,role:'WIDEN',speed:.65},{x:5.8,z:16,role:'WIDEN',speed:.65}]
 };
-let phase='ready',selection=null,runner={x:0,z:0},defs=[],demo=null,elapsed=0,last=performance.now(),held={},r2=false,moveUsed=null,moveAge=99,actionCooldown=0,moves=0,earlyFlag=false,early=0,plays=0,good=0,streak=0,padLast={},spinPhase=0,camZ=-2;
+let phase='ready',selection=null,runner={x:0,z:0},defs=[],blockers=[],laneX=0,laneRead=false,burstAfterGap=false,stamina=100,runSpeed=0,contactTimer=0,demo=null,elapsed=0,last=performance.now(),held={},r2=false,moveUsed=null,moveAge=99,actionCooldown=0,moves=0,earlyFlag=false,early=0,plays=0,good=0,streak=0,padLast={},spinPhase=0,camZ=-2;
 function resize(){let b=canvas.getBoundingClientRect(),r=window.devicePixelRatio||1;canvas.width=Math.round(b.width*r);canvas.height=Math.round(b.height*r);ctx.setTransform(r,0,0,r,0,0)}addEventListener('resize',resize);resize();
 function text(title,explain,tag){$('coachTitle').textContent=title;$('coachText').textContent=explain;$('phase').textContent=tag}
 function overlay(title,msg,button){$('overlayTitle').textContent=title;$('overlayText').textContent=msg;$('continue').textContent=button;$('overlay').hidden=false}
 function stats(){$('plays').textContent=plays;$('good').textContent=good;$('streak').textContent=streak;$('early').textContent=early}
-function setup(key,mode){selection=key;runner={x:0,z:0};defs=scenes[key].map((o,i)=>({...o,id:i+1,baseX:o.x,originZ:o.z,beaten:false}));camZ=-2;elapsed=0;moveUsed=null;moveAge=99;actionCooldown=0;moves=0;earlyFlag=false;spinPhase=0;r2=false;phase=mode;$('overlay').hidden=true}
-function start(){let key=$('drill').value==='mixed'?rand(Object.keys(lessons)):$('drill').value;setup(key,'playing');$('status').textContent='PLAYING • 2 DEFENDERS';text(lessons[key].title,lessons[key].plan+' '+lessons[key].input,'READ 2 DEFENDERS')}
-function reset(){phase='ready';selection=null;runner={x:0,z:0};defs=[];demo=null;plays=good=streak=early=0;stats();$('status').textContent='Ready';text('Learn the defender angles','Use Watch Demo to see two different defenders. The left stick moves forward, backward, and sideways. After every play, results wait for Continue.','READY');overlay('Ready to practice?','Try Watch Demo first. It shows both defenders and pauses after each of three explanations.','Start First Play')}
-function finish(win,reason){if(phase!=='playing')return;phase='review';plays++;if(win){good++;streak++}else streak=0;stats();$('status').textContent='REVIEW • GAME PAUSED';let lesson=lessons[selection];text(win?'Nice run!':'Review the angles',reason+' '+lesson.why,'PAUSED FOR REVIEW');overlay(win?'GOOD RUN!':'PLAY REVIEW',reason+'\n\nWHY: '+lesson.why+'\n\nINPUT: '+lesson.input+'\n\nRead this at your own pace; nothing advances automatically.','Continue → Next Play')}
+function setup(key,mode){selection=key;runner={x:0,z:0};
+ laneX=rand([-3.4,0,3.4]);laneRead=false;burstAfterGap=false;stamina=100;runSpeed=0;contactTimer=0;
+ blockers=[-6.8,-3.4,0,3.4,6.8].map((x,i)=>({x,z:6.5,target:x,number:['LT','LG','C','RG','RT'][i]}));
+ // Two defensive linemen engage the line, and a third linebacker reads and pursues.
+ defs=[{x:laneX-2.5,z:8.9,role:'BLOCKED',speed:2.4,id:1,baseX:laneX-2.5,beaten:false},
+       {x:laneX+2.6,z:9.5,role:'BLOCKED',speed:2.4,id:2,baseX:laneX+2.6,beaten:false},
+       {x:laneX*.45,z:17,role:'PURSUIT',speed:3.15,id:3,baseX:laneX*.45,beaten:false}];
+ camZ=-2;elapsed=0;moveUsed=null;moveAge=99;actionCooldown=0;moves=0;earlyFlag=false;spinPhase=0;r2=false;phase=mode;$('overlay').hidden=true}
+function start(){let key=$('drill').value==='mixed'?rand(Object.keys(lessons)):$('drill').value;setup(key,'playing');$('status').textContent='PLAYING • 5 OL / 3 DEFENDERS';text(lessons[key].title,lessons[key].plan+' '+lessons[key].input,'READ THE CREASE')}
+function reset(){phase='ready';selection=null;runner={x:0,z:0};defs=[];demo=null;plays=good=streak=early=0;stats();$('status').textContent='Ready';text('Learn the defender angles','Use Watch Demo to review moves, then run through the gap your linemen create. The left stick moves forward, backward, and sideways. After every play, results wait for Continue.','READY');overlay('Ready to practice?','Try Watch Demo first. It demonstrates movement in three slow-motion stages before you try the new blocking drill.','Start First Play')}
+function finish(win,reason){if(phase!=='playing')return;phase='review';plays++;if(win){good++;streak++}else streak=0;stats();$('status').textContent='REVIEW • GAME PAUSED';let lesson=lessons[selection];text(win?'Nice run!':'Review the running lane',reason+' '+lesson.why,'PAUSED FOR REVIEW');overlay(win?'GOOD RUN!':'PLAY REVIEW',reason+'\n\nWHY: '+lesson.why+'\n\nINPUT: '+lesson.input+'\n\nRead this at your own pace; nothing advances automatically.','Continue → Next Play')}
 function action(kind){if(phase!=='playing'||actionCooldown>0)return;moveUsed=kind;moveAge=0;actionCooldown=.60;moves++;spinPhase=kind==='spin'?1:0;
  if(kind==='jukeL')runner.x-=1.55;else if(kind==='jukeR')runner.x+=1.55;else if(kind==='spin'){runner.x+=lessons[selection].dir*1.0;}else if(kind==='deadleg'){runner.x+=lessons[selection].dir*1.15;}else if(kind==='stiff'){runner.x+=.4;}
- runner.x=clamp(runner.x,-8.4,8.4);text('MOVE: '+kind.toUpperCase(),'Now turn upfield! The right move must match the first defender and leave space away from the second.','EXECUTE → EXIT')}
+ runner.x=clamp(runner.x,-8.4,8.4);text('MOVE: '+kind.toUpperCase(),'Turn upfield! Your move must produce separation from a nearby defender, not just an animation.','EXECUTE → EXIT')}
 function project(x,z){let w=canvas.clientWidth,h=canvas.clientHeight;let camera=camZ;let rel=z-camera,depth=clamp((rel+5)/34,0,1),t=Math.pow(depth,.73);return {x:w/2+(x/10)*w*(.46-.30*t),y:h*(.96-.84*t),s:1.5-1.09*t,visible:rel>-7&&rel<43}}
 function drawGuy(x,z,color,label,spin=0){let p=project(x,z);if(!p.visible)return;let s=p.s;ctx.save();ctx.translate(p.x,p.y);ctx.fillStyle='#061421aa';ctx.beginPath();ctx.ellipse(0,5*s,13*s,5*s,0,0,7);ctx.fill();ctx.fillStyle=color;ctx.fillRect(-7*s,-29*s,14*s,23*s);ctx.fillStyle='#e4ac83';ctx.beginPath();ctx.arc(0,-36*s,7*s,0,7);ctx.fill();ctx.fillStyle=color;ctx.fillRect(-8*s,-44*s,16*s,5*s);ctx.fillRect(-7*s,-6*s,5*s,13*s);ctx.fillRect(2*s,-6*s,5*s,13*s);
  // Spin around the standing vertical body axis: shoulders narrow and widen, never tumble.
@@ -45,39 +52,87 @@ function drawGuy(x,z,color,label,spin=0){let p=project(x,z);if(!p.visible)return
 function draw(){let w=canvas.clientWidth,h=canvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#071e34';ctx.fillRect(0,0,w,h);ctx.fillStyle='#153852';ctx.fillRect(0,0,w,h*.12);let a=project(-10,camZ+38),b=project(10,camZ+38),c=project(10,camZ-3),d=project(-10,camZ-3);ctx.fillStyle='#1b654c';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.closePath();ctx.fill();
  for(let z=Math.max(0,Math.floor((camZ-6)/5)*5);z<camZ+44;z+=5){let l=project(-10,z),r=project(10,z);if(!l.visible)continue;ctx.strokeStyle=z%10===0?'#e9ffeca9':'#baf6c34e';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(l.x,l.y);ctx.lineTo(r.x,r.y);ctx.stroke();ctx.fillStyle='#f7fff0a8';ctx.font='12px sans-serif';ctx.fillText(String(z),r.x-22,r.y-5)}
  for(let side of [-10,10]){ctx.strokeStyle='#f5fff4bd';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<=40;i++){let p=project(side,camZ-5+i*1.2);if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y)}ctx.stroke()}
- for(let i=0;i<3;i++)if(selection&&phase==='demo'&&demo?.step===0)drawGuy((i-1)*3.4,6,'#2c92cd','OL');
- for(const dd of [...defs].sort((a,b)=>b.z-a.z))drawGuy(dd.x,dd.z,dd.beaten?'#777b88':'#d95063',String(dd.id));drawGuy(runner.x,runner.z,'#f4b534','HB',spinPhase);
- $('hud').textContent=`HB ${runner.z.toFixed(1)} yd · X ${runner.x.toFixed(1)} · ${r2?'R2 SPRINT':'R2 OFF'} · ${moveUsed||'Read defense'} · 2 defenders`}
+ if(phase==='playing'||phase==='paused'||phase==='review'){
+  // Actual line shifts produce the gap; none of these players is just painted decoration.
+  const guys=[...blockers.map(b=>({x:b.x,z:b.z,c:'#269bdc',n:b.number})),...defs.map(d=>({x:d.x,z:d.z,c:d.beaten?'#656d76':'#e95361',n:String(d.id)}))].sort((a,b)=>b.z-a.z);
+  for(const g of guys)drawGuy(g.x,g.z,g.c,g.n);
+ }else if(selection&&phase==='demo'&&demo?.step===0)for(let i=0;i<5;i++)drawGuy((i-2)*3.1,6,'#2c92cd','OL');
+ if(phase==='demo')for(const dd of [...defs].sort((a,b)=>b.z-a.z))drawGuy(dd.x,dd.z,dd.beaten?'#777b88':'#d95063',String(dd.id));
+ drawGuy(runner.x,runner.z,'#f4b534','HB',spinPhase);
+ // Lateral first-down line and dynamic gap cue only after line engages.
+ if(phase==='playing'&&elapsed>.65&&runner.z<11){let pt=project(laneX,7.7);ctx.save();ctx.strokeStyle='rgba(122,255,177,.65)';ctx.setLineDash([5,6]);ctx.beginPath();ctx.moveTo(pt.x-19*pt.s,pt.y);ctx.lineTo(pt.x+19*pt.s,pt.y);ctx.stroke();ctx.restore();}
+
+ $('hud').textContent=`HB ${runner.z.toFixed(1)} yd · X ${runner.x.toFixed(1)} · ${r2?'R2 SPRINT':'R2 OFF'} · ${moveUsed||'Read defense'} · 3 defenders · stamina ${Math.round(stamina)}% · ${laneRead?'CREASE ✓':'FIND HOLE'}`}
 function demoExplain(){let d=demo;if(!d)return;let L=lessons[d.key],stage=[['1/3: READ','Defender #1 attacks the first lane. Defender #2 contains the escape. Look for where they are NOT.'],['2/3: MOVE','As #1 commits, use '+L.input+'; redirect toward the safe gap, away from #2.'],['3/3: EXIT','Straighten upfield after the move. Sprint only once you see a crease.']][d.step];$('demoStatus').textContent=stage[0]+(d.animated?' • SLOW MOTION':' • PAUSED');$('lessonInfo').textContent=stage[1]+' WHY: '+L.why+' '+'CONTROL: '+L.input; text(L.title,stage[1],'COACH MODE')}
-function watch(key){setup(key,'demo');demo={key,step:0,elapsed:0,animated:true};$('status').textContent='DEMO • PAUSES AFTER EVERY STEP';demoExplain()}
+function watch(key){setup(key,'demo');defs=scenes[key].map((o,i)=>({...o,id:i+1,baseX:o.x,originZ:o.z,beaten:false}));demo={key,step:0,elapsed:0,animated:true};$('status').textContent='DEMO • PAUSES AFTER EVERY STEP';demoExplain()}
 function nextStage(){if(!demo){watch($('lessonSelect').value);return}if(demo.step>=2){demo.animated=false;demoExplain();return}demo.step++;demo.elapsed=0;demo.animated=true;let k=demo.key;runner={x:0,z:demo.step===1?4:9};defs=scenes[k].map((v,i)=>({...v,id:i+1,baseX:v.x,originZ:v.z,beaten:false,z:v.z-(demo.step===1?1:3)}));camZ=runner.z-3;moveUsed=null;demoExplain()}
 function demoTick(dt){if(!demo?.animated)return;let d=demo;d.elapsed+=dt;let t=clamp(d.elapsed/3.2,0,1),L=lessons[d.key];if(d.step===0){runner.z=4*t;defs[0].z=defs[0].originZ-t*2;defs[1].x=defs[1].baseX+(d.key==='none'?t:0)}else if(d.step===1){runner.z=4+t*5;runner.x=L.dir*3*(t*t*(3-2*t));defs[0].z=defs[0].originZ-1-2*t;defs[0].x+=dt*(d.key==='none'?-1:(L.dir===0?0:-L.dir*.7));moveUsed=d.key;spinPhase=d.key==='spin'?t:0}else{runner.z=9+t*9;runner.x=L.dir*3;defs[0].z=defs[0].originZ-3-2*t;defs[1].z=defs[1].originZ-3-.5*t;spinPhase=0}camZ=runner.z-3;if(t>=1){d.animated=false;demoExplain()}}
-function gameplay(dt){let scale=Number($('speed').value),t=dt*scale;elapsed+=t;moveAge+=t;actionCooldown=Math.max(0,actionCooldown-t);spinPhase=Math.max(0,spinPhase-t*1.2);
- let x=(held.right?1:0)-(held.left?1:0),forward=(held.up?1:0)-(held.down?1:0),pads=navigator.getGamepads?.(),pad=pads&&Array.from(pads).find(p=>p?.connected);if(pad){let a=pad.axes||[];if(Math.abs(a[0]||0)>.14)x=a[0];if(Math.abs(a[1]||0)>.14)forward=-a[1];$('inputStatus').textContent='Controller: '+pad.id.slice(0,48)}else $('inputStatus').textContent='Keyboard: WASD/Arrows; Q/E juke, C spin, T truck, F stiff, G dead leg';
- r2=Boolean(held.sprint||pad?.buttons[7]?.value>.38);if(r2&&runner.z<5&&!earlyFlag){earlyFlag=true;early++;stats();text('Early R2','Try running with control first. Sprint after identifying the crease.','R2 TOO EARLY')}
- let length=Math.hypot(x,forward);if(length>1){x/=length;forward/=length}runner.x=clamp(runner.x+x*t*(r2?8:6),-9.3,9.3);runner.z=clamp(runner.z+forward*t*(r2?10.8:7.1),0,35);camZ+=(runner.z-2-camZ)*Math.min(1,dt*3.1);
- // Defenders have distinct behavior, with different reads rather than duplicates.
- defs.forEach((d,i)=>{if(d.beaten)return;let dx=runner.x-d.x,dz=runner.z-d.z;
- if(d.role==='WIDEN'){d.x+=Math.sign(d.baseX)*t*.9;d.z-=t*.18}
- else if(d.role==='CONTAIN'){let target=d.baseX>0?Math.max(3.7,runner.x+1.9):Math.min(-3.7,runner.x-1.9);d.x+=clamp(target-d.x,-1,1)*t*d.speed;d.z-=t*.48}
- else if(d.role==='OVERRUN'){d.z-=t*d.speed;d.x+=clamp((runner.x-1.7)-d.x,-1,1)*t*.75}
- else if(d.role==='HIP'||d.role==='REACH'){d.x+=clamp(runner.x+(d.baseX>0?1.5:-1.5)-d.x,-1,1)*t*d.speed;d.z-=t*.85}
- else {d.x+=clamp(dx,-1,1)*t*d.speed;d.z-=t*1.2}
- let dist=Math.hypot((runner.x-d.x)*1.18,runner.z-d.z);
- if(dist<1.55){let valid=selection==='juke'?['jukeL','jukeR'].includes(moveUsed):moveUsed===selection;let timely=moveAge<1.5;let dirGood=!(selection==='juke'&&moveUsed==='jukeR')&&(selection!=='spin'||runner.x<0);let escape=selection==='none'&&Math.abs(runner.x)<3;
- if((valid&&timely&&dirGood)||(escape&&i===0)){d.beaten=true;d.x+=runner.x<=d.x?2.5:-2.5;runner.z+=.9;moveUsed=null;text('Beat defender #'+d.id,'Nice. Now locate defender #'+(d.id===1?2:1)+' before you sprint again.','KEEP YOUR EYES UP')}
- else finish(false,`Defender #${d.id} made the tackle. ${lessons[selection].plan}`)
- }
+function gameplay(dt){
+ const t=dt*Number($('speed').value);elapsed+=t;moveAge+=t;actionCooldown=Math.max(0,actionCooldown-t);spinPhase=Math.max(0,spinPhase-t*1.2);
+ let x=(held.right?1:0)-(held.left?1:0),forward=(held.up?1:0)-(held.down?1:0);
+ const pads=navigator.getGamepads?.(),pad=pads&&Array.from(pads).find(p=>p?.connected);
+ if(pad){let a=pad.axes||[];if(Math.abs(a[0]||0)>.14)x=a[0];if(Math.abs(a[1]||0)>.14)forward=-a[1];$('inputStatus').textContent='Controller: '+pad.id.slice(0,48)}
+ else $('inputStatus').textContent='Keyboard: WASD/Arrows move · Q/E juke · C spin · T truck · F stiff · G dead leg · Shift sprint';
+ const prevZ=runner.z; r2=Boolean(held.sprint||pad?.buttons[7]?.value>.38);
+ if(r2&&runner.z<8&&!earlyFlag){earlyFlag=true;early++;stats();text('Early R2','Sprinting early wastes stamina and makes cutting into the developing gap harder.','EARLY SPRINT')}
+ stamina=clamp(stamina+(r2?-16:8)*t,0,100);
+ const intent=Math.hypot(x,forward);if(intent>1){x/=intent;forward/=intent}
+ const targetSpeed=forward*(r2&&stamina>3?10.8:7.1);
+ runSpeed+=(targetSpeed-runSpeed)*Math.min(1,t*(r2?2.1:5.2));
+ runner.x=clamp(runner.x+x*t*(r2?4.3:6.0),-9.3,9.3);
+ runner.z=clamp(runner.z+runSpeed*t,0,35);
+ camZ+=(runner.z-2-camZ)*Math.min(1,dt*3.1);
+ // Line opens a different lane on each play. Two adjacent blockers move apart.
+ blockers.forEach((b,i)=>{
+  const distance=Math.abs(b.target-laneX);
+  let sign=b.target<=laneX?-1:1;
+  if(distance<2.0)sign=b.target<laneX?-1:1;
+  const push=distance<2.1?1.45:distance<4.5?.48:0;
+  b.x+=(b.target+sign*push-b.x)*Math.min(1,t*1.8);
+  b.z=6.5+Math.min(1,elapsed/1.3)*.9+Math.sin(elapsed*3+i)*.06;
  });
- if(runner.z>=26)finish(true,`You reached ${runner.z.toFixed(1)} yards, beating or avoiding both defenders. ${lessons[selection].why}`);
- if(elapsed>=25)finish(false,'The play expired. Press forward on the left stick to travel downfield, and steer around the two defenders.');
+ // Only the proper inside crease counts as a successful line read.
+ if(!laneRead&&prevZ<8.0&&runner.z>=8.0){
+  if(Math.abs(runner.x-laneX)>2.0){finish(false,'MISSED THE HOLE: You crossed the line outside the gap created by your offensive line. Read the moving blockers and cut into the crease.');return}
+  laneRead=true;text('CREASE FOUND','Good read! Now beat the linebacker and accelerate into daylight.','HIT THE HOLE');
+ }
+ if(laneRead&&r2&&runner.z>=9)burstAfterGap=true;
+ if(Math.abs(runner.x)>8.5&&runner.z<14){finish(false,'BOUNCED TOO WIDE: You ran around the formation instead of attacking the available hole.');return}
+ // Blockers engage the first two defenders; after 1.8 seconds they can shed blocks.
+ for(const d of defs){if(d.beaten)continue;
+  if(d.role==='BLOCKED'&&elapsed<1.8){
+    let nearest=blockers.reduce((a,b)=>Math.abs(b.x-d.x)<Math.abs(a.x-d.x)?b:a,blockers[0]);
+    d.x+=(nearest.x+(d.id===1?-.65:.65)-d.x)*Math.min(1,t*2.4);
+    d.z=nearest.z+1.35;
+    continue;
+  }
+  const dx=runner.x-d.x,dz=runner.z-d.z,dist=Math.hypot(dx,dz);
+  // Closing angle and recovery speed react to the runner's actual location.
+  const pursuitSpeed=d.id===3?3.5:3.2;
+  if(dist>.05){d.x+=dx/dist*t*pursuitSpeed*(r2?1.07:1);d.z+=dz/dist*t*pursuitSpeed*(r2?1.07:1)}
+  let contact=Math.hypot((runner.x-d.x)*1.12,runner.z-d.z);
+  if(contact<1.4){
+   const valid=moveAge<.80&&(
+       (['jukeL','jukeR','spin','deadleg'].includes(moveUsed)&&contact>.45)||
+       (moveUsed==='truck'&&runner.z<=d.z+.7)||
+       (moveUsed==='stiff'&&Math.abs(runner.x-d.x)>.35));
+   if(valid){d.beaten=true;d.x+=runner.x<=d.x?2.7:-2.7;moveUsed=null;runner.z+=.45;text('BROKE FREE','Good move at contact. Locate the next pursuer and burst upfield.','KEEP RUNNING')}
+   else {finish(false,`TACKLED BY #${d.id} at ${runner.z.toFixed(1)} yards. You need a well-timed move or a cleaner path—not just distance gained.`);return}
+  }
+ }
+ if(runner.z>=26){
+  if(laneRead)finish(true,`GOOD RUN: Hit the offensive-line crease near X ${laneX.toFixed(1)} and gained ${runner.z.toFixed(1)} yards.${earlyFlag?' Try delaying R2 next time.':''}`);
+  else finish(false,'You gained yards but did not enter the running lane. Find the designed crease first.');
+ }
+ if(elapsed>=25)finish(false,'The play expired. Use the left stick to move forward and read where your linemen separate.');
 }
+
 function tick(now){let dt=Math.min(.05,(now-last)/1000);last=now;if(phase==='playing')gameplay(dt);else if(phase==='demo')demoTick(dt);draw();requestAnimationFrame(tick)}
 function keyAction(code){if(code==='KeyQ')action('jukeL');if(code==='KeyE')action('jukeR');if(code==='KeyC')action('spin');if(code==='KeyT')action('truck');if(code==='KeyF')action('stiff');if(code==='KeyG')action('deadleg')}
 const keyMap={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',ShiftLeft:'sprint',ShiftRight:'sprint'};
 document.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();if(keyMap[e.code])held[keyMap[e.code]]=true;if(e.repeat)return;if(e.code==='Enter'||e.code==='Space'){if(phase==='ready'||phase==='review')start();else if(phase==='paused')resume();else if(phase==='playing')pause();return}keyAction(e.code)});document.addEventListener('keyup',e=>{if(keyMap[e.code])held[keyMap[e.code]]=false});
 function pollPad(){let pad=navigator.getGamepads?.(),p=pad&&Array.from(pad).find(q=>q?.connected);if(p){let b=i=>Boolean(p.buttons[i]?.pressed),a=p.axes||[],now={x:b(0),circle:b(1),right:(a[2]||0)>.70,left:(a[2]||0)<-.70,up:(a[3]||0)<-.70,down:(a[3]||0)>.70};if((phase==='ready'||phase==='review')&&now.x&&!padLast.x)start();else if(phase==='playing'){if(now.circle&&!padLast.circle)action('spin');if(now.left&&!padLast.left)action('jukeL');if(now.right&&!padLast.right)action('jukeR');if(now.up&&!padLast.up)action('truck');if(now.down&&!padLast.down)action('deadleg');if(now.x&&!padLast.x)action('stiff')}padLast=now}requestAnimationFrame(pollPad)}
-function pause(){if(phase!=='playing')return;phase='paused';$('status').textContent='PAUSED';overlay('Paused','Study the two defenders before continuing.','Resume Play')}
+function pause(){if(phase!=='playing')return;phase='paused';$('status').textContent='PAUSED';overlay('Paused','Study the five blockers and three defenders before continuing.','Resume Play')}
 function resume(){if(phase!=='paused')return;phase='playing';$('overlay').hidden=true;$('status').textContent='PLAYING'}
 $('start').onclick=start;$('reset').onclick=reset;$('pause').onclick=()=>phase==='paused'?resume():pause();$('continue').onclick=()=>phase==='paused'?resume():start();
 document.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>action(b.dataset.move));
