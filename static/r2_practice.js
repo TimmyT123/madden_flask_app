@@ -1,5 +1,5 @@
-// HB Vision + Moves 3D v0.1 | 2026-10-26
-// Standalone sister drill to WURD R2 Practice v20. No changes to original R2 practice.
+// HB Vision + Moves 3D v0.2 | 2026-10-26
+// Drop-in replacement for WURD r2_practice.js; HTML page uses /r2-practice.
 'use strict';
 (() => {
  const $=id=>document.getElementById(id), canvas=$('field'),ctx=canvas.getContext('2d');
