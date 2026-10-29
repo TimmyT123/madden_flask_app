@@ -5135,30 +5135,35 @@ def new_orleans_trip():
 # --- Personal Workout Coach -----------------------------------------
 # Workout schedule, exercise guides, and progress tracking.
 @app.route("/workout")
+@app.route("/workout.html")
 def workout():
     return render_template("workout.html")
 
 # --- Personal Typing Coach -----------------------------------------
 # Learn to type faster and more accurate the best way
 @app.route("/typing")
+@app.route("/typing.html")
 def typing():
     return render_template("typing.html")
 
 # --- Personal Speech Coach -----------------------------------------
 # Work on speech, pronunciation, etc
 @app.route("/speech")
+@app.route("/speech.html")
 def speech():
     return render_template("speech.html")
 
 # --- Personal Memory Coach -----------------------------------------
 # Working on my memory
 @app.route("/memory")
+@app.route("/memory.html")
 def memory():
     return render_template("memory.html")
 
 # --- Personal Spanish Coach -----------------------------------------
 # Working on my Spanish
 @app.route("/spanish")
+@app.route("/spanish.html")
 def spanish():
     return render_template("spanish.html")
 
