@@ -5167,6 +5167,12 @@ def memory():
 def spanish():
     return render_template("spanish.html")
 
+# --- Reading Speed & Comprehension ---
+@app.route("/reading")
+@app.route("/reading.html")
+def reading():
+    return render_template("reading.html")
+
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
