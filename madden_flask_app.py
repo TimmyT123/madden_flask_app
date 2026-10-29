@@ -5176,7 +5176,7 @@ def reading():
 # --- Flash Cards ---
 @app.route("/flashcards")
 @app.route("/flashcards.html")
-def reading():
+def flashcards():
     return render_template("flashcards.html")
 
 
