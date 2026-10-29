@@ -5173,6 +5173,12 @@ def spanish():
 def reading():
     return render_template("reading.html")
 
+# --- Flash Cards ---
+@app.route("/flashcards")
+@app.route("/flashcards.html")
+def reading():
+    return render_template("flashcards.html")
+
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
