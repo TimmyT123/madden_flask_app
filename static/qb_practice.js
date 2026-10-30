@@ -76,16 +76,36 @@ function choosePassType() {
     return PASS_TYPES[0];
 }
 
+// Create a visibly green release region on the same track as the moving line.
+// This is built in JS, so the existing HTML does not need a new element.
+const meterTrack = movingLine.parentElement;
+let releaseZone = document.getElementById("wurdReleaseZone");
+if (!releaseZone && meterTrack) {
+    releaseZone = document.createElement("div");
+    releaseZone.id = "wurdReleaseZone";
+    // Absolute positioning is relative to the meter track, not the page.
+    if (window.getComputedStyle(meterTrack).position === "static") {
+        meterTrack.style.position = "relative";
+    }
+    releaseZone.style.cssText = [
+        "position:absolute", "top:0", "bottom:0", "height:100%",
+        "box-sizing:border-box", "background:rgba(34,197,94,0.48)",
+        "border-left:2px solid #16a34a", "border-right:2px solid #16a34a",
+        "pointer-events:none", "z-index:1"
+    ].join(";");
+    meterTrack.insertBefore(releaseZone, movingLine);
+    movingLine.style.zIndex = "2";
+}
+
 function updatePassTypeCue() {
     passTypeDisplay.textContent = `${currentPassType.label} PASS — ${currentPassType.cue}`;
-    // Where the existing HTML supplies a release-zone element, move it to match.
-    // The HTML file will help confirm the exact release-zone selector and styling.
-    const zone = document.querySelector("#targetZone, .target-zone, #perfectZone, .perfect-zone");
-    if (zone) {
-        zone.style.left = currentPassType.min + "%";
-        zone.style.width = (currentPassType.max - currentPassType.min) + "%";
-        zone.style.right = "auto";
+    if (releaseZone) {
+        releaseZone.style.left = currentPassType.min + "%";
+        releaseZone.style.width = (currentPassType.max - currentPassType.min) + "%";
     }
+    // Hide an older fixed target zone, if one exists, to prevent two targets.
+    const oldZone = document.querySelector("#targetZone, .target-zone, #perfectZone, .perfect-zone");
+    if (oldZone && oldZone !== releaseZone) oldZone.style.display = "none";
 }
 
 let linePosition = 0;
@@ -405,10 +425,10 @@ function checkRelease() {
     lineMoving = false;
     attempts++;
 
-    // Different hold durations determine lob, touch, or bullet passes.
-    // Results do not change the tempo automatically.
+    // Releasing inside the green region is a successful pass and plays the ding.
+    // Knock rhythm remains a separate practice cue. Tempo never changes automatically.
     const { min, max, label } = currentPassType;
-    if (linePosition >= min && linePosition <= max && pressedOnBeat) {
+    if (linePosition >= min && linePosition <= max) {
         score++;
         feedback.textContent = `Perfect ${label} pass!`;
 
@@ -416,8 +436,6 @@ function checkRelease() {
         perfectSound.play().catch(error => {
             console.log("Perfect sound failed:", error);
         });
-    } else if (linePosition >= min && linePosition <= max && !pressedOnBeat) {
-        feedback.textContent = `Good ${label} release, but missed the beat!`;
     } else if (linePosition < min) {
         feedback.textContent = linePosition >= min - 8
             ? `Too early for ${label}!`
