@@ -1,4 +1,4 @@
-// WURD QB Passing Practice v2
+// WURD QB Passing Practice v3 — randomized bullet / touch / lob passes
 // Mobile refresh-rate fix: moving meter now uses elapsed time instead of movement-per-frame.
 // Modified section: animation/gameLoop timing (originally around lines 304-337).
 
@@ -48,7 +48,46 @@ let lastKnockTime = 0;
 let pressedOnBeat = false;
 let beatWindowMs = 400;
 
+// Weighted pass selection: bullet 65%, touch 25%, lob 10%.
+// The zones reflect a long hold, medium hold, and quick tap respectively.
+const PASS_TYPES = [
+    { id: "bullet", label: "BULLET", weight: 65, min: 68, max: 80, cue: "Hold longer" },
+    { id: "touch", label: "TOUCH", weight: 25, min: 34, max: 49, cue: "Medium hold" },
+    { id: "lob", label: "LOB", weight: 10, min: 9, max: 25, cue: "Quick tap" }
+];
+
+let currentPassType = PASS_TYPES[0];
 let currentTarget = null;
+
+// The pass cue is created in JavaScript, so the current HTML can still load.
+const passTypeDisplay = document.createElement("div");
+passTypeDisplay.id = "passTypeDisplay";
+passTypeDisplay.setAttribute("aria-live", "polite");
+passTypeDisplay.style.cssText = "font-size:1.3rem;font-weight:800;text-align:center;margin:8px 0;letter-spacing:0.04em";
+targetButton.insertAdjacentElement("afterend", passTypeDisplay);
+
+function choosePassType() {
+    const totalWeight = PASS_TYPES.reduce((sum, type) => sum + type.weight, 0);
+    let draw = Math.random() * totalWeight;
+    for (const type of PASS_TYPES) {
+        draw -= type.weight;
+        if (draw < 0) return type;
+    }
+    return PASS_TYPES[0];
+}
+
+function updatePassTypeCue() {
+    passTypeDisplay.textContent = `${currentPassType.label} PASS — ${currentPassType.cue}`;
+    // Where the existing HTML supplies a release-zone element, move it to match.
+    // The HTML file will help confirm the exact release-zone selector and styling.
+    const zone = document.querySelector("#targetZone, .target-zone, #perfectZone, .perfect-zone");
+    if (zone) {
+        zone.style.left = currentPassType.min + "%";
+        zone.style.width = (currentPassType.max - currentPassType.min) + "%";
+        zone.style.right = "auto";
+    }
+}
+
 let linePosition = 0;
 let lineSpeed = 4.4;
 let gameRunning = false;
@@ -167,7 +206,7 @@ document.addEventListener("keydown", function(event) {
         if (!pressedOnBeat) {
             feedback.textContent = "Good button, but missed the knock!";
         } else {
-            feedback.textContent = "On beat! Release near the target zone!";
+            feedback.textContent = `${currentPassType.label}: release in its target zone!`;
         }
     } else if (currentTarget && key !== currentTarget.key) {
         wrongButton();
@@ -293,11 +332,13 @@ function nextRound() {
 
     const buttons = getButtonSet();
     currentTarget = buttons[Math.floor(Math.random() * buttons.length)];
+    currentPassType = choosePassType();
+    updatePassTypeCue();
 
     targetButton.textContent = currentTarget.label;
     targetButton.className = "target-button " + currentTarget.className;
 
-    feedback.textContent = "Press and hold " + currentTarget.label;
+    feedback.textContent = `${currentPassType.label}: ${currentPassType.cue} ${currentTarget.label} on the knock`;
 
     linePosition = 0;
     movingLine.style.left = "0%";
@@ -364,26 +405,27 @@ function checkRelease() {
     lineMoving = false;
     attempts++;
 
-    // Target zone is 68% to 80%.
-    // Results no longer change the tempo automatically.
-    if (linePosition >= 68 && linePosition <= 80 && pressedOnBeat) {
+    // Different hold durations determine lob, touch, or bullet passes.
+    // Results do not change the tempo automatically.
+    const { min, max, label } = currentPassType;
+    if (linePosition >= min && linePosition <= max && pressedOnBeat) {
         score++;
-        feedback.textContent = "Perfect!";
+        feedback.textContent = `Perfect ${label} pass!`;
 
         perfectSound.currentTime = 0;
         perfectSound.play().catch(error => {
             console.log("Perfect sound failed:", error);
         });
-    } else if (linePosition >= 68 && linePosition <= 80 && !pressedOnBeat) {
-        feedback.textContent = "Good release, but missed the beat!";
-    } else if (linePosition >= 60 && linePosition < 68) {
-        feedback.textContent = "Early!";
-    } else if (linePosition > 80 && linePosition <= 88) {
-        feedback.textContent = "Late!";
-    } else if (linePosition > 88) {
-        feedback.textContent = "Overthrown!";
+    } else if (linePosition >= min && linePosition <= max && !pressedOnBeat) {
+        feedback.textContent = `Good ${label} release, but missed the beat!`;
+    } else if (linePosition < min) {
+        feedback.textContent = linePosition >= min - 8
+            ? `Too early for ${label}!`
+            : `Way too early for ${label}!`;
     } else {
-        feedback.textContent = "Way too early!";
+        feedback.textContent = linePosition <= max + 8
+            ? `Too late for ${label}!`
+            : `Held too long for ${label}!`;
     }
 
     updateScoreboard();
@@ -527,7 +569,7 @@ function checkControllerInput() {
                 if (!pressedOnBeat) {
                     feedback.textContent = "Good button, but late on the beat!";
                 } else {
-                    feedback.textContent = "Release near the target zone!";
+                    feedback.textContent = `${currentPassType.label}: release in its target zone!`;
                 }
             } else if (buttonIndex !== correctButtonIndex) {
                 wrongButton();
