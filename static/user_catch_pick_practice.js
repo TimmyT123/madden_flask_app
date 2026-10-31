@@ -1,3 +1,4 @@
+// VERSION 42: slightly faster throw meter and short/medium instant catch-input training.
 // VERSION 41: clearer, moderate-volume double-pulse warning for late catch-button input.
 // VERSION 40: three slowly roaming linebackers 5–10 yards deep; live pass-lane interceptions.
 // VERSION 39: 3D throw meter positioned immediately above receiver button symbol.
@@ -22,6 +23,9 @@
     // Training cue: if no catch button has been pressed by this point in the ball flight,
     // give one light buzz to reinforce getting the catch input down early.
     const CATCH_INPUT_REMINDER_DELAY_MS = 250;
+    // Medium throws: react fast after releasing the pass button, but allow
+    // slightly more time than quick-tap throws under 10 yards.
+    const MEDIUM_CATCH_INPUT_MAX_DELAY_MS = 200;
     // Short throws require an almost-immediate catch input after the throw.
     // If the user waits longer than this, the short-pass meter starts in RED.
     const SHORT_CATCH_INPUT_MAX_DELAY_MS = 130;
@@ -85,9 +89,9 @@
     // Keep this independent of drill length so Infinite practice can always exit.
     const PS_HOME_BUTTON_INDEX = 16;
     const WURD_HOME_URL = "/";
-    const THROW_METER_DURATION_MS = 740;
-    const LOB_MAX_HOLD_MS = 149;
-    const TOUCH_MAX_HOLD_MS = 451;
+    const THROW_METER_DURATION_MS = 700;
+    const LOB_MAX_HOLD_MS = 141;
+    const TOUCH_MAX_HOLD_MS = 427;
     // Tiny Madden-like hesitation before the catch meter moves on 25+ yard throws.
     // This is intentionally subtle: just enough to remind the user that deep catches hesitate.
     const DEEP_CATCH_METER_PAUSE_MS = 90;
@@ -1047,11 +1051,18 @@
             rep.ball.elapsed * 1000 >= (
                 isShortTapCatch(rep)
                     ? SHORT_CATCH_INPUT_MAX_DELAY_MS
-                    : CATCH_INPUT_REMINDER_DELAY_MS
+                    : isMediumCatch(rep)
+                        ? MEDIUM_CATCH_INPUT_MAX_DELAY_MS
+                        : CATCH_INPUT_REMINDER_DELAY_MS
             )
         ) {
             rep.catchInputReminderBuzzed = true;
-            setTiming("Catch button — get it down early.", "warn");
+            setTiming(
+                isShortTapCatch(rep) ? "SHORT: press catch immediately after the throw!"
+                    : isMediumCatch(rep) ? "MEDIUM: press catch right after releasing the throw!"
+                    : "Catch button — get it down early.",
+                "warn"
+            );
             lateCatchWarningChirp();
         }
 
@@ -1375,6 +1386,8 @@
             setInstruction(
                 `${coverageRead}. SHORT PASS: QUICK-TAP X / Square / Triangle IMMEDIATELY after the throw.`
             );
+        } else if (isMediumCatch(rep)) {
+            setInstruction(`${coverageRead}. MEDIUM PASS: press X / Square / Triangle IMMEDIATELY after throwing, hold, then release in GREEN.`);
         } else if (isDifficultCatchTraining()) {
             setInstruction(`${coverageRead}. READ THE DEFENDER, choose X / Square / Triangle, then release in the SMALL GREEN window.`);
         } else if (!rep.catchMeterEnabled) {
@@ -1426,6 +1439,10 @@
 
     function isShortTapCatch(rep) {
         return Boolean(rep && rep.throwDistanceYards < 10);
+    }
+
+    function isMediumCatch(rep) {
+        return Boolean(rep && rep.throwDistanceYards >= 10 && rep.throwDistanceYards < 25);
     }
 
     function isDeepPreHoldCatch(rep) {
@@ -1512,9 +1529,9 @@
         // immediately after the throw. If it comes after the short-pass grace window,
         // force the meter to begin in RED.
         if (
-            isShortTapCatch(rep) &&
             rep.ball &&
-            rep.ball.elapsed * 1000 > SHORT_CATCH_INPUT_MAX_DELAY_MS
+            ((isShortTapCatch(rep) && rep.ball.elapsed * 1000 > SHORT_CATCH_INPUT_MAX_DELAY_MS) ||
+             (isMediumCatch(rep) && rep.ball.elapsed * 1000 > MEDIUM_CATCH_INPUT_MAX_DELAY_MS))
         ) {
             const profile = catchMeterProfile(rep);
             rep.catchInitiationBallProgress = rep.ball.progress;
@@ -1559,6 +1576,8 @@
                     : `SHORT PASS: quick-tap ${BUTTON_LABELS[buttonName]} and release in green.`,
                 alreadyRed ? "bad" : "good"
             );
+        } else if (isMediumCatch(rep) && startProgress > profile.sweetEnd) {
+            setTiming("MEDIUM PASS: catch button pressed too late — meter started RED.", "bad");
         } else if (isDifficultCatchTraining()) {
             const initiation = rep.catchInitiationLabel || "GOOD";
             const alreadyRed = startProgress > profile.sweetEnd;
