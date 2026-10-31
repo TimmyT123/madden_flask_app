@@ -1,3 +1,4 @@
+// VERSION 43: track throw-release to first catch-button press reaction time (short/medium).
 // VERSION 42: slightly faster throw meter and short/medium instant catch-input training.
 // VERSION 41: clearer, moderate-volume double-pulse warning for late catch-button input.
 // VERSION 40: three slowly roaming linebackers 5–10 yards deep; live pass-lane interceptions.
@@ -175,6 +176,8 @@
         successCount: 0,
         streak: 0,
         totalScore: 0,
+        reactionTotalMs: 0,
+        reactionCount: 0,
         phase: "idle",
         rep: null,
         lastTime: performance.now(),
@@ -394,6 +397,8 @@
         state.successCount = 0;
         state.streak = 0;
         state.totalScore = 0;
+        state.reactionTotalMs = 0;
+        state.reactionCount = 0;
         state.phase = "idle";
         state.rep = null;
         state.nextRepAt = 0;
@@ -428,6 +433,8 @@
         state.successCount = 0;
         state.streak = 0;
         state.totalScore = 0;
+        state.reactionTotalMs = 0;
+        state.reactionCount = 0;
         state.running = true;
         state.nextRepAt = 0;
         state.keyboardButtons.clear();
@@ -628,6 +635,8 @@
             throwHolding: false,
             throwHeldAt: null,
             throwHoldMs: 0,
+            throwReleasedAt: null,
+            catchReactionMs: null,
             precisionLeadActive: false,
             precisionLeadX: 0,
             precisionLeadY: 0,
@@ -1105,6 +1114,7 @@
                         rep.ball &&
                         rep.ball.progress < deepCatchActivationProgress(rep)
                     ) {
+                        recordCatchReaction(rep, now);
                         rep.catchPreHeld = true;
                         rep.catchPreHeldAt = rep.ball.progress;
                         rep.catchButtonHeld = buttonName;
@@ -1269,6 +1279,7 @@
         if (rep.thrown) return;
 
         rep.thrown = true;
+        rep.throwReleasedAt = performance.now();
 
         const profile = getPassProfile(rep.throwHoldMs, currentDifficulty());
         rep.passType = profile.type;
@@ -1514,6 +1525,23 @@
         );
     }
 
+    function recordCatchReaction(rep, now) {
+        if (!rep || rep.catchReactionMs !== null || rep.throwReleasedAt === null) return;
+        // Focus on short (<10 yd) and medium (10–24.9 yd) QB-to-target throws.
+        if (rep.throwDistanceYards >= 25) return;
+        rep.catchReactionMs = Math.max(0, Math.round(now - rep.throwReleasedAt));
+        state.reactionTotalMs += rep.catchReactionMs;
+        state.reactionCount += 1;
+    }
+
+    function reactionFeedback(rep) {
+        if (rep.kind !== "offense" || rep.throwDistanceYards >= 25) return "";
+        if (rep.catchReactionMs === null) return " | Reaction: no input";
+        const goal = isShortTapCatch(rep) ? SHORT_CATCH_INPUT_MAX_DELAY_MS : MEDIUM_CATCH_INPUT_MAX_DELAY_MS;
+        const avg = Math.round(state.reactionTotalMs / Math.max(1, state.reactionCount));
+        return ` | Reaction: ${rep.catchReactionMs} ms (${rep.catchReactionMs <= goal ? "ON TIME" : "LATE"}; goal ≤${goal} ms) | Avg: ${avg} ms`;
+    }
+
     function startOffenseCatchMeter(rep, buttonName, now) {
         if (
             rep.catchAttempted ||
@@ -1523,6 +1551,8 @@
         ) {
             return;
         }
+
+        recordCatchReaction(rep, now);
 
         // Grade WHEN the user commits to the catch.
         // Short throws are intentionally strict: the catch button must come almost
@@ -1842,13 +1872,13 @@
         if (success) {
             state.successCount += 1;
             state.streak += 1;
-            setTiming(`${rep.resultReason} — ${repScore} points`, "good");
+            setTiming(`${rep.resultReason} — ${repScore} points${reactionFeedback(rep)}`, "good");
             setInstruction("Successful rep.");
             beep(760, 0.09);
             vibrate(95, 0.5);
         } else {
             state.streak = 0;
-            setTiming(`${rep.resultReason} — ${repScore} points`, "bad");
+            setTiming(`${rep.resultReason} — ${repScore} points${reactionFeedback(rep)}`, "bad");
             setInstruction("Review the feedback, then the next rep will begin.");
             beep(185, 0.12);
             vibrate(150, 0.6);
