@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WURD Madden Controller Input Recorder v8</title>
+<title>WURD Madden Controller Input Recorder v9</title>
 <style>
 :root{color-scheme:dark;--bg:#090b10;--panel:#141923;--border:#293244;--text:#f4f6fa;--muted:#aeb7c7;--green:#4bd37b;--yellow:#ffd166;--blue:#70a5ff;--red:#ff6b6b}
 *{box-sizing:border-box}
@@ -40,7 +40,7 @@ button{border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:point
 .overlayMain{display:grid;grid-template-columns:94px 1fr 94px;gap:10px;align-items:center}
 .stickViz{width:90px;height:90px;border:2px solid #526078;border-radius:50%;position:relative;background:#0c1119}.stickCross:before,.stickCross:after{content:"";position:absolute;background:#2b3547}.stickCross:before{width:1px;height:100%;left:50%;top:0}.stickCross:after{height:1px;width:100%;top:50%;left:0}.stickDot{position:absolute;width:16px;height:16px;border-radius:50%;background:#f4f6fa;left:50%;top:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px #111}.stickName{text-align:center;font:700 11px Arial,sans-serif;color:var(--muted);margin-top:4px}
 .centerPad{display:grid;gap:8px}.shoulders{display:grid;grid-template-columns:1fr 1fr;gap:7px}.miniBtn{background:#1c2432;border:1px solid #3a465b;border-radius:8px;padding:7px 5px;text-align:center;font-weight:800;font-size:12px}.miniBtn.down{background:#1d5736;border-color:#58e391}.trigMini{background:#141923;border:1px solid #3a465b;border-radius:8px;padding:6px}.trigLabel{display:flex;justify-content:space-between;font:700 11px Arial,sans-serif;color:#d7deea}.trigTrack{height:6px;margin-top:5px;background:#283143;border-radius:5px;overflow:hidden}.trigFill{height:100%;background:#e7edf8;width:0}
-.face{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.face .miniBtn{font-size:14px;padding:9px 4px}.face .miniBtn.down{background:#245d3d}
+.face{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.face .miniBtn{font-family:Arial,"Segoe UI Symbol",sans-serif;font-size:24px;line-height:1.15;padding:10px 4px;color:#ffffff;text-shadow:0 1px 2px #000;border:2px solid #56647a;min-height:52px}.face .miniBtn.down{background:#1b8045;border-color:#80ffc1;color:#ffffff;box-shadow:inset 0 0 0 1px #b5ffd4,0 0 9px rgba(77,255,143,.65)}
 .overlayBottom{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.overlayBottom button{font-size:12px;padding:8px 10px}.overlayMark{margin-top:8px;font:700 12px Consolas,monospace;color:var(--yellow);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overlayHint{display:none;color:#aeb7c7;font-size:12px;margin-top:6px}
 
@@ -55,7 +55,7 @@ body.overlay-mode .overlayHint{display:block}
 </style>
 </head>
 <body><div class="wrap">
-<h1>WURD Madden Controller Input Recorder <small>v8</small></h1>
+<h1>WURD Madden Controller Input Recorder <small>v9</small></h1>
 <div class="sub">Full-game input logging + dedicated popup overlay for screen-recording Chiaki-ng gameplay.</div>
 <div id="status" class="status waiting">Waiting for controller...</div>
 
@@ -126,8 +126,8 @@ body.overlay-mode .overlayHint{display:block}
 <div class="note">Use Open Overlay Window while screen-recording Chiaki-ng. The popup can record, mark plays, stop, and download the CSV by itself.</div>
 </div>
 <script>
-/* WURD Madden Controller Input Recorder v8
-   v8: Adjustable overlay display delay and visual opacity, preserving raw CSV input timestamps and play marking. */
+/* WURD Madden Controller Input Recorder v9
+   v9: Larger, high-contrast face buttons for OBS recordings. v8: Adjustable overlay display delay and visual opacity, preserving raw CSV input timestamps and play marking. */
 const DEADZONE=.06, STICK_DELTA=.025, TRIGGER_DELTA=.01;
 const defs=[['x','✕ X',0],['circle','○ Circle',1],['square','□ Square',2],['triangle','△ Triangle',3],['l1','L1',4],['r1','R1',5],['up','D-Pad Up',12],['down','D-Pad Down',13],['left','D-Pad Left',14],['right','D-Pad Right',15]];
 const buttonBox=document.getElementById('buttons'),cards={};
@@ -166,7 +166,7 @@ document.querySelectorAll('.qBtn').forEach(btn=>btn.addEventListener('click',()=
 $('start').onclick=startRecording;$('oStart').onclick=startRecording;$('mark').onclick=markLastPlay;$('oMark').onclick=markLastPlay;$('stop').onclick=stopRecording;$('oStop').onclick=stopRecording;
 $('saveMark').onclick=()=>{if(currentMarkIndex===null)return;if(!selectedQuarter){$('clockValidation').textContent='Choose the quarter first.';return}const clock=normalizeClock($('gameClock').value);if(!clock){$('clockValidation').textContent='Enter the Madden clock as M:SS, for example 6:42.';return}const qLabel=selectedQuarter==='OT'?'OT':`Q${selectedQuarter}`;const label=`PLAY ${currentMarkNumber} | ${qLabel} | ${clock}`;rows[currentMarkIndex][5]=label;rows[currentMarkIndex][6]=selectedQuarter;rows[currentMarkIndex][7]=clock;lastQuarter=selectedQuarter;refreshLastMark(label);closeMarkPanel()};
 $('skipMark').onclick=()=>{if(currentMarkIndex===null)return;refreshLastMark(`PLAY ${currentMarkNumber} — unlabeled`);closeMarkPanel()};
-function downloadLog(){const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','quarter','game_clock','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];const esc=v=>`"${String(v).replaceAll('"','""')}"`;const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');const d=new Date(startEpoch),name=`controller_input_v8_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function downloadLog(){const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','quarter','game_clock','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];const esc=v=>`"${String(v).replaceAll('"','""')}"`;const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');const d=new Date(startEpoch),name=`controller_input_v9_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function setVisualDelay(n){visualDelay=Number(n);$('visualDelay').value=String(visualDelay);$('visualDelayValue').textContent=visualDelay+' ms';sampleHistory=[];try{localStorage.setItem('wurd_overlay_delay',String(visualDelay))}catch(e){}}
 function setOverlayOpacity(n){overlayOpacity=Number(n);$('overlayOpacity').value=String(overlayOpacity);$('overlayOpacityValue').textContent=overlayOpacity+'%';$('overlayPanel').style.opacity=String(overlayOpacity/100);try{localStorage.setItem('wurd_overlay_opacity',String(overlayOpacity))}catch(e){}}
 $('visualDelay').addEventListener('input',e=>setVisualDelay(e.target.value));
