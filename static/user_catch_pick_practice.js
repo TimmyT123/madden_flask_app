@@ -1,3 +1,4 @@
+// VERSION 47: ≤100 ms short/medium reaction goal; red-start penalty follows displayed reaction reading.
 // VERSION 46: ≤90 ms short/medium catch goal, 1-second next rep, sticky top result until next throw.
 // VERSION 45: result feedback remains visible for at least 2 seconds between plays.
 // VERSION 44: result feedback remains visible at least 4 seconds so reaction statistics can be read.
@@ -28,10 +29,10 @@
     // give one light buzz to reinforce getting the catch input down early.
     const CATCH_INPUT_REMINDER_DELAY_MS = 250;
     // Medium throws share the same strict reaction target as short throws.
-    const MEDIUM_CATCH_INPUT_MAX_DELAY_MS = 90;
+    const MEDIUM_CATCH_INPUT_MAX_DELAY_MS = 100;
     // Short throws require an almost-immediate catch input after the throw.
     // If the user waits longer than this, the short-pass meter starts in RED.
-    const SHORT_CATCH_INPUT_MAX_DELAY_MS = 90;
+    const SHORT_CATCH_INPUT_MAX_DELAY_MS = 100;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -1569,8 +1570,8 @@
         // force the meter to begin in RED.
         if (
             rep.ball &&
-            ((isShortTapCatch(rep) && rep.ball.elapsed * 1000 > SHORT_CATCH_INPUT_MAX_DELAY_MS) ||
-             (isMediumCatch(rep) && rep.ball.elapsed * 1000 > MEDIUM_CATCH_INPUT_MAX_DELAY_MS))
+            ((isShortTapCatch(rep) && rep.catchReactionMs > SHORT_CATCH_INPUT_MAX_DELAY_MS) ||
+             (isMediumCatch(rep) && rep.catchReactionMs > MEDIUM_CATCH_INPUT_MAX_DELAY_MS))
         ) {
             const profile = catchMeterProfile(rep);
             rep.catchInitiationBallProgress = rep.ball.progress;
