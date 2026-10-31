@@ -1,3 +1,4 @@
+// VERSION 46: ≤90 ms short/medium catch goal, 1-second next rep, sticky top result until next throw.
 // VERSION 45: result feedback remains visible for at least 2 seconds between plays.
 // VERSION 44: result feedback remains visible at least 4 seconds so reaction statistics can be read.
 // VERSION 43: track throw-release to first catch-button press reaction time (short/medium).
@@ -26,12 +27,11 @@
     // Training cue: if no catch button has been pressed by this point in the ball flight,
     // give one light buzz to reinforce getting the catch input down early.
     const CATCH_INPUT_REMINDER_DELAY_MS = 250;
-    // Medium throws: react fast after releasing the pass button, but allow
-    // slightly more time than quick-tap throws under 10 yards.
-    const MEDIUM_CATCH_INPUT_MAX_DELAY_MS = 200;
+    // Medium throws share the same strict reaction target as short throws.
+    const MEDIUM_CATCH_INPUT_MAX_DELAY_MS = 90;
     // Short throws require an almost-immediate catch input after the throw.
     // If the user waits longer than this, the short-pass meter starts in RED.
-    const SHORT_CATCH_INPUT_MAX_DELAY_MS = 130;
+    const SHORT_CATCH_INPUT_MAX_DELAY_MS = 90;
 
     const canvas = document.getElementById("practiceCanvas");
     const ctx = canvas.getContext("2d");
@@ -180,6 +180,7 @@
         totalScore: 0,
         reactionTotalMs: 0,
         reactionCount: 0,
+        preserveLastResult: false,
         phase: "idle",
         rep: null,
         lastTime: performance.now(),
@@ -365,6 +366,8 @@
     }
 
     function setTiming(text = "", className = "") {
+        // Leave the previous red/green result in the top banner until the next pass is released.
+        if (state.preserveLastResult) return;
         ui.timing.textContent = text;
         ui.timing.className = `timing-message ${className}`.trim();
     }
@@ -401,6 +404,7 @@
         state.totalScore = 0;
         state.reactionTotalMs = 0;
         state.reactionCount = 0;
+        state.preserveLastResult = false;
         state.phase = "idle";
         state.rep = null;
         state.nextRepAt = 0;
@@ -437,6 +441,7 @@
         state.totalScore = 0;
         state.reactionTotalMs = 0;
         state.reactionCount = 0;
+        state.preserveLastResult = false;
         state.running = true;
         state.nextRepAt = 0;
         state.keyboardButtons.clear();
@@ -456,7 +461,7 @@
         }
 
         state.phase = "active";
-        setTiming("");
+        if (!state.preserveLastResult) setTiming("");
         setFeedback();
 
         if (state.mode === "offense") {
@@ -475,6 +480,7 @@
         state.paused = false;
         state.pauseStartedAt = 0;
         state.phase = "complete";
+        state.preserveLastResult = false;
 
         if (window.WurdPracticeControls?.isPaused()) {
             window.WurdPracticeControls.setPaused(false);
@@ -1281,6 +1287,7 @@
         if (rep.thrown) return;
 
         rep.thrown = true;
+        state.preserveLastResult = false; // Next throw replaces the persistent prior result.
         rep.throwReleasedAt = performance.now();
 
         const profile = getPassProfile(rep.throwHoldMs, currentDifficulty());
@@ -1903,7 +1910,8 @@
         }
 
         updateScoreboard();
-        state.nextRepAt = performance.now() + Math.max(2000, currentDifficulty().resultDelay);
+        state.preserveLastResult = true;
+        state.nextRepAt = performance.now() + 1000;
     }
 
     function feedbackPlacement(points) {
