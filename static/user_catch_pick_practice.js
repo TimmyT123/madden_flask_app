@@ -1,3 +1,4 @@
+// VERSION 45: result feedback remains visible for at least 2 seconds between plays.
 // VERSION 44: result feedback remains visible at least 4 seconds so reaction statistics can be read.
 // VERSION 43: track throw-release to first catch-button press reaction time (short/medium).
 // VERSION 42: slightly faster throw meter and short/medium instant catch-input training.
@@ -1902,7 +1903,7 @@
         }
 
         updateScoreboard();
-        state.nextRepAt = performance.now() + Math.max(4000, currentDifficulty().resultDelay);
+        state.nextRepAt = performance.now() + Math.max(2000, currentDifficulty().resultDelay);
     }
 
     function feedbackPlacement(points) {
