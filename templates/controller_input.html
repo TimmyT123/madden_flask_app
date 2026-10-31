@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WURD Madden Controller Input Recorder v9</title>
+<title>WURD Madden Controller Input Recorder v9.1</title>
 <style>
 :root{color-scheme:dark;--bg:#090b10;--panel:#141923;--border:#293244;--text:#f4f6fa;--muted:#aeb7c7;--green:#4bd37b;--yellow:#ffd166;--blue:#70a5ff;--red:#ff6b6b}
 *{box-sizing:border-box}
@@ -55,7 +55,7 @@ body.overlay-mode .overlayHint{display:block}
 </style>
 </head>
 <body><div class="wrap">
-<h1>WURD Madden Controller Input Recorder <small>v9</small></h1>
+<h1>WURD Madden Controller Input Recorder <small>v9.1</small></h1>
 <div class="sub">Full-game input logging + dedicated popup overlay for screen-recording Chiaki-ng gameplay.</div>
 <div id="status" class="status waiting">Waiting for controller...</div>
 
@@ -81,7 +81,7 @@ body.overlay-mode .overlayHint{display:block}
 <div id="overlayPanel" aria-label="Controller overlay">
  <div class="overlayTop"><div class="overlayTitle">WURD INPUT OVERLAY</div><div id="overlayRec" class="overlayRec">NOT RECORDING</div></div>
  <div class="overlaySettings">
-  <div class="settingRow"><label for="visualDelay">Display delay</label><input id="visualDelay" type="range" min="0" max="500" step="10" value="120"><output id="visualDelayValue">120 ms</output></div>
+  <div class="settingRow"><label for="visualDelay">Display delay</label><input id="visualDelay" type="range" min="0" max="500" step="5" value="120"><output id="visualDelayValue">120 ms</output></div>
   <div class="settingRow"><label for="overlayOpacity">Overlay opacity</label><input id="overlayOpacity" type="range" min="20" max="100" step="5" value="80"><output id="overlayOpacityValue">80%</output></div>
  </div>
  <div class="overlayMain">
@@ -126,7 +126,7 @@ body.overlay-mode .overlayHint{display:block}
 <div class="note">Use Open Overlay Window while screen-recording Chiaki-ng. The popup can record, mark plays, stop, and download the CSV by itself.</div>
 </div>
 <script>
-/* WURD Madden Controller Input Recorder v9
+/* WURD Madden Controller Input Recorder v9.1
    v9: Larger, high-contrast face buttons for OBS recordings. v8: Adjustable overlay display delay and visual opacity, preserving raw CSV input timestamps and play marking. */
 const DEADZONE=.06, STICK_DELTA=.025, TRIGGER_DELTA=.01;
 const defs=[['x','✕ X',0],['circle','○ Circle',1],['square','□ Square',2],['triangle','△ Triangle',3],['l1','L1',4],['r1','R1',5],['up','D-Pad Up',12],['down','D-Pad Down',13],['left','D-Pad Left',14],['right','D-Pad Right',15]];
