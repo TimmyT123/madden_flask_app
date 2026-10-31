@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WURD Madden Controller Input Recorder v7</title>
+<title>WURD Madden Controller Input Recorder v8</title>
 <style>
 :root{color-scheme:dark;--bg:#090b10;--panel:#141923;--border:#293244;--text:#f4f6fa;--muted:#aeb7c7;--green:#4bd37b;--yellow:#ffd166;--blue:#70a5ff;--red:#ff6b6b}
 *{box-sizing:border-box}
@@ -28,6 +28,12 @@ button{border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:point
 #saveMark{background:var(--green);color:#07130b}#skipMark{background:#2a3343;color:var(--text);border:1px solid #3b4860}
 .validation{min-height:20px;color:#ff9a9a;font-size:13px;margin-top:8px}.meta{font-family:Consolas,monospace;background:#0d1118;border:1px solid var(--border);border-radius:10px;padding:12px;line-height:1.65}.lastMark{margin-top:10px;color:var(--yellow);font-weight:700}.note{color:var(--muted);font-size:13px;margin-top:10px}
 
+/* Adjustable overlay visual settings */
+.overlaySettings{display:flex;flex-direction:column;gap:8px;margin:8px 0 10px;padding:9px;border:1px solid #46536b;border-radius:9px;background:rgba(10,15,24,.85)}
+.settingRow{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
+.settingRow label{min-width:105px;color:#e2e8f3}
+.settingRow input{flex:1;min-width:0;accent-color:#70a5ff}
+.settingRow output{min-width:52px;text-align:right;font-family:Consolas,monospace}
 /* Compact live overlay */
 #overlayPanel{display:none;background:rgba(9,11,16,.92);border:2px solid #46536b;border-radius:14px;padding:10px;max-width:470px}
 .overlayTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.overlayTitle{font-size:13px;font-weight:800;letter-spacing:.5px;color:#d8dfeb}.overlayRec{font:700 12px Consolas,monospace;color:#ff8e8e}.overlayRec.on{color:#75e29b}
@@ -49,7 +55,7 @@ body.overlay-mode .overlayHint{display:block}
 </style>
 </head>
 <body><div class="wrap">
-<h1>WURD Madden Controller Input Recorder <small>v7</small></h1>
+<h1>WURD Madden Controller Input Recorder <small>v8</small></h1>
 <div class="sub">Full-game input logging + dedicated popup overlay for screen-recording Chiaki-ng gameplay.</div>
 <div id="status" class="status waiting">Waiting for controller...</div>
 
@@ -74,6 +80,10 @@ body.overlay-mode .overlayHint{display:block}
 
 <div id="overlayPanel" aria-label="Controller overlay">
  <div class="overlayTop"><div class="overlayTitle">WURD INPUT OVERLAY</div><div id="overlayRec" class="overlayRec">NOT RECORDING</div></div>
+ <div class="overlaySettings">
+  <div class="settingRow"><label for="visualDelay">Display delay</label><input id="visualDelay" type="range" min="0" max="500" step="10" value="120"><output id="visualDelayValue">120 ms</output></div>
+  <div class="settingRow"><label for="overlayOpacity">Overlay opacity</label><input id="overlayOpacity" type="range" min="20" max="100" step="5" value="80"><output id="overlayOpacityValue">80%</output></div>
+ </div>
  <div class="overlayMain">
   <div><div class="stickViz stickCross"><div id="olsDot" class="stickDot"></div></div><div class="stickName">LEFT STICK</div></div>
   <div class="centerPad">
@@ -93,7 +103,7 @@ body.overlay-mode .overlayHint{display:block}
   <button id="oStart">Start</button><button id="oMark" disabled>MARK LAST PLAY</button><button id="oStop" disabled>Stop</button><button id="oDownload" disabled>Download Log</button><button id="oExit">Exit Overlay</button>
  </div>
  <div class="overlayMark">Last: <span id="oLastMark">—</span></div>
- <div class="overlayHint">Place this popup over a corner of Chiaki-ng before screen recording. Start/mark/stop and download the CSV from this popup.</div>
+ <div class="overlayHint">Set delay and opacity, then place this popup over Chiaki-ng before screen recording. Start/mark/stop and download the CSV from this popup.</div>
 </div>
 
 <div id="markPanel">
@@ -116,13 +126,14 @@ body.overlay-mode .overlayHint{display:block}
 <div class="note">Use Open Overlay Window while screen-recording Chiaki-ng. The popup can record, mark plays, stop, and download the CSV by itself.</div>
 </div>
 <script>
-/* WURD Madden Controller Input Recorder v7
-   2026-10-08: Adds compact live overlay mode while preserving v5 CSV + quarter/game-clock marking. */
+/* WURD Madden Controller Input Recorder v8
+   v8: Adjustable overlay display delay and visual opacity, preserving raw CSV input timestamps and play marking. */
 const DEADZONE=.06, STICK_DELTA=.025, TRIGGER_DELTA=.01;
 const defs=[['x','✕ X',0],['circle','○ Circle',1],['square','□ Square',2],['triangle','△ Triangle',3],['l1','L1',4],['r1','R1',5],['up','D-Pad Up',12],['down','D-Pad Down',13],['left','D-Pad Left',14],['right','D-Pad Right',15]];
 const buttonBox=document.getElementById('buttons'),cards={};
 defs.forEach(([k,label])=>{const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="label">${label}</div><div class="value">UP</div>`;buttonBox.appendChild(d);cards[k]=d});
 const $=id=>document.getElementById(id);
+let sampleHistory=[],visualDelay=120,overlayOpacity=80;
 let gpIndex=null,recording=false,startPerf=0,startEpoch=0,rows=[],previous=null,markCount=0,currentMarkIndex=null,currentMarkNumber=0,selectedQuarter='',lastQuarter='';
 function gp(){const list=navigator.getGamepads?navigator.getGamepads():[];if(gpIndex!==null&&list[gpIndex])return list[gpIndex];for(const g of list)if(g){gpIndex=g.index;return g}return null}
 function axis(v){return Math.abs(v||0)<DEADZONE?0:(v||0)} function pressed(g,i){return!!g.buttons[i]?.pressed} function val(g,i){return +(g.buttons[i]?.value||0)}
@@ -133,15 +144,16 @@ function changed(a,b){if(!b)return true;for(const k of ['x','circle','square','t
 function csvRow(type,s,perfNow,label='',quarter='',gameClock=''){const ms=perfNow-startPerf,epoch=startEpoch+ms;return[type,Math.round(ms),elapsed(ms),localStamp(epoch),new Date(epoch).toISOString(),label,quarter,gameClock,+s.x,+s.circle,+s.square,+s.triangle,+s.l1,s.l2.toFixed(3),+s.r1,s.r2.toFixed(3),+s.up,+s.down,+s.left,+s.right,s.lx.toFixed(3),s.ly.toFixed(3),s.rx.toFixed(3),s.ry.toFixed(3)]}
 function moveDot(id,x,y){const el=$(id);el.style.left=`${50+x*38}%`;el.style.top=`${50+y*38}%`}
 function setDown(id,on){$(id).classList.toggle('down',!!on)}
-function render(s){
+function render(s,overlayS=s){
  defs.forEach(([k])=>{cards[k].classList.toggle('down',s[k]);cards[k].querySelector('.value').textContent=s[k]?'DOWN':'UP'});
  const l=Math.round(s.l2*100),r=Math.round(s.r2*100);$('l2').textContent=l+'%';$('r2').textContent=r+'%';$('l2bar').style.width=l+'%';$('r2bar').style.width=r+'%';$('ls').textContent=`X ${s.lx>=0?'+':''}${s.lx.toFixed(3)}   Y ${s.ly>=0?'+':''}${s.ly.toFixed(3)}`;$('rs').textContent=`X ${s.rx>=0?'+':''}${s.rx.toFixed(3)}   Y ${s.ry>=0?'+':''}${s.ry.toFixed(3)}`;
- moveDot('olsDot',s.lx,s.ly);moveDot('orsDot',s.rx,s.ry);setDown('ol1',s.l1);setDown('or1',s.r1);setDown('ox',s.x);setDown('ocircle',s.circle);setDown('osquare',s.square);setDown('otriangle',s.triangle);$('ol2Pct').textContent=l+'%';$('or2Pct').textContent=r+'%';$('ol2Fill').style.width=l+'%';$('or2Fill').style.width=r+'%';
+ const ol=Math.round(overlayS.l2*100),or=Math.round(overlayS.r2*100);
+ moveDot('olsDot',overlayS.lx,overlayS.ly);moveDot('orsDot',overlayS.rx,overlayS.ry);setDown('ol1',overlayS.l1);setDown('or1',overlayS.r1);setDown('ox',overlayS.x);setDown('ocircle',overlayS.circle);setDown('osquare',overlayS.square);setDown('otriangle',overlayS.triangle);$('ol2Pct').textContent=ol+'%';$('or2Pct').textContent=or+'%';$('ol2Fill').style.width=ol+'%';$('or2Fill').style.width=or+'%';
 }
 function syncRecordButtons(){
  $('oStart').disabled=recording;$('oStop').disabled=!recording;$('oMark').disabled=!recording;$('oDownload').disabled=recording||rows.length===0;$('overlayRec').textContent=recording?'RECORDING':'NOT RECORDING';$('overlayRec').classList.toggle('on',recording)
 }
-function loop(t){const g=gp();if(g){$('status').textContent='Controller connected: '+g.id;$('status').className='status connected';const s=snap(g);render(s);if(recording){$('elapsed').textContent=elapsed(t-startPerf);if(changed(s,previous)){rows.push(csvRow('INPUT',s,t));previous={...s};$('events').textContent=rows.length}}}else{$('status').textContent='Waiting for controller...';$('status').className='status waiting'}requestAnimationFrame(loop)}
+function loop(t){const g=gp();if(g){$('status').textContent='Controller connected: '+g.id;$('status').className='status connected';const s=snap(g);sampleHistory.push({t,s});const cutoff=t-visualDelay;while(sampleHistory.length>1&&sampleHistory[1].t<=cutoff)sampleHistory.shift();const displaySample=sampleHistory[0].s;render(s,visualDelay===0?s:displaySample);if(recording){$('elapsed').textContent=elapsed(t-startPerf);if(changed(s,previous)){rows.push(csvRow('INPUT',s,t));previous={...s};$('events').textContent=rows.length}}}else{sampleHistory=[];$('status').textContent='Waiting for controller...';$('status').className='status waiting'}requestAnimationFrame(loop)}
 function selectQuarter(q){selectedQuarter=q;document.querySelectorAll('.qBtn').forEach(b=>b.classList.toggle('selected',b.dataset.q===q))}
 function normalizeClock(raw){const text=String(raw||'').trim();let m=text.match(/^(\d{1,2}):(\d{1,2})$/);if(!m){const digits=text.replace(/\D/g,'');if(digits.length>=2&&digits.length<=4){const sec=digits.slice(-2),min=digits.slice(0,-2)||'0';m=[text,min,sec]}}if(!m)return null;const min=Number(m[1]),sec=Number(m[2]);if(!Number.isInteger(min)||!Number.isInteger(sec)||min<0||min>15||sec<0||sec>59)return null;return`${min}:${pad(sec)}`}
 function closeMarkPanel(){$('markPanel').style.display='none';$('clockValidation').textContent='';$('gameClock').value='';currentMarkIndex=null;currentMarkNumber=0}
@@ -154,7 +166,12 @@ document.querySelectorAll('.qBtn').forEach(btn=>btn.addEventListener('click',()=
 $('start').onclick=startRecording;$('oStart').onclick=startRecording;$('mark').onclick=markLastPlay;$('oMark').onclick=markLastPlay;$('stop').onclick=stopRecording;$('oStop').onclick=stopRecording;
 $('saveMark').onclick=()=>{if(currentMarkIndex===null)return;if(!selectedQuarter){$('clockValidation').textContent='Choose the quarter first.';return}const clock=normalizeClock($('gameClock').value);if(!clock){$('clockValidation').textContent='Enter the Madden clock as M:SS, for example 6:42.';return}const qLabel=selectedQuarter==='OT'?'OT':`Q${selectedQuarter}`;const label=`PLAY ${currentMarkNumber} | ${qLabel} | ${clock}`;rows[currentMarkIndex][5]=label;rows[currentMarkIndex][6]=selectedQuarter;rows[currentMarkIndex][7]=clock;lastQuarter=selectedQuarter;refreshLastMark(label);closeMarkPanel()};
 $('skipMark').onclick=()=>{if(currentMarkIndex===null)return;refreshLastMark(`PLAY ${currentMarkNumber} — unlabeled`);closeMarkPanel()};
-function downloadLog(){const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','quarter','game_clock','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];const esc=v=>`"${String(v).replaceAll('"','""')}"`;const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');const d=new Date(startEpoch),name=`controller_input_v7_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function downloadLog(){const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','quarter','game_clock','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];const esc=v=>`"${String(v).replaceAll('"','""')}"`;const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');const d=new Date(startEpoch),name=`controller_input_v8_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function setVisualDelay(n){visualDelay=Number(n);$('visualDelay').value=String(visualDelay);$('visualDelayValue').textContent=visualDelay+' ms';sampleHistory=[];try{localStorage.setItem('wurd_overlay_delay',String(visualDelay))}catch(e){}}
+function setOverlayOpacity(n){overlayOpacity=Number(n);$('overlayOpacity').value=String(overlayOpacity);$('overlayOpacityValue').textContent=overlayOpacity+'%';$('overlayPanel').style.opacity=String(overlayOpacity/100);try{localStorage.setItem('wurd_overlay_opacity',String(overlayOpacity))}catch(e){}}
+$('visualDelay').addEventListener('input',e=>setVisualDelay(e.target.value));
+$('overlayOpacity').addEventListener('input',e=>setOverlayOpacity(e.target.value));
+try{const storedDelay=localStorage.getItem('wurd_overlay_delay');const d=Number(storedDelay);if(storedDelay!==null&&Number.isFinite(d)&&d>=0&&d<=500)setVisualDelay(d);else setVisualDelay(120);const storedOpacity=localStorage.getItem('wurd_overlay_opacity');const o=Number(storedOpacity);if(storedOpacity!==null&&Number.isFinite(o)&&o>=20&&o<=100)setOverlayOpacity(o);else setOverlayOpacity(80)}catch(e){setVisualDelay(120);setOverlayOpacity(80)}
 $('download').onclick=downloadLog;$('oDownload').onclick=downloadLog;
 function enterOverlay(){document.body.classList.add('overlay-mode');$('overlayToggle').textContent='Exit Overlay';$('overlayPanel').style.display='block';syncRecordButtons()}
 function exitOverlay(){document.body.classList.remove('overlay-mode');$('overlayToggle').textContent='Overlay In This Window';$('overlayPanel').style.display='none'}
