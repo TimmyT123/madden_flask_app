@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WURD Madden Controller Input Recorder v9.1</title>
+<title>WURD Madden Controller Input Recorder v9.2</title>
 <style>
 :root{color-scheme:dark;--bg:#090b10;--panel:#141923;--border:#293244;--text:#f4f6fa;--muted:#aeb7c7;--green:#4bd37b;--yellow:#ffd166;--blue:#70a5ff;--red:#ff6b6b}
 *{box-sizing:border-box}
@@ -32,7 +32,7 @@ button{border:0;border-radius:9px;padding:11px 16px;font-weight:700;cursor:point
 .overlaySettings{display:flex;flex-direction:column;gap:8px;margin:8px 0 10px;padding:9px;border:1px solid #46536b;border-radius:9px;background:rgba(10,15,24,.85)}
 .settingRow{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
 .settingRow label{min-width:105px;color:#e2e8f3}
-.settingRow input{flex:1;min-width:0;accent-color:#70a5ff}
+.settingRow input{width:90px;min-width:0;background:#0d1118;color:#f4f6fa;border:1px solid #60738f;border-radius:7px;padding:8px;font:700 16px Consolas,monospace}
 .settingRow output{min-width:52px;text-align:right;font-family:Consolas,monospace}
 /* Compact live overlay */
 #overlayPanel{display:none;background:rgba(9,11,16,.92);border:2px solid #46536b;border-radius:14px;padding:10px;max-width:470px}
@@ -55,7 +55,7 @@ body.overlay-mode .overlayHint{display:block}
 </style>
 </head>
 <body><div class="wrap">
-<h1>WURD Madden Controller Input Recorder <small>v9.1</small></h1>
+<h1>WURD Madden Controller Input Recorder <small>v9.2</small></h1>
 <div class="sub">Full-game input logging + dedicated popup overlay for screen-recording Chiaki-ng gameplay.</div>
 <div id="status" class="status waiting">Waiting for controller...</div>
 
@@ -81,8 +81,7 @@ body.overlay-mode .overlayHint{display:block}
 <div id="overlayPanel" aria-label="Controller overlay">
  <div class="overlayTop"><div class="overlayTitle">WURD INPUT OVERLAY</div><div id="overlayRec" class="overlayRec">NOT RECORDING</div></div>
  <div class="overlaySettings">
-  <div class="settingRow"><label for="visualDelay">Display delay</label><input id="visualDelay" type="range" min="0" max="500" step="5" value="120"><output id="visualDelayValue">120 ms</output></div>
-  <div class="settingRow"><label for="overlayOpacity">Overlay opacity</label><input id="overlayOpacity" type="range" min="20" max="100" step="5" value="80"><output id="overlayOpacityValue">80%</output></div>
+  <div class="settingRow"><label for="visualDelay">Display delay</label><input id="visualDelay" type="number" min="0" max="500" step="1" value="105" inputmode="numeric" aria-label="Display delay in milliseconds"><span>ms</span></div>
  </div>
  <div class="overlayMain">
   <div><div class="stickViz stickCross"><div id="olsDot" class="stickDot"></div></div><div class="stickName">LEFT STICK</div></div>
@@ -103,7 +102,7 @@ body.overlay-mode .overlayHint{display:block}
   <button id="oStart">Start</button><button id="oMark" disabled>MARK LAST PLAY</button><button id="oStop" disabled>Stop</button><button id="oDownload" disabled>Download Log</button><button id="oExit">Exit Overlay</button>
  </div>
  <div class="overlayMark">Last: <span id="oLastMark">—</span></div>
- <div class="overlayHint">Set delay and opacity, then place this popup over Chiaki-ng before screen recording. Start/mark/stop and download the CSV from this popup.</div>
+ <div class="overlayHint">Enter display delay in milliseconds, then place this popup over Chiaki-ng before screen recording. Start/mark/stop and download the CSV from this popup.</div>
 </div>
 
 <div id="markPanel">
@@ -126,14 +125,14 @@ body.overlay-mode .overlayHint{display:block}
 <div class="note">Use Open Overlay Window while screen-recording Chiaki-ng. The popup can record, mark plays, stop, and download the CSV by itself.</div>
 </div>
 <script>
-/* WURD Madden Controller Input Recorder v9.1
-   v9: Larger, high-contrast face buttons for OBS recordings. v8: Adjustable overlay display delay and visual opacity, preserving raw CSV input timestamps and play marking. */
+/* WURD Madden Controller Input Recorder v9.2
+   v9: Larger, high-contrast face buttons for OBS recordings. v9.2: Direct millisecond delay entry; removed opacity setting. Raw CSV timing remains unchanged. */
 const DEADZONE=.06, STICK_DELTA=.025, TRIGGER_DELTA=.01;
 const defs=[['x','✕ X',0],['circle','○ Circle',1],['square','□ Square',2],['triangle','△ Triangle',3],['l1','L1',4],['r1','R1',5],['up','D-Pad Up',12],['down','D-Pad Down',13],['left','D-Pad Left',14],['right','D-Pad Right',15]];
 const buttonBox=document.getElementById('buttons'),cards={};
 defs.forEach(([k,label])=>{const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="label">${label}</div><div class="value">UP</div>`;buttonBox.appendChild(d);cards[k]=d});
 const $=id=>document.getElementById(id);
-let sampleHistory=[],visualDelay=120,overlayOpacity=80;
+let sampleHistory=[],visualDelay=105;
 let gpIndex=null,recording=false,startPerf=0,startEpoch=0,rows=[],previous=null,markCount=0,currentMarkIndex=null,currentMarkNumber=0,selectedQuarter='',lastQuarter='';
 function gp(){const list=navigator.getGamepads?navigator.getGamepads():[];if(gpIndex!==null&&list[gpIndex])return list[gpIndex];for(const g of list)if(g){gpIndex=g.index;return g}return null}
 function axis(v){return Math.abs(v||0)<DEADZONE?0:(v||0)} function pressed(g,i){return!!g.buttons[i]?.pressed} function val(g,i){return +(g.buttons[i]?.value||0)}
@@ -167,11 +166,17 @@ $('start').onclick=startRecording;$('oStart').onclick=startRecording;$('mark').o
 $('saveMark').onclick=()=>{if(currentMarkIndex===null)return;if(!selectedQuarter){$('clockValidation').textContent='Choose the quarter first.';return}const clock=normalizeClock($('gameClock').value);if(!clock){$('clockValidation').textContent='Enter the Madden clock as M:SS, for example 6:42.';return}const qLabel=selectedQuarter==='OT'?'OT':`Q${selectedQuarter}`;const label=`PLAY ${currentMarkNumber} | ${qLabel} | ${clock}`;rows[currentMarkIndex][5]=label;rows[currentMarkIndex][6]=selectedQuarter;rows[currentMarkIndex][7]=clock;lastQuarter=selectedQuarter;refreshLastMark(label);closeMarkPanel()};
 $('skipMark').onclick=()=>{if(currentMarkIndex===null)return;refreshLastMark(`PLAY ${currentMarkNumber} — unlabeled`);closeMarkPanel()};
 function downloadLog(){const header=['event_type','elapsed_ms','elapsed','local_time','iso_time','marker','quarter','game_clock','x','circle','square','triangle','l1','l2','r1','r2','dpad_up','dpad_down','dpad_left','dpad_right','left_x','left_y','right_x','right_y'];const esc=v=>`"${String(v).replaceAll('"','""')}"`;const csv=[header.join(','),...rows.map(r=>r.map(esc).join(','))].join('\r\n');const d=new Date(startEpoch),name=`controller_input_v9_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.csv`;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
-function setVisualDelay(n){visualDelay=Number(n);$('visualDelay').value=String(visualDelay);$('visualDelayValue').textContent=visualDelay+' ms';sampleHistory=[];try{localStorage.setItem('wurd_overlay_delay',String(visualDelay))}catch(e){}}
-function setOverlayOpacity(n){overlayOpacity=Number(n);$('overlayOpacity').value=String(overlayOpacity);$('overlayOpacityValue').textContent=overlayOpacity+'%';$('overlayPanel').style.opacity=String(overlayOpacity/100);try{localStorage.setItem('wurd_overlay_opacity',String(overlayOpacity))}catch(e){}}
-$('visualDelay').addEventListener('input',e=>setVisualDelay(e.target.value));
-$('overlayOpacity').addEventListener('input',e=>setOverlayOpacity(e.target.value));
-try{const storedDelay=localStorage.getItem('wurd_overlay_delay');const d=Number(storedDelay);if(storedDelay!==null&&Number.isFinite(d)&&d>=0&&d<=500)setVisualDelay(d);else setVisualDelay(120);const storedOpacity=localStorage.getItem('wurd_overlay_opacity');const o=Number(storedOpacity);if(storedOpacity!==null&&Number.isFinite(o)&&o>=20&&o<=100)setOverlayOpacity(o);else setOverlayOpacity(80)}catch(e){setVisualDelay(120);setOverlayOpacity(80)}
+function setVisualDelay(n){
+ const parsed=Number(n);
+ if(!Number.isFinite(parsed))return;
+ visualDelay=Math.max(0,Math.min(500,Math.round(parsed)));
+ $('visualDelay').value=String(visualDelay);
+ sampleHistory=[];
+ try{localStorage.setItem('wurd_overlay_delay',String(visualDelay))}catch(e){}
+}
+$('visualDelay').addEventListener('change',e=>setVisualDelay(e.target.value));
+$('visualDelay').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur()});
+try{const stored=localStorage.getItem('wurd_overlay_delay');const n=Number(stored);setVisualDelay(stored!==null&&Number.isFinite(n)?n:105)}catch(e){setVisualDelay(105)}
 $('download').onclick=downloadLog;$('oDownload').onclick=downloadLog;
 function enterOverlay(){document.body.classList.add('overlay-mode');$('overlayToggle').textContent='Exit Overlay';$('overlayPanel').style.display='block';syncRecordButtons()}
 function exitOverlay(){document.body.classList.remove('overlay-mode');$('overlayToggle').textContent='Overlay In This Window';$('overlayPanel').style.display='none'}
