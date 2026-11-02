@@ -8,6 +8,13 @@
 .historybar{border:1px solid #31556c;background:#102636;border-radius:12px;margin:14px 0;padding:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.previous{margin:9px 0;padding:10px;border-left:3px solid #63cbaa;background:#152a38;color:#d3e9e3;font-size:13px;border-radius:6px}.progress-note{color:#a5e4c8;font-size:12px;margin-top:5px}.rirselect{width:100%;padding:7px;background:#132638;color:#fff;border:1px solid #526f81;border-radius:6px}.historyitem{padding:8px 0;border-bottom:1px solid #2c475a;font-size:13px;line-height:1.5}.historyitem:last-child{border:0}.historybar.hide{display:none!important}
 
 /* Madden after-workout planner v1.9 */
+.anti-blitz-lab{border:1px solid #366d7c;border-radius:13px;background:#102638;padding:15px;margin-top:14px}
+.blitz-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.blitz-fields label{font-size:12px;color:#cbdfec}
+.blitz-fields input{display:block;width:100%;margin-top:5px;border:1px solid #54728b;background:#0e1e30;color:#fff;border-radius:8px;padding:9px}
+.blitz-drill-select{font-size:12px;padding:7px 10px;margin-top:7px}
+@media(max-width:540px){.blitz-fields{grid-template-columns:1fr}}
+
 .madden-intro{margin-top:8px}.madden-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.madden-stats{display:flex;gap:8px;flex-wrap:wrap}.madden-progress{height:11px;border-radius:99px;background:#0a1726;overflow:hidden;border:1px solid #3a5369;margin:13px 0}.madden-progress>div{height:100%;background:linear-gradient(90deg,#68c5ff,#75e1c8);transition:width .2s}.madden-plan{display:grid;gap:10px}.madden-step{display:flex;gap:12px;align-items:flex-start;background:#172a41;border:1px solid #37516e;padding:12px;border-radius:11px}.madden-step input{accent-color:#72dfbc;width:19px;height:19px;flex:none;margin-top:4px}.madden-step b{color:#e7f8ff}.madden-step p{margin:4px 0 0;color:#bdd2e2;font-size:13px}.madden-step.done{border-color:#317b71;background:#12352f}.madden-select{background:#0e1e30;color:#fff;border:1px solid #54728b;border-radius:9px;padding:10px;width:100%;max-width:280px}.madden-note{width:100%;min-height:84px;resize:vertical;border:1px solid #52718b;border-radius:10px;background:#0d1c2d;color:#fff;padding:12px;font:inherit}.madden-coach{border-left:3px solid #e3c675;background:#28303b;padding:12px 14px;border-radius:9px;line-height:1.55;font-size:14px;color:#e9e3d7}.madden-small{font-size:12px;color:#abc1d3}.madden-panel a{color:#9cddff}.madden-tags{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0 13px}.madden-tags span{font-size:12px;padding:5px 9px;border:1px solid #45617c;border-radius:99px;background:#18334b}.madden-note-label{font-size:13px;color:#d3e7f4;font-weight:700;display:block;margin:13px 0 6px}.madden-day-selector{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.madden-day-selector button{padding:8px 10px;border:1px solid #466584;background:#1a2d44;color:#e0edf7;border-radius:9px}.madden-day-selector button.selected{background:#285b70;border-color:#7fdacb;color:#fff}.madden-controlrow{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-top:12px}
 
 /* Skills & Sprint Lab v2.0 */
@@ -33,7 +40,7 @@
 .volume-options select{padding:5px;background:#10283b;color:white;border:1px solid #51748c;border-radius:7px;max-width:100%}
 @media(max-width:740px){.art-timer-column{width:118px;min-width:118px}}
 @media(max-width:370px){.art-timer-column{width:90px;min-width:90px}.timerbox.embedded-timer .timertime{font-size:23px}.timerbox.embedded-timer .btnrow .btn{font-size:11px}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 2.2</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, daily brain skills, and Madden 27 — organized through the week.</p></section>
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 2.3</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, daily brain skills, and Madden 27 — organized through the week.</p></section>
 <section class="panel"><div class="topline"><div><div class="sectiontitle">Your weekly schedule</div><p style="font-size:13px;margin:6px 0">Today is selected automatically. Tap another weekday to view its plan. Tuesday builds acceleration; Friday adds a second, short sprint session after an initial adaptation period. Thursday is boxing. Weekends remain recovery days.</p></div><div class="btnrow"><button class="btn secondary" id="prev">← Previous</button><button class="btn primary" id="next">Next day →</button></div></div><div id="cycle" class="cycle"></div><div id="daytitle"></div></section>
 <section class="panel" id="cloudPanel" aria-label="Cloud synchronization">
 <div class="headrow"><div><div class="sectiontitle">Workout Coach v2.0 · Cloud account</div><h2>Phone + laptop sync</h2><p class="muted" style="font-size:13px;margin:5px 0">Google sign-in connects both devices to the same private Firebase account. This browser keeps a local copy.</p></div><div class="btnrow"><button type="button" class="btn primary" id="cloudLogin">Sign in with Google</button><button type="button" class="btn secondary hide" id="cloudLogout">Sign out</button></div></div>
@@ -67,6 +74,16 @@
 <div class="madden-head"><div><h3 id="maddenTitle">Training</h3><p id="maddenFocus" style="margin:4px 0"></p></div><div><label for="maddenDuration" class="madden-small">Time available</label><select id="maddenDuration" class="madden-select"><option value="short">Quick · 20–30 min</option><option value="normal" selected>Standard · 45–60 min</option><option value="long">Extended · 75–90 min</option></select></div></div>
 <div class="madden-tags" id="maddenTags"></div><div class="madden-coach" id="maddenCoach"></div>
 <div class="madden-plan" id="maddenSteps" style="margin-top:13px"></div>
+<div id="antiBlitzPanel" class="anti-blitz-lab hide" aria-label="20-minute anti-blitz training lab">
+  <div class="headrow"><div><h3>🛡️ Anti-blitz lab · 20 minutes</h3><p class="muted" style="font-size:13px;margin:4px 0">17 minutes of practice + 3 minutes of mental rest. Check each part off as you finish.</p></div><span id="blitzProgress" class="pill green">0 / 7 complete</span></div>
+  <div class="madden-progress"><div id="blitzProgressFill" style="width:0%"></div></div>
+  <div id="blitzDrills" class="madden-plan"></div>
+  <div class="timerbox"><div><div class="sectiontitle">Anti-blitz drill / rest timer</div><div class="timertime" id="blitzTime">03:00</div><div class="madden-small" id="blitzTimerLabel">Choose a drill to set its timer</div></div><div class="btnrow"><button class="btn primary" type="button" id="blitzTimerToggle">▶ Start</button><button class="btn secondary" type="button" id="blitzTimerReset">↺ Reset</button></div></div>
+  <div class="madden-tags"><span>Against man blitz: slant / zig / quick out</span><span>Against zone blitz: find the vacated area</span><span>Never force an HB screen into a waiting user</span></div>
+  <label class="madden-note-label" for="blitzSacks">Training results (optional)</label>
+  <div class="blitz-fields"><label>Sacks<input id="blitzSacks" type="number" min="0" max="99" placeholder="0"></label><label>Risky throws<input id="blitzRisky" type="number" min="0" max="99" placeholder="0"></label><label>Successful counters<input id="blitzWins" type="number" min="0" max="99" placeholder="0"></label></div>
+  <p class="madden-small">Results, notes, and checks are stored with your weekly workout backup and cloud-sync data. Timer runs only while this page is open.</p>
+</div>
 <label class="madden-note-label" for="maddenNotes">What did I learn? What should I fix on the next play?</label><textarea class="madden-note" id="maddenNotes" placeholder="Example: On HB zone, their linebacker shot the B gap. I held R2 early. Next time read the guard and cut away before accelerating."></textarea>
 <div class="madden-controlrow"><span class="madden-small" id="maddenSaveStatus">Changes save locally and sync when connected.</span><div class="btnrow"><button class="btn secondary" type="button" id="maddenCopy">Copy weekly Madden log</button><button class="btn secondary" type="button" id="maddenClear">Reset this week's Madden checks</button></div></div>
 <p class="madden-small" style="margin-top:12px">Your workout, skills and Madden data are backed up locally and can sync across devices after cloud connection. Checkboxes reset for a new calendar week; older weeks remain saved.</p>
@@ -236,10 +253,10 @@ const MADDEN_PLAN=[
 ['Warm up with 6 move reps','Make 2 spins, 2 hard cuts and 2 no-move bursts in open space. Check the controls respond consistently.'],
 ['Practice 6 real line-of-scrimmage reads','Watch the blocking before you move. Choose a spin, hard cut or no move based on the linebacker’s angle—not a preset button.'],
 ['Replay 2 contact moments','Separate button timing from blocking failure. Record whether Cook actually began a move before tackle contact.']]},
-{title:'Passing under pressure',focus:'Make fast, safe decisions with Allen.',coach:'Practice with only your two familiar offensive formations first. Read the defense before the snap, watch the first defender after it, and take the high-percentage throw. Protect the ball instead of trying to rescue every bad play.',tags:['Two familiar formations','Checkdown','Ball security'],steps:[
-['Rehearse a 3-option progression','For each of 5 snaps choose your first read, second read and checkdown before the snap.'],
-['Play 2 CPU offensive drives','Focus on completing manageable passes and recognizing pressure early. Mix in Cook runs if the box is favorable.'],
-['Review 2 pressured plays','Were you late reading the blitz, aiming at the wrong receiver, or forcing a throw? Note the answer.']]},
+{title:'Anti-blitz passing · Josh Allen',focus:'Punish heavy pressure without forcing covered throws.',coach:'The Panthers pressured Allen and user-covered your HB screen. Identify the blitzer and user defender before snapping. Make one quick read, use a safe outlet, and run when the defense gives you a lane. Bootlegs are situational: avoid slow play-action against a free rusher.',tags:['Quick game','User defender','Bootleg / scramble'],steps:[
+['Complete the 20-minute anti-blitz lab','Work through the seven timed drills below, including the two mental rest breaks. Mark each drill complete to track progress.'],
+['Apply it during two CPU drives','Mix quick slants, zigs or outs, inside runs, and occasional safe bootlegs. If the defense sits on the HB screen, stop forcing the screen.'],
+['Review sacks, risky throws, and good adjustments','Record the number of sacks and bad throws, then name the counter that worked best.']]},
 {title:'Competitive application · H2H',focus:'Test your skills against a human, then find one weakness.',coach:'A human can disguise Cover 3/4, manually fill gaps and adjust to repetitive runs. Keep your familiar formations. Choose one improvement goal for the game—not winning every snap. If the game runs long, finish it and shorten review.',tags:['Human adjustments','Game decisions','Postgame film'],steps:[
 ['Set one measurable game goal','Examples: no blind throw against rotating safeties, or read the box before every Cook run.'],
 ['Play one complete H2H game','Use what you practiced this week. During each drive adapt to what the opponent is actually doing.'],
@@ -262,7 +279,9 @@ function maddenRender(){
  $('maddenTags').innerHTML=plan.tags.map(t=>'<span>'+esc(t)+'</span>').join('');$('maddenCoach').textContent='Coach’s focus: '+plan.coach;
  $('maddenDuration').value=maddenDuration;
  let times=maddenDuration==='short'?['5 min','10–15 min','5 min']:maddenDuration==='long'?['20 min','40–50 min','15–20 min']:['10 min','25–35 min','10 min'];
+ if(maddenDay===4)times[0]='20 min (incl. rests)';
  $('maddenSteps').innerHTML=plan.steps.map(([title,desc],i)=>`<label class="madden-step ${entry.checks[i]?'done':''}"><input type="checkbox" data-madden-check="${i}" ${entry.checks[i]?'checked':''}><span><b>${times[i]} · ${esc(title)}</b><p>${esc(desc)}</p></span></label>`).join('');
+ $('antiBlitzPanel').classList.toggle('hide',maddenDay!==4);if(maddenDay===4)blitzRender();
  $('maddenNotes').value=entry.note||'';$('maddenSaveStatus').textContent='Changes save locally and sync when connected.';
 }
 $('maddenDays').addEventListener('click',e=>{const b=e.target.closest('[data-madden-day]');if(!b)return;maddenDay=Number(b.dataset.maddenDay);maddenRender()});
@@ -271,6 +290,40 @@ $('maddenDuration').addEventListener('change',e=>{maddenDuration=e.target.value;
 $('maddenNotes').addEventListener('input',e=>{maddenEntry(maddenDay).note=e.target.value;save();$('maddenSaveStatus').textContent='Notes saved.'});
 $('maddenCopy').onclick=async()=>{const week=maddenWeekStart(),wk=maddenStore();let lines=['Madden 27 training — Week of '+week];MADDEN_PLAN.forEach((p,i)=>{lines.push('\n'+WEEKDAYS[i]+' — '+p.title);p.steps.forEach(([name],j)=>lines.push(((wk[i]?.checks||[])[j]?'[x] ':'[ ] ')+name));if(wk[i]?.note)lines.push('Lesson: '+wk[i].note)});let out=lines.join('\n');try{await navigator.clipboard.writeText(out);$('maddenSaveStatus').textContent='Weekly Madden log copied.'}catch{window.prompt('Copy weekly Madden log:',out)}};
 $('maddenClear').onclick=()=>{if(!confirm('Reset only this week’s Madden checkboxes? Notes and your workout history will remain.'))return;let wk=maddenStore();for(let i=0;i<7;i++)if(wk[i])wk[i].checks=[false,false,false];save();maddenRender()};
+
+// Friday anti-blitz lab: separate progress state, retained in the same cloud-backed workout object.
+const BLITZ_DRILLS=[
+ ['Recognize the blitz',3,'Identify potential free rushers and decide your immediate answer before the snap.'],
+ ['Quick throws vs man',4,'Rehearse slant, zig, or short out. Watch the defender rather than staring at your WR.'],
+ ['Mental rest',1,'Hands off the controller. Recall which defender took away your first read.'],
+ ['Beat the user defender',4,'Look where the manually controlled defender is sitting. If he waits for the HB screen, attack elsewhere.'],
+ ['Mental rest',2,'Relax and choose one correction for your next snap.'],
+ ['Safe bootleg or scramble',4,'Check the edge first. Flat → crossing receiver → Allen scramble if the lane opens. Skip slow PA against a free blitzer.'],
+ ['Review',2,'Review sacks, risky throws and successful blitz counters.']
+];
+let blitzSelected=0,blitzRemaining=BLITZ_DRILLS[0][1]*60,blitzTimer=null,blitzEndsAt=0;
+function blitzEntry(){const wk=maddenStore();wk[4]??={checks:[false,false,false],note:''};wk[4].blitz??={checks:Array(7).fill(false),sacks:'',risky:'',wins:''};return wk[4].blitz;}
+function blitzClock(sec){return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0')}
+function blitzTimerUi(){
+ $('blitzTime').textContent=blitzClock(blitzRemaining);
+ $('blitzTimerLabel').textContent=BLITZ_DRILLS[blitzSelected][0]+' · '+BLITZ_DRILLS[blitzSelected][1]+' min';
+ $('blitzTimerToggle').textContent=blitzTimer?'■ Pause':'▶ Start';
+}
+function blitzPause(){if(blitzTimer){clearInterval(blitzTimer);blitzTimer=null;}blitzTimerUi()}
+function blitzSelect(i){blitzPause();blitzSelected=i;blitzRemaining=BLITZ_DRILLS[i][1]*60;blitzTimerUi()}
+function blitzRender(){
+ const item=blitzEntry(),done=item.checks.filter(Boolean).length;
+ $('blitzProgress').textContent=done+' / 7 complete';$('blitzProgressFill').style.width=(done/7*100)+'%';
+ $('blitzDrills').innerHTML=BLITZ_DRILLS.map(([name,min,desc],i)=>`<div class="madden-step ${item.checks[i]?'done':''}"><input type="checkbox" data-blitz-check="${i}" ${item.checks[i]?'checked':''} aria-label="Complete ${esc(name)}"><span><b>${min} min · ${esc(name)}</b><p>${esc(desc)}</p><button class="btn secondary blitz-drill-select" data-blitz-select="${i}" type="button">${blitzSelected===i?'✓ Selected':'Set timer'}</button></span></div>`).join('');
+ for(const [id,key] of [['blitzSacks','sacks'],['blitzRisky','risky'],['blitzWins','wins']])$(''+id).value=item[key]??'';
+ blitzTimerUi();
+}
+$('blitzDrills').addEventListener('click',e=>{const b=e.target.closest('[data-blitz-select]');if(!b)return;blitzSelect(Number(b.dataset.blitzSelect));blitzRender()});
+$('blitzDrills').addEventListener('change',e=>{const b=e.target.closest('[data-blitz-check]');if(!b)return;blitzEntry().checks[Number(b.dataset.blitzCheck)]=b.checked;save();blitzRender()});
+$('blitzTimerToggle').onclick=()=>{if(blitzTimer){blitzRemaining=Math.max(0,Math.ceil((blitzEndsAt-Date.now())/1000));blitzPause();return;}if(blitzRemaining<=0)blitzRemaining=BLITZ_DRILLS[blitzSelected][1]*60;primeAudio();blitzEndsAt=Date.now()+blitzRemaining*1000;blitzTimer=setInterval(()=>{blitzRemaining=Math.max(0,Math.ceil((blitzEndsAt-Date.now())/1000));if(blitzRemaining===0){blitzPause();ding();}else blitzTimerUi()},250);blitzTimerUi()};
+$('blitzTimerReset').onclick=()=>blitzSelect(blitzSelected);
+for(const [id,key] of [['blitzSacks','sacks'],['blitzRisky','risky'],['blitzWins','wins']])$(id).addEventListener('change',e=>{const val=e.target.value;blitzEntry()[key]=val===''?'':String(Math.max(0,Math.min(99,Math.floor(Number(val)||0))));save();});
+
 maddenRender();
 
 // Skills & Sprint Lab v2.0: additive, non-destructive data keys.
