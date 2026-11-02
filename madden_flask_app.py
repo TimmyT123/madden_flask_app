@@ -4457,6 +4457,63 @@ def build_schedule_id_fallback_map(league_id: str, parsed_schedule: list) -> dic
 
     return fallback
 
+# Scheduler is Discord-owned; Flask reads a read-only JSON snapshot.
+# Configure WURD_GAME_SCHEDULE_FILE identically in bot and Flask .env if needed.
+WURD_GAME_SCHEDULE_FILE = Path(os.getenv(
+    'WURD_GAME_SCHEDULE_FILE', '/home/pi/projects/time_madden_old/data/game_schedules.json'
+))
+
+def _wurd_schedule_aliases(info):
+    if not isinstance(info, dict):
+        return set()
+    aliases = set()
+    for key in ('nickName', 'nickname', 'name', 'displayName', 'teamName', 'abbr', 'abbrName', 'teamAbbr'):
+        value = info.get(key)
+        if value:
+            text = str(value).lower()
+            aliases.add(re.sub(r'[^a-z0-9]', '', text))
+            aliases.add(re.sub(r'[^a-z0-9]', '', text.split()[-1]))
+    return aliases - {''}
+
+def _wurd_scheduler_lookup(league_id, season, week, team_map):
+    # Older records without season are only considered for the *current* season.
+    latest = _load_json_safe(os.path.join(app.config['UPLOAD_FOLDER'], '_latest.json')) or {}
+    active = str(latest.get('league')) == str(league_id) and str(latest.get('season')) == str(season)
+    records = _load_json_safe(str(WURD_GAME_SCHEDULE_FILE)) or {}
+    result = {}
+    for rec in records.values():
+        if not isinstance(rec, dict):
+            continue
+        if str(rec.get('league_id') or league_id) != str(league_id):
+            continue
+        rec_season = rec.get('season')
+        if rec_season and str(rec_season) != str(season):
+            continue
+        if not rec_season and not active:
+            continue
+        # Support both week_1 and pre_1; legacy records have only the numeric week.
+        rec_week = str(rec.get('week') or '')
+        if rec_week != str(week).split('_')[-1]:
+            continue
+        name_parts = str(rec.get('matchup') or '').lower().split('-')
+        if len(name_parts) != 2:
+            continue
+        ids = []
+        for name in name_parts:
+            key = re.sub(r'[^a-z0-9]', '', name)
+            candidates = [str(tid) for tid, info in team_map.items() if key in _wurd_schedule_aliases(info)]
+            if len(candidates) != 1:
+                break
+            ids.append(candidates[0])
+        if len(ids) != 2 or ids[0] == ids[1]:
+            continue
+        pair = frozenset(ids)
+        if pair in result:  # Ambiguous duplicate; do not display a possibly wrong kickoff.
+            result[pair] = None
+            continue
+        result[pair] = rec
+    return result
+
 @app.route('/schedule')
 def show_schedule():
     league_id = request.args.get("league") or league_data.get("latest_league") or "1886931"
@@ -4503,6 +4560,8 @@ def show_schedule():
     root_dir = os.path.join(app.config['UPLOAD_FOLDER'], league_id)
     records = load_team_records(root_dir)
 
+    scheduler_matchups = _wurd_scheduler_lookup(league_id, season, week, team_map)
+
     # Decorate labels (visitor first); choose 'name' or switch to 'abbr'
     prefer = "name"  # change to "abbr" if you want e.g., MIA(15-1)
     for game in parsed_schedule:
@@ -4511,6 +4570,32 @@ def show_schedule():
 
         game["awayName"] = make_label_with_record(away_id, team_map, records, prefer=prefer)
         game["homeName"] = make_label_with_record(home_id, team_map, records, prefer=prefer)
+
+        game['wurdKickoffDisplay'] = ''
+        game['wurdScheduleStatus'] = ''
+        game['wurdBroadcastDisplay'] = ''
+        rec = scheduler_matchups.get(frozenset((away_id, home_id)))
+        if isinstance(rec, dict):
+            kickoff = rec.get('kickoff_utc')
+            if kickoff:
+                try:
+                    from zoneinfo import ZoneInfo
+                    from datetime import timezone as _timezone
+                    dt = datetime.fromisoformat(str(kickoff).replace('Z', '+00:00'))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=_timezone.utc)
+                    az = dt.astimezone(ZoneInfo('America/Phoenix'))
+                    game['wurdKickoffDisplay'] = f"{az.strftime('%b')} {az.day}, {az.strftime('%I:%M %p').lstrip('0')} AZ"
+                    game['wurdScheduleStatus'] = 'Confirmed' if len(rec.get('confirmed', [])) == 2 else 'Proposed'
+                except (ValueError, TypeError):
+                    pass
+            broadcasts = rec.get('broadcast') or {}
+            players = rec.get('users') or []
+            if any(broadcasts.get(str(uid)) is True for uid in players):
+                game['wurdBroadcastDisplay'] = 'Broadcast planned'
+            elif players and all(broadcasts.get(str(uid)) is False for uid in players):
+                game['wurdBroadcastDisplay'] = 'No broadcast planned'
+
 
         # Display the immutable first-completion timestamp recorded by schedule_parser.
         # Keep old completed games blank if they predate timestamp tracking.

@@ -57,6 +57,8 @@
         <th>Away</th>
         <th>Score</th>
         <th>Home</th>
+        <th>Game Time (AZ)</th>
+        <th>Broadcast</th>
         <th>Completed</th>
         <!-- <th>Game of the Week</th> -->
       </tr>
@@ -68,6 +70,13 @@
         <td>{{ game.awayName }}</td>
         <td>{{ game.awayScore }} - {{ game.homeScore }}</td>
         <td>{{ game.homeName }}</td>
+        <td>
+          {% if game.wurdKickoffDisplay %}
+            {{ game.wurdKickoffDisplay }}
+            <small style="display:block;opacity:.75">{{ game.wurdScheduleStatus }}</small>
+          {% else %}&mdash;{% endif %}
+        </td>
+        <td>{{ game.wurdBroadcastDisplay or '—' }}</td>
         <td>
           {% if game.completedDisplay %}
             {{ game.completedDisplay }}
