@@ -4572,6 +4572,7 @@ def show_schedule():
         game["homeName"] = make_label_with_record(home_id, team_map, records, prefer=prefer)
 
         game['wurdKickoffDisplay'] = ''
+        game['wurdKickoffIso'] = ''
         game['wurdScheduleStatus'] = ''
         game['wurdBroadcastDisplay'] = ''
         rec = scheduler_matchups.get(frozenset((away_id, home_id)))
@@ -4585,8 +4586,22 @@ def show_schedule():
                     if dt.tzinfo is None:
                         dt = dt.replace(tzinfo=_timezone.utc)
                     az = dt.astimezone(ZoneInfo('America/Phoenix'))
-                    game['wurdKickoffDisplay'] = f"{az.strftime('%b')} {az.day}, {az.strftime('%I:%M %p').lstrip('0')} AZ"
-                    game['wurdScheduleStatus'] = 'Confirmed' if len(rec.get('confirmed', [])) == 2 else 'Proposed'
+                    game['wurdKickoffDisplay'] = f"{az.strftime('%a, %b')} {az.day}, {az.strftime('%I:%M %p').lstrip('0')} AZ"
+                    game['wurdKickoffIso'] = az.isoformat()
+                    game['wurdScheduleStatus'] = ('Confirmed' if len(set(rec.get('confirmed', []))) == 2 else ('Expired proposal' if dt <= datetime.now(_timezone.utc) else 'Proposed'))
+                    if rec.get('pending_kickoff_utc'):
+                        game['wurdScheduleStatus'] += ' • Change pending'
+                    advance_info = load_advance_info() or {}
+                    advance_raw = advance_info.get('advance_time_iso')
+                    if advance_raw:
+                        try:
+                            advance_dt = datetime.fromisoformat(advance_raw.replace('Z', '+00:00'))
+                            if advance_dt.tzinfo is None:
+                                advance_dt = advance_dt.replace(tzinfo=ZoneInfo('America/Phoenix'))
+                            if dt >= advance_dt:
+                                game['wurdScheduleStatus'] += (' • Extension approved' if rec.get('extension_approved_for') == kickoff else ' • Commissioner approval needed')
+                        except (ValueError, TypeError):
+                            pass
                 except (ValueError, TypeError):
                     pass
             broadcasts = rec.get('broadcast') or {}

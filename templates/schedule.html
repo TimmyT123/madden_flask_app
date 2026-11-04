@@ -1,7 +1,32 @@
-{# schedule_v2.html | Version 2.0 | Status column replaced with first webhook completion timestamp #}
+{# schedule_v2.html | Version 2.1 | Status column replaced with first webhook completion timestamp #}
 {% extends "base.html" %}
 
-{% block title %}Schedule{% endblock %}
+{% block title %}Schedule<script>
+(function () {
+  const zone = 'America/Phoenix';
+  const partsFor = (date) => Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {timeZone: zone, year:'numeric',month:'numeric',day:'numeric'}).formatToParts(date)
+      .filter(p=>p.type!=='literal').map(p=>[p.type,Number(p.value)]));
+  const dateKey = p => Date.UTC(p.year,p.month-1,p.day)/86400000;
+  function refreshKickoffs() {
+    const today = dateKey(partsFor(new Date()));
+    document.querySelectorAll('.wurd-kickoff[data-az-kickoff]').forEach(el=>{
+      const dt=new Date(el.dataset.azKickoff);
+      if (isNaN(dt.getTime())) return;
+      const days=dateKey(partsFor(dt))-today;
+      const time=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit',hour12:true}).format(dt);
+      let dateText;
+      if (days===0) dateText='Today';
+      else if(days===1) dateText='Tomorrow';
+      else dateText=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',month:'short',day:'numeric'}).format(dt);
+      el.textContent=dateText+', '+time+' AZ';
+    });
+  }
+  refreshKickoffs();
+  setInterval(refreshKickoffs, 60000);
+})();
+</script>
+{% endblock %}
 
 {% block content %}
 
@@ -72,7 +97,7 @@
         <td>{{ game.homeName }}</td>
         <td>
           {% if game.wurdKickoffDisplay %}
-            {{ game.wurdKickoffDisplay }}
+            <span class="wurd-kickoff" data-az-kickoff="{{ game.wurdKickoffIso }}">{{ game.wurdKickoffDisplay }}</span>
             <small style="display:block;opacity:.75">{{ game.wurdScheduleStatus }}</small>
           {% else %}&mdash;{% endif %}
         </td>
@@ -102,4 +127,29 @@
 {% else %}
 <p>No schedule data available.</p>
 {% endif %}
+<script>
+(function () {
+  const zone = 'America/Phoenix';
+  const partsFor = (date) => Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {timeZone: zone, year:'numeric',month:'numeric',day:'numeric'}).formatToParts(date)
+      .filter(p=>p.type!=='literal').map(p=>[p.type,Number(p.value)]));
+  const dateKey = p => Date.UTC(p.year,p.month-1,p.day)/86400000;
+  function refreshKickoffs() {
+    const today = dateKey(partsFor(new Date()));
+    document.querySelectorAll('.wurd-kickoff[data-az-kickoff]').forEach(el=>{
+      const dt=new Date(el.dataset.azKickoff);
+      if (isNaN(dt.getTime())) return;
+      const days=dateKey(partsFor(dt))-today;
+      const time=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit',hour12:true}).format(dt);
+      let dateText;
+      if (days===0) dateText='Today';
+      else if(days===1) dateText='Tomorrow';
+      else dateText=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',month:'short',day:'numeric'}).format(dt);
+      el.textContent=dateText+', '+time+' AZ';
+    });
+  }
+  refreshKickoffs();
+  setInterval(refreshKickoffs, 60000);
+})();
+</script>
 {% endblock %}
