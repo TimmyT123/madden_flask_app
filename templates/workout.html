@@ -66,7 +66,36 @@
 .learning-frame.blackjack-frame{height:1040px}
 .learning-frame.python-frame{height:1110px}
 @media(max-width:740px){.learning-frame.blackjack-frame,.learning-frame.python-frame{height:890px}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 2.8</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, daily skills, five learning academies, flashcards, and Madden 27 — all in one place.</p></section>
+
+/* v2.9: Weekly Learning Center; academy iframe documents are preserved intact. */
+.learning-center-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.learning-week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin:16px 0 10px}
+.learning-week-grid button{min-width:0;border:1px solid #46627a;border-radius:11px;background:#162b3e;color:#d9e9f7;padding:10px 3px;font-size:12px;cursor:pointer}
+.learning-week-grid button strong{display:block;font-size:14px;margin:3px 0}
+.learning-week-grid button span{font-size:10px;display:block;color:#a9c8d7}
+.learning-week-grid button.selected{border-color:#7ce8cd;background:#20505b}
+.learning-week-grid button.today{outline:1px dashed #dfc676;outline-offset:2px}
+.learning-plan{display:grid;gap:10px;margin:13px 0}
+.learning-session{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#192f42;border:1px solid #3b5871;border-radius:12px;padding:11px}
+.learning-session.is-done{border-color:#327663;background:#16382f}
+.learning-session label{display:flex;align-items:center;gap:9px;flex:1;min-width:170px;cursor:pointer}
+.learning-session input{accent-color:#73dfba;width:19px;height:19px}
+.learning-session label strong{display:block;color:#f1f7fa;font-size:14px}
+.learning-session label small{display:block;color:#b4c7d4;font-size:12px;margin-top:3px}
+.learning-session .btn{font-size:12px;padding:8px 10px}
+.learning-progress-track{height:11px;border-radius:90px;background:#0b1d2b;overflow:hidden;border:1px solid #3b566e;margin-top:10px}
+.learning-progress-track div{height:100%;width:0;background:linear-gradient(90deg,#65b6f5,#75e0b8);transition:width .2s}
+.learning-course-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:14px 0}
+.learning-course-grid button{background:#182e44;color:#dbeefa;border:1px solid #486782;border-radius:10px;min-height:67px;padding:9px 4px;font-weight:700;font-size:12px;cursor:pointer}
+.learning-course-grid button.active{border-color:#73e0c1;background:#23505b}
+.learning-course-grid button span{display:block;font-size:22px;margin-bottom:3px}
+.learning-selection-note{font-size:12px;color:#b4cbda;margin:8px 0}
+.learning-notes{width:100%;min-height:70px;resize:vertical;border:1px solid #4d6c83;border-radius:9px;padding:10px;background:#102437;color:#f4fbff;font:inherit;font-size:13px}
+#learningCourses .academy-shell{margin-top:12px}
+#learningCourses .academy-shell.learning-inactive{display:none}
+@media(max-width:700px){.learning-week-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.learning-course-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:370px){.learning-week-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 2.9</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 <section class="panel"><div class="topline"><div><div class="sectiontitle">Your weekly schedule</div><p style="font-size:13px;margin:6px 0">Today is selected automatically. Tap another weekday to view its plan. Tuesday builds acceleration; Friday adds a second, short sprint session after an initial adaptation period. Thursday is boxing. Weekends remain recovery days.</p></div><div class="btnrow"><button class="btn secondary" id="prev">← Previous</button><button class="btn primary" id="next">Next day →</button></div></div><div id="cycle" class="cycle"></div><div id="daytitle"></div></section>
 <section class="panel" id="cloudPanel" aria-label="Cloud synchronization">
 <div class="headrow"><div><div class="sectiontitle">Workout Coach v2.0 · Cloud account</div><h2>Phone + laptop sync</h2><p class="muted" style="font-size:13px;margin:5px 0">Google sign-in connects both devices to the same private Firebase account. This browser keeps a local copy.</p></div><div class="btnrow"><button type="button" class="btn primary" id="cloudLogin">Sign in with Google</button><button type="button" class="btn secondary hide" id="cloudLogout">Sign out</button></div></div>
@@ -89,7 +118,20 @@
 
 <section class="panel" id="skills-training"><div class="headrow"><div><div class="sectiontitle">After physical training · Learn and improve</div><h2>Daily Brain &amp; Skills Training</h2><p class="muted" style="margin:4px 0">Two sessions per skill each week, plus Reading Lab on Sunday. Progress is saved in your Workout History backup.</p></div><span class="pill green" id="skillsProgress">0 / 11 sessions</span></div>
 <div class="skill-meter"><span id="skillsFill" style="width:0%"></span></div><div class="skill-row" id="skillDays" style="margin:12px 0"></div><div class="skill-grid" id="skillCards"></div><div class="notice">Work on the day’s recommended skill after your physical workout, or whenever you feel fresh. Madden training remains below. You can add more activities and rearrange this rotation later.</div></section>
-<section class="panel academy-shell" id="printing-academy" aria-label="3D Printing Academy">
+<section class="panel" id="learning-center" aria-label="Weekly Learning Center">
+ <div class="learning-center-header"><div><div class="sectiontitle">Personal weekly study plan · Learn without cramming</div><h2 style="margin-top:7px">📚 Learning Center</h2><p class="muted" style="font-size:13px;margin:5px 0">One focused subject on weekdays. Extra learning time on weekends. Choose any day or subject whenever you like.</p></div><span class="pill green" id="learningCount">0 / 11 sessions this week</span></div>
+ <div class="learning-progress-track" role="progressbar" aria-label="Weekly learning progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="learningProgress"><div id="learningProgressFill"></div></div>
+ <div class="learning-week-grid" id="learningWeekGrid" aria-label="Choose a study day"></div>
+ <div class="headrow"><div><h3 id="learningDayTitle">Today's study plan</h3><p class="muted" id="learningDayDescription" style="font-size:12px;margin:4px 0"></p></div><span class="pill" id="learningDayMinutes"></span></div>
+ <div class="learning-plan" id="learningSessionList"></div>
+ <label for="learningNotes" class="madden-note-label">Notes for this day (saved locally)</label><textarea id="learningNotes" class="learning-notes" placeholder="What did I learn? What should I work on next time?"></textarea>
+ <div class="divider" style="border-top:1px solid #334f63;margin:18px 0"></div>
+ <div class="sectiontitle">Open any academy</div><p class="learning-selection-note">Your courses keep their existing lessons, games, quizzes and saved progress. Only the selected course is shown below.</p>
+ <div class="learning-course-grid" id="learningCourseGrid" aria-label="Learning academy selector"></div>
+ <p class="learning-selection-note" id="learningSelectedText">Select a course to begin.</p>
+</section>
+<div id="learningCourses">
+<section class="panel academy-shell learning-inactive" id="printing-academy" aria-label="3D Printing Academy">
  <div class="academy-controls"><div><div class="sectiontitle">Practical learning · New course</div><h2 style="margin-top:7px">🖨️ 3D Printing Academy</h2><p class="muted">Eight interactive lessons, knowledge checks, a layer-height simulator, and hands-on projects. Your course progress and notes save in this browser.</p></div><button class="btn primary" id="togglePrintingAcademy" type="button" aria-expanded="false" aria-controls="printingAcademyContent">Open 3D Printing Academy ↓</button></div>
  <div id="printingAcademyContent" class="hide"><iframe id="printingAcademyFrame" class="academy-frame" title="Interactive 3D Printing Academy" loading="lazy" referrerpolicy="no-referrer" srcdoc="&lt;!doctype html&gt;
 &lt;html lang=&quot;en&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;&lt;title&gt;3D Printing Academy | Learn by Making&lt;/title&gt;
@@ -120,7 +162,7 @@ $(&#x27;start&#x27;).onclick=()=&gt;{show(state.current);$(&#x27;course&#x27;).s
 &lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
 ">Your browser does not support embedded webpages.</iframe><p class="muted" style="font-size:12px">Scroll inside the course to see more lessons. Course progress saves locally in this browser and is separate from Workout Coach's Google cloud backup.</p></div>
 </section>
-<section class="panel academy-shell" id="atari-assembly-academy" aria-label="Atari 800XL Assembly Academy">
+<section class="panel academy-shell learning-inactive" id="atari-assembly-academy" aria-label="Atari 800XL Assembly Academy">
   <div class="learning-toolbar"><div><div class="sectiontitle">6502 · Learn by making games</div><h2 style="margin-top:7px">Atari 800XL Assembly Academy</h2><p class="muted">Hands-on lessons, 6502 register sandbox, hardware demos, joystick games, quizzes, and downloadable assembly examples. Saves progress in this browser.</p></div>
   <button type="button" class="btn primary" id="toggleAtariAcademy" aria-controls="atariAcademyContent" aria-expanded="false">Open Atari 800XL Assembly Academy ↓</button></div>
   <div id="atariAcademyContent" class="hide"><iframe class="learning-frame " id="atariAcademyFrame" title="Atari 800XL Assembly Academy" loading="lazy" srcdoc="&lt;!doctype html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;&lt;title&gt;ATARI 800XL • Assembly Game Academy&lt;/title&gt;&lt;style&gt;
@@ -162,7 +204,7 @@ const PROJECTS=[[&#x27;01&#x27;,&#x27;Catch the Star&#x27;,&#x27;Joystick, text-
 const canvas=$(&#x27;#game&#x27;),ctx=canvas.getContext(&#x27;2d&#x27;);let state={running:false,paused:false,score:0,lives:3,frame:0,player:300,stars:[],bad:[],keys:{},last:0,raf:0};function newGame(){state={running:true,paused:false,score:0,lives:3,frame:0,player:300,stars:[{x:320,y:35}],bad:[],keys:{},last:0,raf:state.raf};$(&#x27;#gamestatus&#x27;).textContent=&#x27;PLAYING&#x27;;updateHUD();draw()};function updateHUD(){$(&#x27;#score&#x27;).textContent=&#x27;SCORE &#x27;+String(state.score).padStart(3,&#x27;0&#x27;);$(&#x27;#lives&#x27;).textContent=&#x27;LIVES &#x27;+String(state.lives).padStart(2,&#x27;0&#x27;);$(&#x27;#level&#x27;).textContent=&#x27;LEVEL &#x27;+String(1+Math.floor(state.score/100)).padStart(2,&#x27;0&#x27;)};function sound(f=500){if(!$(&#x27;#audio&#x27;).checked)return;try{let A=window.AudioContext||window.webkitAudioContext;window._atariAudio??=new A();let ac=window._atariAudio;ac.resume();let o=ac.createOscillator(),g=ac.createGain();o.type=&#x27;square&#x27;;o.frequency.value=f;g.gain.setValueAtTime(.06,ac.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.12);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.14)}catch(e){}}function draw(){ctx.fillStyle=&#x27;#07131e&#x27;;ctx.fillRect(0,0,640,360);ctx.fillStyle=&#x27;#193450&#x27;;for(let y=25;y&lt;360;y+=30){ctx.fillRect(0,y,640,1)}ctx.fillStyle=&#x27;#79e8b2&#x27;;ctx.font=&#x27;bold 19px monospace&#x27;;ctx.fillText(&#x27;ATARI 800XL  •  CATCH THE STAR&#x27;,30,28);ctx.fillStyle=&#x27;#f3f3d9&#x27;;state.stars.forEach(s=&gt;{ctx.font=&#x27;bold 26px monospace&#x27;;ctx.fillText(&#x27;★&#x27;,s.x,s.y)});ctx.fillStyle=&#x27;#ff7677&#x27;;state.bad.forEach(b=&gt;{ctx.fillRect(b.x,b.y,23,15)});ctx.fillStyle=&#x27;#8fd0ff&#x27;;ctx.fillRect(state.player,326,44,16);ctx.fillRect(state.player+13,313,18,13);ctx.fillStyle=&#x27;#3a7e9a&#x27;;ctx.fillRect(state.player+17,308,10,7);if(!state.running||state.paused){ctx.fillStyle=&#x27;#07131ecd&#x27;;ctx.fillRect(120,120,400,120);ctx.fillStyle=&#x27;#fff&#x27;;ctx.font=&#x27;bold 25px monospace&#x27;;ctx.textAlign=&#x27;center&#x27;;ctx.fillText(state.paused?&#x27;PAUSED&#x27;:state.lives===0?&#x27;GAME OVER&#x27;:&#x27;PRESS START&#x27;,320,181);ctx.font=&#x27;14px monospace&#x27;;ctx.fillText(&#x27;Move with ← → / A D&#x27;,320,211);ctx.textAlign=&#x27;left&#x27;}}function advance(){if(!state.running||state.paused)return;state.frame++;if(state.keys.left)state.player-=5;if(state.keys.right)state.player+=5;state.player=Math.min(593,Math.max(0,state.player));if(state.frame%65===0)state.stars.push({x:16+Math.random()*590,y:40});if(state.frame%92===0)state.bad.push({x:10+Math.random()*604,y:40});let sp=2.5+state.score/120;state.stars.forEach(s=&gt;s.y+=sp);state.bad.forEach(b=&gt;b.y+=sp*1.12);let coll=s=&gt;s.y&gt;306&amp;&amp;s.y&lt;350&amp;&amp;s.x&gt;state.player-18&amp;&amp;s.x&lt;state.player+45;state.stars=state.stars.filter(s=&gt;{if(coll(s)){state.score+=10;sound(740);updateHUD();return false}return s.y&lt;360});state.bad=state.bad.filter(s=&gt;{if(coll(s)){state.lives--;sound(170);updateHUD();if(state.lives&lt;=0){state.running=false;$(&#x27;#gamestatus&#x27;).textContent=&#x27;GAME OVER&#x27;}return false}return s.y&lt;360});draw()};function frameLoop(t){if(!state.last)state.last=t;if(t-state.last&gt;=16){advance();state.last=t}state.raf=requestAnimationFrame(frameLoop)}state.raf=requestAnimationFrame(frameLoop);$(&#x27;#play&#x27;).onclick=()=&gt;{newGame();sound(500)};$(&#x27;#pause&#x27;).onclick=()=&gt;{if(state.running){state.paused=!state.paused;$(&#x27;#gamestatus&#x27;).textContent=state.paused?&#x27;PAUSED&#x27;:&#x27;PLAYING&#x27;;draw()}};document.addEventListener(&#x27;keydown&#x27;,e=&gt;{if([&#x27;ArrowLeft&#x27;,&#x27;ArrowRight&#x27;,&#x27;a&#x27;,&#x27;d&#x27;,&#x27;A&#x27;,&#x27;D&#x27;].includes(e.key)&amp;&amp;$(&#x27;#lab&#x27;).classList.contains(&#x27;active&#x27;))e.preventDefault();if([&#x27;ArrowLeft&#x27;,&#x27;a&#x27;,&#x27;A&#x27;].includes(e.key))state.keys.left=true;if([&#x27;ArrowRight&#x27;,&#x27;d&#x27;,&#x27;D&#x27;].includes(e.key))state.keys.right=true});document.addEventListener(&#x27;keyup&#x27;,e=&gt;{if([&#x27;ArrowLeft&#x27;,&#x27;a&#x27;,&#x27;A&#x27;].includes(e.key))state.keys.left=false;if([&#x27;ArrowRight&#x27;,&#x27;d&#x27;,&#x27;D&#x27;].includes(e.key))state.keys.right=false});for(let [id,k] of [[&#x27;left&#x27;,&#x27;left&#x27;],[&#x27;right&#x27;,&#x27;right&#x27;]]){let b=$(&#x27;#&#x27;+id);b.addEventListener(&#x27;pointerdown&#x27;,e=&gt;{e.preventDefault();state.keys[k]=true;b.setPointerCapture(e.pointerId)});b.addEventListener(&#x27;pointerup&#x27;,()=&gt;state.keys[k]=false);b.addEventListener(&#x27;pointercancel&#x27;,()=&gt;state.keys[k]=false);b.addEventListener(&#x27;lostpointercapture&#x27;,()=&gt;state.keys[k]=false)}draw();
 &lt;/script&gt;&lt;/body&gt;&lt;/html&gt;"></iframe></div>
 </section>
-<section class="panel academy-shell" id="flashcards-training" aria-label="Flashcards">
+<section class="panel academy-shell learning-inactive" id="flashcards-training" aria-label="Flashcards">
   <div class="learning-toolbar"><div><div class="sectiontitle">Review · Remember · Master</div><h2 style="margin-top:7px">Flashcards</h2><p class="muted">Your existing Flashcards v0.3 with decks, spaced review, editing, JSON backups, and optional Firebase cloud sync.</p></div>
   <button type="button" class="btn primary" id="toggleFlashcards" aria-controls="flashcardsContent" aria-expanded="false">Open Flashcards ↓</button></div>
   <div id="flashcardsContent" class="hide"><iframe class="learning-frame flashcards-frame" id="flashcardsFrame" title="Flashcards" loading="lazy" srcdoc="&lt;!doctype html&gt;
@@ -215,7 +257,7 @@ renderTop();resetQueue();renderCardList();renderDeckList();initializeCloud();
 &lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
 "></iframe><p class="muted" style="font-size:12px">For Google sign-in or a larger editing view, you can also <a class="learning-external" href="/flashcards" target="_blank" rel="noopener">open the standalone Flashcards page</a>. Both use the same browser storage when hosted on the same website.</p></div>
 </section>
-<section class="panel academy-shell" id="python-code-reader-academy" aria-label="Python Code Reader Academy">
+<section class="panel academy-shell learning-inactive" id="python-code-reader-academy" aria-label="Python Code Reader Academy">
 <div class="learning-toolbar"><div><div class="sectiontitle">Intermediate Python · Read · Trace · Debug</div><h2 style="margin-top:7px">Python Code Reader Academy</h2><p class="muted">10 lessons, execution traces, bug hunts, quizzes, and real-world Flask debugging practice.</p></div>
 <button class="btn primary" type="button" id="togglePythonAcademy" aria-controls="pythonAcademyContent" aria-expanded="false">Open Python Code Reader Academy ↓</button></div>
 <div id="pythonAcademyContent" class="hide"><iframe class="learning-frame python-frame" id="pythonAcademyFrame" title="Python Code Reader Academy" loading="lazy" srcdoc="&lt;!DOCTYPE html&gt;
@@ -342,7 +384,7 @@ showLesson(0);showTrace(0);showBug(0);renderStats();
 &lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
 "></iframe><p class="muted" style="font-size:12px">Your academy progress is saved in your browser, separately from Workout Coach's cloud backup. Scroll inside this lesson panel to explore the course.</p></div>
 </section>
-<section class="panel academy-shell" id="blackjack-counting-academy" aria-label="Blackjack Counting Academy">
+<section class="panel academy-shell learning-inactive" id="blackjack-counting-academy" aria-label="Blackjack Counting Academy">
 <div class="learning-toolbar"><div><div class="sectiontitle">Hi-Lo · Practice · Probability</div><h2 style="margin-top:7px">Blackjack Counting Academy</h2><p class="muted">Learn the Hi-Lo count, true count, blackjack fundamentals, and practice in interactive drills without real-money wagering.</p></div>
 <button class="btn primary" type="button" id="toggleBlackjackAcademy" aria-controls="blackjackAcademyContent" aria-expanded="false">Open Blackjack Counting Academy ↓</button></div>
 <div id="blackjackAcademyContent" class="hide"><iframe class="learning-frame blackjack-frame" id="blackjackAcademyFrame" title="Blackjack Counting Academy" loading="lazy" srcdoc="&lt;!doctype html&gt;
@@ -419,6 +461,7 @@ refreshProgress();renderLessons();nextTrue();updateSlider();showStrategy();rende
 &lt;/script&gt;&lt;/body&gt;&lt;/html&gt;
 "></iframe><p class="muted" style="font-size:12px">Your academy progress is saved in your browser, separately from Workout Coach's cloud backup. Scroll inside this lesson panel to explore the course.</p></div>
 </section>
+</div>
 <section class="panel" id="sprint-toggle-panel" aria-label="Sprint Speed Lab access"><div class="topline"><div><div class="sectiontitle">Sprint speed records</div><p class="muted" style="font-size:13px;margin:5px 0" id="sprintVisibilityNote">Sprint Speed Lab is scheduled for Tuesday and optional Friday. You can review your records any day.</p></div><button class="btn secondary" type="button" id="toggleSprintLab" aria-controls="sprint-lab" aria-expanded="false">View Sprint Speed Lab</button></div></section>
 <section class="panel" id="sprint-lab"><div class="sectiontitle">Backyard training · 30 yards</div><h2>Sprint Speed Lab</h2><p>Track your true 10-, 20-, and 30-yard split times, see personal bests and progress, and estimate your 40-yard dash. For comparable splits, use the same start and timing system during one 30-yard run.</p>
 <div class="sprint-upgrade"><h3>Log a timed run</h3><div class="sprint-inputs"><label>Date<input type="date" id="sprintDate"></label><label>10 yards (sec)<input type="number" id="sprint10" min="0.01" step="0.01" placeholder="Optional"></label><label>20 yards (sec)<input type="number" id="sprint20" min="0.01" step="0.01" placeholder="Optional"></label><label>30 yards (sec)<input type="number" id="sprint30" min="0.01" step="0.01" placeholder="Required"></label></div><div class="btnrow"><button type="button" class="btn primary" id="saveSprintRun">Save 30-yard run</button><button type="button" class="btn secondary" id="exportSprintCsv">Export sprint CSV</button></div><p class="sprint-note">Only enter split times from the same run. If you only have one gate at the finish, enter your 30-yard time alone. The estimated 40-yard time requires a 20-yard split and is not an official result.</p></div>
@@ -865,6 +908,93 @@ onAuthStateChanged(auth,u=>{begin(u)});
  }
  hook('togglePythonAcademy','pythonAcademyContent','Python Code Reader Academy');
  hook('toggleBlackjackAcademy','blackjackAcademyContent','Blackjack Counting Academy');
+})();
+</script>
+<script>
+/* Workout Coach v2.9 Learning Center: local weekly check-ins; no changes to course storage. */
+(function(){
+ const COURSE={
+  python:{id:'python-code-reader-academy',label:'Python Code Reader',icon:'🐍',toggle:'togglePythonAcademy'},
+  atari:{id:'atari-assembly-academy',label:'Atari 800XL Assembly',icon:'🕹️',toggle:'toggleAtariAcademy'},
+  printing:{id:'printing-academy',label:'3D Printing',icon:'🖨️',toggle:'togglePrintingAcademy'},
+  blackjack:{id:'blackjack-counting-academy',label:'Blackjack Counting',icon:'♠️',toggle:'toggleBlackjackAcademy'},
+  flashcards:{id:'flashcards-training',label:'Flashcards',icon:'🗂️',toggle:'toggleFlashcards'}
+ };
+ // Each index is Monday..Sunday. Sessions are adjustable by revising this plan.
+ const PLAN=[
+  [{c:'python',m:25,task:'Trace code and solve one debugging challenge'}],
+  [{c:'printing',m:20,task:'Complete a lesson or improve a small design'}],
+  [{c:'atari',m:25,task:'Study one 6502 concept or build a tiny game feature'}],
+  [{c:'flashcards',m:15,task:'Review due cards or add 5 useful cards'}],
+  [{c:'blackjack',m:20,task:'Practice basic strategy or Hi-Lo counting'}],
+  [{c:'python',m:40,task:'Read, debug and test a real Python snippet'},
+   {c:'atari',m:40,task:'Build or modify an Atari mini-game'},
+   {c:'flashcards',m:15,task:'Short spaced-repetition review'}],
+  [{c:'printing',m:40,task:'Work on a practical 3D design project'},
+   {c:'blackjack',m:35,task:'Count a deck and practice true-count drills'},
+   {c:'flashcards',m:15,task:'Review cards and prepare for next week'}]
+ ];
+ const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+ const key='wurd-learning-center-v1';
+ const el=id=>document.getElementById(id);
+ let state={weeks:{},notes:{}};
+ try{const parsed=JSON.parse(localStorage.getItem(key)||'null');if(parsed&&typeof parsed==='object'){state.weeks=parsed.weeks||{};state.notes=parsed.notes||{}}}catch(e){}
+ const save=()=>{try{localStorage.setItem(key,JSON.stringify(state))}catch(e){console.warn('Learning Center storage unavailable',e)}};
+ const date=new Date(), today=(date.getDay()+6)%7;
+ let selectedDay=today,selectedCourse=null;
+ const weekStart=new Date(date.getFullYear(),date.getMonth(),date.getDate()-today);
+ const wk=[weekStart.getFullYear(),String(weekStart.getMonth()+1).padStart(2,'0'),String(weekStart.getDate()).padStart(2,'0')].join('-');
+ const completed=()=>state.weeks[wk]||(state.weeks[wk]={});
+ const slotId=(day,index)=>day+'-'+index;
+ function selectCourse(which){
+  selectedCourse=which;
+  for(const [code,meta] of Object.entries(COURSE)){
+   const node=el(meta.id);node.classList.toggle('learning-inactive',code!==which);
+  }
+  for(const button of el('learningCourseGrid').querySelectorAll('button')){
+   const active=button.dataset.course===which;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));
+  }
+  const meta=COURSE[which];el('learningSelectedText').textContent=meta.label+' • Your course opens below this selector.';
+  const button=el(meta.toggle);
+  if(button?.getAttribute('aria-expanded')!=='true')button.click();
+ }
+ function draw(){
+  const done=completed();let finished=0,total=0;
+  PLAN.forEach((slots,d)=>slots.forEach((_,i)=>{total++;if(done[slotId(d,i)])finished++}));
+  el('learningCount').textContent=finished+' / '+total+' sessions this week';
+  const pct=Math.round(100*finished/total);el('learningProgressFill').style.width=pct+'%';
+  el('learningProgress').setAttribute('aria-valuenow',String(pct));
+  el('learningWeekGrid').innerHTML='';
+  DAYS.forEach((name,idx)=>{
+   const b=document.createElement('button');b.type='button';
+   b.classList.toggle('selected',idx===selectedDay);b.classList.toggle('today',idx===today);
+   const count=PLAN[idx].filter((_,i)=>done[slotId(idx,i)]).length;
+   b.innerHTML='<span>'+name.slice(0,3)+'</span><strong>'+count+'/'+PLAN[idx].length+'</strong><span>'+(idx>=5?'Weekend':'Weekday')+'</span>';
+   b.setAttribute('aria-label',name+', '+count+' of '+PLAN[idx].length+' sessions complete');b.setAttribute('aria-pressed',String(idx===selectedDay));
+   b.addEventListener('click',()=>{selectedDay=idx;draw()});el('learningWeekGrid').appendChild(b);
+  });
+  el('learningDayTitle').textContent=DAYS[selectedDay]+(selectedDay===today?' · Today':'')+' study plan';
+  el('learningDayDescription').textContent=selectedDay>=5?'Weekend: tackle longer projects with breaks between subjects.':'Weekday: one short, focused session is enough.';
+  const slots=PLAN[selectedDay];el('learningDayMinutes').textContent=slots.reduce((n,s)=>n+s.m,0)+' min planned';
+  const list=el('learningSessionList');list.replaceChildren();
+  slots.forEach((slot,i)=>{
+   const meta=COURSE[slot.c], row=document.createElement('div');row.className='learning-session';
+   row.classList.toggle('is-done',!!done[slotId(selectedDay,i)]);
+   const label=document.createElement('label'),box=document.createElement('input');box.type='checkbox';box.checked=!!done[slotId(selectedDay,i)];
+   box.addEventListener('change',()=>{completed()[slotId(selectedDay,i)]=box.checked;save();draw()});
+   const desc=document.createElement('span'),title=document.createElement('strong'),sub=document.createElement('small');
+   title.textContent=meta.icon+' '+meta.label+' · '+slot.m+' min';sub.textContent=slot.task;desc.append(title,sub);label.append(box,desc);
+   const open=document.createElement('button');open.type='button';open.className='btn secondary';open.textContent='Open lesson →';
+   open.addEventListener('click',()=>{selectCourse(slot.c);el('learningCourseGrid').scrollIntoView({behavior:'smooth',block:'start'})});
+   row.append(label,open);list.appendChild(row);
+  });
+  const noteKey=wk+'-'+selectedDay;el('learningNotes').value=state.notes[noteKey]||'';
+ }
+ const grid=el('learningCourseGrid');
+ Object.entries(COURSE).forEach(([code,meta])=>{const b=document.createElement('button');b.type='button';b.dataset.course=code;b.innerHTML='<span>'+meta.icon+'</span>'+meta.label;b.addEventListener('click',()=>selectCourse(code));grid.appendChild(b)});
+ el('learningNotes').addEventListener('input',e=>{state.notes[wk+'-'+selectedDay]=e.target.value;save()});
+ draw();
+ // Do not open five iframe-heavy pages on initial load. User picks the one to use.
 })();
 </script>
 </body></html>
