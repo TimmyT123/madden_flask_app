@@ -13,7 +13,8 @@
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     .full{grid-column:1 / -1}
     label{display:block;font-weight:600;margin:0 0 6px}
-    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #2a355f;background:#0f1530;color:#e6e9ef}
+    input,select,textarea{box-sizing:border-box;width:100%;padding:10px;border-radius:8px;border:1px solid #2a355f;background:#0f1530;color:#e6e9ef}
+    @media(max-width:600px){.wrap{margin:16px auto;padding:12px}.grid{grid-template-columns:1fr}.full{grid-column:auto}}
     .err{color:#ffb4b4;font-size:13px;margin-top:6px}
     .hint{color:#c7d2fe;font-size:12px;opacity:.9;margin-top:6px}
     button{margin-top:16px;padding:12px 16px;border-radius:10px;border:0;background:#3b82f6;color:#fff;font-weight:700;cursor:pointer}
@@ -36,7 +37,7 @@
     <h1>Welcome to WURD Madden Franchise!</h1>
     <p class="lead">Fill out the form below. Approved users will be contacted by a commissioner.</p>
 
-    <form method="post" action="{{ url_for('new_recruit') }}" novalidate
+    <form method="post" action="{{ url_for('new_recruit') }}"
       onsubmit="const b=this.querySelector('button[type=submit]'); if(b){b.disabled=true; b.textContent='Submitting…';}">
       <div class="grid">
         <div>
@@ -58,18 +59,30 @@
           <div class="hint">Enter your Discord username exactly as it appears in Discord (for example: RemainCalm).</div>
         </div>
 
+        <div class="full">
+          <label for="gaming_platform">Gaming Platform</label>
+          <select id="gaming_platform" name="gaming_platform" required>
+            <option value="">Select your platform…</option>
+            <option value="PS5" {% if data and data.gaming_platform == 'PS5' %}selected{% endif %}>PlayStation 5</option>
+            <option value="Xbox" {% if data and data.gaming_platform == 'Xbox' %}selected{% endif %}>Xbox Series X|S</option>
+            <option value="PC" {% if data and data.gaming_platform == 'PC' %}selected{% endif %}>PC</option>
+          </select>
+          {% if errors.gaming_platform %}<div class="err">{{ errors.gaming_platform }}</div>{% endif %}
+          <div class="hint">WURD supports crossplay on PS5, Xbox Series X|S, and PC.</div>
+        </div>
+
         <div>
           <label for="ea_id">EA ID</label>
           <input id="ea_id" name="ea_id" required value="{{ (data.ea_id or '') if data else '' }}" />
           {% if errors.ea_id %}<div class="err">{{ errors.ea_id }}</div>{% endif %}
-          <div class="hint">On the Madden 26 main screen, press <strong>R3</strong> (PS5) or <strong>RS</strong> (Xbox). In the <strong>Player Search</strong> tab you’ll see your EA ID.</div>
+          <div class="hint">Required for all platforms. Enter the EA ID associated with your Madden 27 account. You can check your EA account profile or Madden 27's EA Connect/player search.</div>
         </div>
 
         <div>
-          <label for="platform_id">PS/Xbox ID</label>
-          <input id="platform_id" name="platform_id" required value="{{ (data.platform_id or '') if data else '' }}" />
+          <label for="platform_id" id="platform_id_label">Gaming Username (Optional)</label>
+          <input id="platform_id" name="platform_id" value="{{ (data.platform_id or '') if data else '' }}" placeholder="Select a platform above" />
           {% if errors.platform_id %}<div class="err">{{ errors.platform_id }}</div>{% endif %}
-          <div class="hint">To find your PS5/Xbox ID: click your profile picture, then click <strong>Profile</strong>.</div>
+          <div class="hint" id="platform_id_hint">Your PSN ID, Xbox Gamertag, or PC username helps commissioners identify you. Your EA ID is the primary identifier.</div>
         </div>
 
         <div>
@@ -170,5 +183,26 @@
       <button type="submit">Submit Application</button>
     </form>
   </div>
+  <script>
+    (function () {
+      const platform = document.getElementById('gaming_platform');
+      const label = document.getElementById('platform_id_label');
+      const input = document.getElementById('platform_id');
+      const hint = document.getElementById('platform_id_hint');
+      const options = {
+        PS5: ['PlayStation Network ID (Optional)', 'Your PSN ID', 'Optional: enter your PlayStation Network ID. Your EA ID is the primary identifier.'],
+        Xbox: ['Xbox Gamertag (Optional)', 'Your Xbox Gamertag', 'Optional: enter your Xbox Gamertag. Your EA ID is the primary identifier.'],
+        PC: ['PC Username (Optional)', 'Steam / EA app / Epic username', 'Optional: enter the username you play under on PC. Your EA ID is the primary identifier.']
+      };
+      function updateUsernameField() {
+        const selected = options[platform.value] || ['Gaming Username (Optional)', 'Select a platform above', 'Optional: enter your platform username. Your EA ID is the primary identifier.'];
+        label.textContent = selected[0];
+        input.placeholder = selected[1];
+        hint.textContent = selected[2];
+      }
+      platform.addEventListener('change', updateUsernameField);
+      updateUsernameField();
+    }());
+  </script>
 </body>
 </html>
