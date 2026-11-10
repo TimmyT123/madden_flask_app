@@ -1,3 +1,4 @@
+// VERSION 48: 10–15 yd catch starts 3% left; adjustment fades to zero by 20 yd.
 // VERSION 47: ≤100 ms short/medium reaction goal; red-start penalty follows displayed reaction reading.
 // VERSION 46: ≤90 ms short/medium catch goal, 1-second next rep, sticky top result until next throw.
 // VERSION 45: result feedback remains visible for at least 2 seconds between plays.
@@ -1455,7 +1456,18 @@
 
         const band = Math.floor((throwDistanceYards - 10) / 5) + 1;
         const fullMeterFraction = clamp(band / 5.5, 0.20, .70);
-        return lerp(justBeforeGreen, 0, fullMeterFraction);
+        const originalStart = lerp(justBeforeGreen, 0, fullMeterFraction);
+
+        // Version 48 calibration: give 10–15 yard throws a small, 3%-of-meter
+        // head start to the LEFT, gradually tapering the shift to zero by 20 yd.
+        // Preserve meter speed, green-window width, and the existing ≤100 ms
+        // catch-press reaction requirement.
+        const leftShift = throwDistanceYards < 15
+            ? 0.03
+            : throwDistanceYards < 20
+                ? 0.03 * (20 - throwDistanceYards) / 5
+                : 0;
+        return Math.max(0, originalStart - leftShift);
     }
 
     function isShortTapCatch(rep) {
