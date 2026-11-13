@@ -1,118 +1,35 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>WURD Game Recap</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #111;
-            color: #eee;
-            margin: 0;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 800px;
-            margin: auto;
-            background: #1c1c1c;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.6);
-        }
-
-        h1 {
-            margin-top: 0;
-            font-size: 26px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
-        }
-
-        .narrative {
-            margin-top: 20px;
-            line-height: 1.6;
-        }
-
-        .pog {
-            margin-top: 25px;
-            padding: 15px;
-            background: #222;
-            border-left: 4px solid #4CAF50;
-        }
-
-        .defense {
-            margin-top: 20px;
-            padding: 15px;
-            background: #222;
-            border-left: 4px solid #2196F3;
-        }
-
-        a {
-            color: #4CAF50;
-        }
-
-        .back {
-            margin-top: 30px;
-        }
-
-        .defense-team {
-            margin-top: 12px;
-        }
-
-        .defense-team ul {
-            margin-top: 6px;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-
-    <h1>{{ game.headline }}</h1>
-
-    <div class="narrative">
-        {{ game.narrative }}
-    </div>
-
-    {% if game.player_of_game %}
-    <div class="pog">
-        <strong>⭐ Player of the Game</strong><br>
-        {{ game.player_of_game }}
-    </div>
-    {% endif %}
-
-    {% if game.impact_defense %}
-    <div class="defense">
-        <strong>🛡 Defensive Impact</strong>
-
-        {% if game.impact_defense.items %}
-            {% for team, players in game.impact_defense.items() %}
-                {% if players %}
-                    <div class="defense-team">
-                        <strong>{{ team }}</strong>
-                        <ul>
-                            {% for player in players %}
-                                <li>{{ player }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                {% endif %}
-            {% endfor %}
-        {% else %}
-            <ul>
-                {% for player in game.impact_defense %}
-                    <li>{{ player }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    </div>
-    {% endif %}
-
-    <div class="back">
-        <a href="/">← Back to WURD</a>
-    </div>
-
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ game.headline }} | WURD</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,Arial,sans-serif;background:#0b1018;color:#edf2f8}*{box-sizing:border-box}body{margin:0;padding:18px}.wrap{max-width:930px;margin:0 auto}.eyebrow{color:#9cafc5;font-size:12px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase}.top{display:flex;justify-content:space-between;align-items:center;margin:10px 0 20px;gap:15px}.brand{font-size:20px;font-weight:900;letter-spacing:2px}.tag{border:1px solid #415366;padding:5px 10px;border-radius:30px;color:#b8d1e8;font-size:12px}.hero{background:linear-gradient(130deg,#1b3046,#151e2d 65%);border:1px solid #30465d;border-radius:19px;padding:24px;margin-bottom:18px}.scoreboard{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-top:20px}.team{text-align:center}.team .name{font-size:clamp(18px,3vw,26px);font-weight:750}.team .score{font-size:clamp(40px,7vw,66px);font-weight:900;margin:4px}.team .record{color:#a8b8c9;font-size:13px}.team .winner{color:#8ce9b5}.versus{color:#8193a8;font-weight:800}.storyline{color:#a3d7f4;font-size:13px;text-transform:uppercase;letter-spacing:1px;font-weight:800}.headline{font-size:clamp(23px,4vw,34px);line-height:1.2;margin:12px 0}.panel{background:#171f2b;border:1px solid #2d3b4d;border-radius:16px;padding:20px;margin-bottom:16px}h2{font-size:17px;margin:0 0 14px}.story p{line-height:1.7;color:#d4deea;margin:0 0 12px}.story p:last-child{margin-bottom:0}.highlight{border-left:4px solid #59c990}.muted{color:#9dacbf}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}.player{border-top:1px solid #2d3b4d;padding:11px 0;display:flex;justify-content:space-between;gap:12px}.player:first-of-type{border-top:0}.player .player-name{font-weight:700}.player .detail{color:#b2c0d0;font-size:13px;text-align:right;line-height:1.4}.pill{display:inline-block;background:#253d50;color:#addaf4;border-radius:15px;padding:5px 10px;font-size:12px}.back{display:inline-block;color:#90e5b8;margin:14px 0 30px;text-decoration:none;font-weight:700}.back:hover{text-decoration:underline}ul{padding-left:22px;line-height:1.7}li{margin:5px 0}@media(max-width:640px){.two{grid-template-columns:1fr}.hero{padding:17px}.panel{padding:17px}.scoreboard{gap:5px}.team .name{font-size:18px}}
+</style></head><body><main class="wrap">
+<div class="top"><div class="brand">🏈 WURD <span class="muted">/ GAME RECAP</span></div><span class="tag">{% if game.week %}WEEK {{ game.week }} · {% endif %}FINAL</span></div>
+<section class="hero">
+{% if game.teams and game.teams|length == 2 %}
+<div class="scoreboard">
+{% for t in game.teams %}
+{% if loop.index == 2 %}<div class="versus">VS</div>{% endif %}
+<div class="team"><div class="name">{{ t.name }}</div><div class="score">{{ t.score }}</div><div class="record">{% if t.won %}<span class="winner">WINNER</span>{% elif game.homeScore == game.awayScore %}TIE{% else %}FINAL{% endif %}{% if t.record_before and t.record_before.verified_prior_games and t.record_before.history_complete %} · Entered {{ t.record_before.wins }}-{{ t.record_before.losses }}{% if t.record_before.ties %}-{{ t.record_before.ties }}{% endif %}{% endif %}</div></div>
+{% endfor %}
 </div>
-
-</body>
-</html>
+{% endif %}
+<div class="storyline" style="margin-top:20px">{{ game.storyline or 'Game recap' }}</div><h1 class="headline">{{ game.headline }}</h1>
+</section>
+<section class="panel story"><h2>📰 Game Story</h2>
+{% if game.paragraphs %}{% for paragraph in game.paragraphs %}<p>{{ paragraph }}</p>{% endfor %}{% else %}<p>{{ game.narrative }}</p>{% endif %}
+</section>
+{% if game.player_of_game %}<section class="panel highlight"><h2>⭐ Player of the Game</h2>
+{% if game.player_of_game_detail %}<strong>{{ game.player_of_game_detail.name }}</strong> <span class="pill">{{ game.player_of_game_detail.team }}</span><p class="muted">{{ game.player_of_game_detail.detail }}</p>{% else %}{{ game.player_of_game }}{% endif %}</section>{% endif %}
+{% if game.teams and game.teams|length == 2 %}
+<section class="two">
+{% for t in game.teams %}<div class="panel"><h2>{{ t.name }} · Top Performers</h2>
+{% if t.leaders %}{% for p in t.leaders %}<div class="player"><div><div class="player-name">{{ p.name }}</div><span class="muted" style="font-size:12px;text-transform:capitalize">{{ p.kind }}</span></div><div class="detail">{{ p.detail }}</div></div>{% endfor %}
+{% else %}<p class="muted">No individual player statistics available.</p>{% endif %}</div>{% endfor %}
+</section>
+{% endif %}
+{% if game.impact_defense %}<section class="panel"><h2>🛡 Defensive Impact</h2><div class="two">
+{% for team, players in game.impact_defense.items() %}{% if players %}<div><strong>{{ team }}</strong><ul>{% for player in players %}<li>{{ player }}</li>{% endfor %}</ul></div>{% endif %}{% endfor %}
+</div></section>{% endif %}
+<a class="back" href="/">← Back to WURD</a>
+</main></body></html>

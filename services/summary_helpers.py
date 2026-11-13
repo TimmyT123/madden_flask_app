@@ -173,3 +173,93 @@ def post_summary_to_discord(summary, week_number, league_id, season_dir, week_di
         print(f"❌ Discord recap error: {e}")
 
 
+
+# --- Rich recap helpers (v2; original helpers retained for compatibility) ---
+def _first(row, *keys, default=0):
+    """Select first present value, including a legitimate zero."""
+    for k in keys:
+        if k in row and row[k] is not None and row[k] != '':
+            return row[k]
+    return default
+
+
+def _rows(data, keys):
+    if isinstance(data, list):
+        return [x for x in data if isinstance(x, dict)]
+    if isinstance(data, dict):
+        for key in keys:
+            if isinstance(data.get(key), list):
+                return [x for x in data[key] if isinstance(x, dict)]
+    return []
+
+
+def _leaderboard(team_id, passing, rushing, receiving, defense):
+    """Ordered, source-grounded player leaders and comparable POG candidates."""
+    team_id = str(team_id)
+    leaders = []
+    def add(rows, kind):
+        for p in rows:
+            if str(p.get('teamId', '')) != team_id:
+                continue
+            name = _first(p, 'playerName', 'fullName', 'name', default='Unknown player')
+            if kind == 'passing':
+                yd = _safe_int(_first(p, 'passYds', 'passingYards', 'yards'))
+                td = _safe_int(_first(p, 'passTDs', 'passingTDs', 'tds'))
+                ints = _safe_int(_first(p, 'passINTs', 'int', 'ints', 'interceptions'))
+                att = _safe_int(_first(p, 'passAtt', 'passAttempts', 'attempts', 'att'))
+                comp = _safe_int(_first(p, 'passComp', 'completions', 'comp'))
+                if yd == td == att == 0: continue
+                detail = f'{yd} passing yards, {td} TD, {ints} INT' + (f', {comp}/{att} passing' if att else '')
+                score = yd / 25 + td * 6 - ints * 5
+                notable = (td >= 4 or yd >= 350)
+            elif kind == 'rushing':
+                yd = _safe_int(_first(p, 'rushYds', 'rushingYards', 'yards'))
+                td = _safe_int(_first(p, 'rushTDs', 'rushingTDs', 'tds'))
+                att = _safe_int(_first(p, 'rushAtt', 'attempts', 'att'))
+                if yd == td == att == 0: continue
+                detail = f'{yd} rushing yards, {td} TD' + (f' on {att} carries' if att else '')
+                score = yd / 12 + td * 6
+                notable = (td >= 3 or yd >= 180)
+            elif kind == 'receiving':
+                yd = _safe_int(_first(p, 'recYds', 'receivingYards', 'yards'))
+                td = _safe_int(_first(p, 'recTDs', 'receivingTDs', 'tds'))
+                catches = _safe_int(_first(p, 'receptions', 'rec', 'catches', 'recCatches'))
+                if yd == td == catches == 0: continue
+                detail = f'{catches} catches, {yd} receiving yards, {td} TD'
+                score = yd / 12 + td * 7 + catches * .25
+                notable = (td >= 3 or yd >= 180)
+            else:
+                sack = _safe_float(_first(p, 'sacks', 'sack'))
+                ints = _safe_int(_first(p, 'passINTs', 'int', 'ints', 'interceptions'))
+                ff = _safe_int(_first(p, 'forcedFumbles', 'ff'))
+                tfl = _safe_float(_first(p, 'tfl', 'tacklesForLoss'))
+                td = _safe_int(_first(p, 'defTDs', 'td'))
+                if not any((sack, ints, ff, tfl, td)): continue
+                parts = ([f'{sack:g} sacks'] if sack else []) + ([f'{ints} INT'] if ints else []) + ([f'{ff} FF'] if ff else []) + ([f'{tfl:g} TFL'] if tfl else []) + ([f'{td} defensive TD'] if td else [])
+                detail = ', '.join(parts)
+                score = sack * 4 + ints * 7 + ff * 3 + tfl * 2 + td * 10
+                notable = sack >= 3 or ints >= 2 or td >= 2
+            leaders.append({'name': str(name), 'kind': kind, 'detail': detail, 'score': round(score, 2), 'notable': notable})
+    add(passing, 'passing'); add(rushing, 'rushing'); add(receiving, 'receiving'); add(defense, 'defense')
+    return sorted(leaders, key=lambda x: (-x['score'], x['name']))
+
+
+def _storyline(winner, loser, winner_score, loser_score, leaders):
+    margin = winner_score - loser_score
+    notable = [p for p in leaders if p['notable']]
+    best = max(notable, key=lambda x: x['score']) if notable else None
+    if best and best['kind'] == 'rushing':
+        return 'Rushing showcase', f"{best['name']} Runs Wild as {winner} Beat {loser} {winner_score}–{loser_score}"
+    if best and best['kind'] == 'passing':
+        return 'Passing showcase', f"{best['name']} Leads {winner} Past {loser} {winner_score}–{loser_score}"
+    if best and best['kind'] == 'receiving':
+        return 'Receiving showcase', f"{best['name']} Shines as {winner} Top {loser} {winner_score}–{loser_score}"
+    if best and best['kind'] == 'defense':
+        return 'Defensive standout', f"{best['name']} Makes an Impact in {winner}'s {winner_score}–{loser_score} Win"
+    if margin <= 3:
+        return 'Close contest', f'{winner} Edge {loser} {winner_score}–{loser_score} in Close Contest'
+    if margin >= 28:
+        return 'Blowout', f'{winner} Dominate {loser} {winner_score}–{loser_score}'
+    if winner_score + loser_score >= 70:
+        return 'High-scoring game', f'{winner} Outscore {loser} {winner_score}–{loser_score}'
+    return 'Game recap', f'{winner} Defeat {loser} {winner_score}–{loser_score}'
