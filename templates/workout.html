@@ -155,14 +155,41 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 
 /* v4.1 addition: Madden Skills Trainer companion — isolated from existing workout data */
 .st-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.st-grid label{font-size:12px;color:#cde1ee}.st-grid select,.st-grid input,.st-grid textarea{display:block;width:100%;margin-top:5px;background:#0b2032;border:1px solid #55748c;border-radius:9px;color:#fff;padding:10px;font:inherit}.st-grid textarea{min-height:78px;resize:vertical}.st-timer{font-size:clamp(30px,6vw,48px);font-weight:900;font-variant-numeric:tabular-nums;color:#a4f4de}.st-phases{display:grid;gap:7px;margin:12px 0}.st-phase{display:flex;align-items:center;gap:10px;background:#192f43;border:1px solid #3c596f;border-radius:10px;padding:9px 11px}.st-phase.active{background:#204e4a;border-color:#71dec2}.st-phase.done{opacity:.75}.st-phase input{width:19px;height:19px;accent-color:#75e1be}.st-phase span{flex:1}.st-trainer{border:1px solid #438678;background:#102b39;border-radius:14px;padding:15px;margin:16px 0}.st-trainer .btn{font-size:13px}.st-stat{font-size:12px;color:#b6ccda}.st-trainer details summary{cursor:pointer;color:#a4f4de;font-weight:700}.st-log{font-size:12px;color:#c0d6e5;margin:10px 0;max-height:200px;overflow:auto}.st-log>div{border-bottom:1px solid #315268;padding:8px 0}.st-trainer textarea{width:100%;min-height:75px;resize:vertical;background:#0b2032;border:1px solid #55748c;border-radius:9px;color:#fff;padding:10px;font:inherit}.st-trainer select,.st-trainer input[type=text]{background:#0b2032;border:1px solid #55748c;border-radius:9px;color:#fff;padding:10px;font:inherit;width:100%}@media(max-width:640px){.st-grid{grid-template-columns:1fr}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.1</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+
+/* v4.2: Universal Focus & Break Timer. Exercise rest timer remains unchanged. */
+.focus-panel{border:1px solid #43877e;background:#112e3e;border-radius:14px;padding:15px;margin:14px 0;scroll-margin-top:20px}
+.focus-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.focus-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:14px 0}
+.focus-fields label{font-size:12px;color:#c8e3ec}
+.focus-fields input{display:block;width:100%;margin-top:5px;padding:9px;border-radius:8px;border:1px solid #517889;background:#0b1f30;color:white;font:inherit}
+.focus-clock{font-size:clamp(37px,7vw,60px);font-weight:900;color:#a4f4de;letter-spacing:.025em;font-variant-numeric:tabular-nums}
+.focus-progress{height:10px;overflow:hidden;border-radius:99px;background:#08202e;margin:12px 0;border:1px solid #3b6371}
+.focus-progress>div{height:100%;background:#77e0bf;width:0}
+.focus-caption{color:#b5d0dd;font-size:12px;line-height:1.5}
+.focus-mini{position:fixed;left:15px;bottom:16px;z-index:16;background:#133a49;border:1px solid #70ddc1;color:#f0ffff;border-radius:13px;box-shadow:0 7px 30px #000a;padding:10px 14px;font-weight:800;font-size:13px;cursor:pointer;max-width:min(360px,calc(100vw - 30px));text-align:left}
+.focus-panel .btn{font-size:13px}.focus-panel button:focus-visible,.focus-panel input:focus-visible,.focus-mini:focus-visible{outline:2px solid #f2ce7b;outline-offset:2px}
+@media(max-width:600px){.focus-fields{grid-template-columns:1fr 1fr}.focus-fields label:first-child{grid-column:1/-1}.focus-panel{padding:12px}.focus-mini{bottom:8px}}
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.2</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 
 <section class="panel" id="daily-planner" aria-label="Daily to-do planner">
- <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v4.0</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
+ <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v4.2</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
  <div class="todo-nav"><button type="button" class="btn secondary" id="todoPrevious" aria-label="Previous date">←</button><input type="date" class="todo-date" id="todoDate" aria-label="Plan date"><button type="button" class="btn secondary" id="todoNext" aria-label="Next date">→</button><button type="button" class="btn secondary" id="todoToday">Today</button></div></div>
  <div class="todo-stats"><span id="todoCompleted">0 / 0 completed</span><span id="todoRemaining">0 remaining</span><span id="todoPercentage">0%</span></div>
  <div class="todo-progress" role="progressbar" aria-label="Daily to-do progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="todoProgress"><div id="todoFill"></div></div>
  <div id="todoList" class="todo-list" aria-live="polite"></div>
+
+ <section class="focus-panel hide" id="focusPanel" aria-label="Universal Focus and Break Timer">
+  <div class="focus-head"><div><div class="sectiontitle">Universal focus & break timer · v4.2</div><h3 id="focusTaskName" style="margin:6px 0">Choose a to-do activity</h3><div class="focus-caption" id="focusDateLabel"></div></div><button class="btn secondary" type="button" id="focusHide">Hide timer</button></div>
+  <div class="focus-fields"><label>Focused minutes goal<input id="focusGoal" type="number" min="1" max="480" value="15"></label><label>Focus block (minutes)<input id="focusBlock" type="number" min="1" max="120" value="5"></label><label>Break (minutes)<input id="focusBreak" type="number" min="0" max="60" value="2"></label></div>
+  <div class="btnrow" style="margin-bottom:12px"><button class="btn secondary" type="button" data-focus-preset="5">5-min focus</button><button class="btn secondary" type="button" data-focus-preset="10">10-min focus</button><button class="btn secondary" type="button" data-focus-preset="15">15-min focus</button><button class="btn secondary" type="button" data-break-preset="2">2-min break</button><button class="btn secondary" type="button" data-break-preset="3">3-min break</button><button class="btn secondary" type="button" data-break-preset="4">4-min break</button></div>
+  <div class="focus-caption" id="focusPhase">Ready to focus</div><div class="focus-clock" id="focusClock" role="timer" aria-live="off">05:00</div>
+  <div class="focus-progress" role="progressbar" aria-label="Focused time achieved" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="focusProgress"><div id="focusFill"></div></div>
+  <p class="focus-caption" id="focusSummary">0 of 15 focused minutes · 0 minutes of breaks</p>
+  <div class="btnrow"><button class="btn primary" type="button" id="focusStart">▶ Start focus</button><button class="btn secondary" type="button" id="focusPause">Pause</button><button class="btn secondary" type="button" id="focusSkip">Skip break</button><button class="btn secondary" type="button" id="focusReset">Reset this activity's timer</button><button class="btn secondary" type="button" id="focusSound">🔊 Test alert</button></div>
+  <div class="btnrow" style="margin-top:12px"><button class="btn secondary" id="focusBackTask" type="button">↗ Go to activity</button><button class="btn secondary" id="focusBackTodo" type="button">↑ To-Do List</button></div>
+  <p id="focusStatus" class="focus-caption" role="status" style="margin:12px 0 0">A break begins automatically after each focus block. After a break, start your next focus block when you're ready. The existing exercise-set rest timer is separate.</p>
+  <p class="focus-caption">Focus minutes are saved in this browser, separate from your existing cloud-synced To-Do checkmarks. Keep this page open for sound alerts; browser background restrictions may delay them.</p>
+ </section>
  <div class="btnrow" style="margin-top:13px"><button type="button" class="btn primary" id="todoAdd">＋ Add activity anywhere</button><button type="button" class="btn secondary" id="todoNextTask">Go to next unfinished ↗</button><button type="button" class="btn secondary" id="todoRestore">Restore default tasks</button><button type="button" class="btn secondary" id="todoExport">Export planner backup</button><button type="button" class="btn secondary" id="todoImportButton">Import planner backup</button><input type="file" id="todoImportFile" accept=".json,application/json" class="hide"></div>
  <form class="todo-form hide" id="todoForm"><h3 id="todoFormTitle">Add an activity</h3><div class="todo-form-grid"><label>Activity name<input id="todoName" maxlength="130" required placeholder="e.g. Cut the grass"></label><label>Repeat<select id="todoRepeat"><option value="once">This date only</option><option value="daily">Every day</option><option value="weekly">Every week on this weekday</option></select></label><label>Place in the list<select id="todoPosition"></select></label></div>
  <div class="todo-form-grid" style="margin-top:10px"><label>Jump to a page activity (optional)<select id="todoTarget"></select></label><label>Minutes (optional)<input id="todoMinutes" type="number" min="1" max="480" placeholder="e.g. 20"></label></div>
@@ -1617,7 +1644,7 @@ function render(){
  const ts=tasks(),done=ts.filter(t=>completed(t.id)).length,percent=ts.length?Math.round(100*done/ts.length):0;
  $('todoCompleted').textContent=`${done} / ${ts.length} completed`;$('todoRemaining').textContent=`${ts.length-done} remaining`;$('todoPercentage').textContent=percent+'%';
  $('todoFill').style.width=percent+'%';$('todoProgress').setAttribute('aria-valuenow',String(percent));
- $('todoList').innerHTML=ts.map((t,i)=>`<div class="todo-entry ${completed(t.id)?'is-done':''}" data-id="${esc(t.id)}" draggable="true"><input class="todo-check" type="checkbox" data-action="done" ${completed(t.id)?'checked':''} aria-label="Complete ${esc(t.name)}"><div class="todo-main"><button type="button" data-action="open" title="${t.target?'Jump to activity':'Personal task — no page section'}">${esc(t.name)}${t.target?' ↗':''}</button><small>${t.repeat==='daily'?'Repeats daily · ':t.repeat==='weekly'?'Repeats weekly · ':''}${t.minutes?t.minutes+' minutes · ':''}${t.target?'Tap to open activity':'Personal / break'}</small></div><div class="todo-actions"><button class="todo-mini" data-action="up" title="Move up" aria-label="Move ${esc(t.name)} up" ${i===0?'disabled':''}>↑</button><button class="todo-mini" data-action="down" title="Move down" aria-label="Move ${esc(t.name)} down" ${i===ts.length-1?'disabled':''}>↓</button><button class="todo-mini" data-action="insert" title="Insert task immediately after" aria-label="Insert after ${esc(t.name)}">＋</button>${t.id.startsWith('base-')?'<button class="todo-mini" data-action="remove" title="Hide this scheduled task on this date">×</button>':`<button class="todo-mini" data-action="edit" aria-label="Edit ${esc(t.name)}">Edit</button><button class="todo-mini" data-action="remove" aria-label="Delete ${esc(t.name)}">×</button>`}</div></div>`).join('')||'<p class="muted">No tasks for this day. Add one below.</p>';
+ $('todoList').innerHTML=ts.map((t,i)=>`<div class="todo-entry ${completed(t.id)?'is-done':''}" data-id="${esc(t.id)}" draggable="true"><input class="todo-check" type="checkbox" data-action="done" ${completed(t.id)?'checked':''} aria-label="Complete ${esc(t.name)}"><div class="todo-main"><button type="button" data-action="open" title="${t.target?'Jump to activity':'Personal task — no page section'}">${esc(t.name)}${t.target?' ↗':''}</button><small>${t.repeat==='daily'?'Repeats daily · ':t.repeat==='weekly'?'Repeats weekly · ':''}${t.minutes?t.minutes+' minutes · ':''}${t.target?'Tap to open activity':'Personal / break'}</small></div><div class="todo-actions"><button class="todo-mini" type="button" data-action="focus" title="Focus & break timer" aria-label="Open timer for ${esc(t.name)}">⏱ Timer</button><button class="todo-mini" data-action="up" title="Move up" aria-label="Move ${esc(t.name)} up" ${i===0?'disabled':''}>↑</button><button class="todo-mini" data-action="down" title="Move down" aria-label="Move ${esc(t.name)} down" ${i===ts.length-1?'disabled':''}>↓</button><button class="todo-mini" data-action="insert" title="Insert task immediately after" aria-label="Insert after ${esc(t.name)}">＋</button>${t.id.startsWith('base-')?'<button class="todo-mini" data-action="remove" title="Hide this scheduled task on this date">×</button>':`<button class="todo-mini" data-action="edit" aria-label="Edit ${esc(t.name)}">Edit</button><button class="todo-mini" data-action="remove" aria-label="Delete ${esc(t.name)}">×</button>`}</div></div>`).join('')||'<p class="muted">No tasks for this day. Add one below.</p>';
  const position=$('todoPosition'),old=position.value;
  position.innerHTML='<option value="first">At the beginning</option>'+ts.map(t=>`<option value="${esc(t.id)}">After: ${esc(t.name)}</option>`).join('');
  position.value=[...position.options].some(x=>x.value===old)?old:'first';
@@ -1650,7 +1677,7 @@ function showForm(t=null,afterId=null){editing=t?.id||null;after=afterId;$('todo
 function insertOrder(id,position){const arr=tasks().filter(t=>t.id!==id).map(t=>t.id),idx=position==='first'?-1:arr.indexOf(position);arr.splice(idx+1,0,id);state.order[current]=arr}
 $('todoList').addEventListener('change',e=>{if(!e.target.matches('[data-action="done"]'))return;const id=e.target.closest('[data-id]')?.dataset.id;if(!id)return;(state.done[current]??={})[id]=e.target.checked;persist();render()});
 $('todoList').addEventListener('click',e=>{const btn=e.target.closest('button[data-action]');if(!btn)return;const id=btn.closest('[data-id]')?.dataset.id,t=tasks().find(x=>x.id===id);if(!t)return;
- switch(btn.dataset.action){case 'up':move(id,-1);break;case 'down':move(id,1);break;case 'open':openTask(t);break;case 'insert':showForm(null,id);break;case 'edit':showForm(t);break;
+ switch(btn.dataset.action){case 'up':move(id,-1);break;case 'down':move(id,1);break;case 'open':openTask(t);break;case 'focus':window.dispatchEvent(new CustomEvent('wurd:focus-task',{detail:{id:t.id,name:t.name,date:current,minutes:t.minutes,target:t.target}}));break;case 'insert':showForm(null,id);break;case 'edit':showForm(t);break;
  case 'remove':if(t.id.startsWith('base-')){(state.hidden[current]??=[]).push(id);persist();render()}else if(confirm(`Delete "${t.name}"${t.repeat!=='once'?' from all recurring dates':''}?`)){state.custom=state.custom.filter(x=>x.id!==id);persist();render()}break;
  }});
 let dragging=null;
@@ -1788,6 +1815,92 @@ window.addEventListener('wurd:sync-remote',e=>{if(e.detail?.section!=='waistProg
  $('stExport').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(getRecords(),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='madden-skills-trainer-history.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)});
  $('stImportBtn').addEventListener('click',()=>$('stImport').click());$('stImport').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data)||data.length>10000||!data.every(x=>x&&typeof x==='object'&&typeof x.date==='string'&&typeof x.focus==='string'))throw Error('Invalid history');const old=getRecords(),merged=[...old,...data].filter((v,i,a)=>a.findIndex(x=>x.date===v.date&&x.focus===v.focus)===i);if(setRecords(merged)){$('stStatus').textContent='Imported '+data.length+' entries; existing entries retained.';renderHistory()}}catch{$('stStatus').textContent='Import failed: this is not a valid Skills Trainer history file.'}e.target.value=''});
  reset();renderHistory();
+})();
+</script>
+<button type="button" class="focus-mini hide" id="focusMini" aria-label="Return to active focus timer"></button>
+<script>
+/* Universal focus timer: self-contained, keyed by activity ID and date. */
+(()=>{'use strict';
+const $=id=>document.getElementById(id), STORE='wurd-focus-break-v4.2';
+const safe=(n,lo,hi,fallback)=>{n=Number(n);return Number.isFinite(n)?Math.max(lo,Math.min(hi,Math.round(n))):fallback};
+const stamp=()=>Date.now();
+const pad=n=>String(n).padStart(2,'0');
+const display=s=>`${pad(Math.floor(Math.max(0,s)/60))}:${pad(Math.ceil(Math.max(0,s))%60)}`;
+let data={records:{},settings:{block:5,rest:2}},active=null,lastTick=0,interval=null,audio=null;
+try{const x=JSON.parse(localStorage.getItem(STORE)||'null');if(x&&typeof x==='object'){data.records=x.records&&typeof x.records==='object'?x.records:{};data.settings=x.settings||data.settings;active=x.active||null}}catch{}
+// Don't resume unobserved background time after a reload; require explicit start.
+if(active){active.running=false;active.left=safe(active.left,0,28800,300);active.spent=safe(active.spent,0,28800,0)}
+function save(){try{localStorage.setItem(STORE,JSON.stringify({records:data.records,settings:data.settings,active}))}catch{}}
+const key=a=>a.date+'::'+a.id;
+function record(){const k=key(active);return data.records[k]||(data.records[k]={spent:0,goal:active.goal})}
+function goalSeconds(){return safe(active?.goal,1,480,15)*60}
+function blockSeconds(){return Math.min(safe(active.block,1,120,5)*60,Math.max(0,goalSeconds()-record().spent))}
+function notify(message){$('focusStatus').textContent=message}
+function sound(){try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();const now=audio.currentTime;[0,.18,.36].forEach((dt,i)=>{const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=i===2?880:660;g.gain.setValueAtTime(.0001,now+dt);g.gain.exponentialRampToValueAtTime(.18,now+dt+.015);g.gain.exponentialRampToValueAtTime(.0001,now+dt+.14);o.connect(g);g.connect(audio.destination);o.start(now+dt);o.stop(now+dt+.15)})}catch{}}
+function markCompleted(){if(!active)return;const sameDay=$('todoDate')?.value===active.date;
+ if(!sameDay){notify('Focus goal reached! Switch to the activity date in To-Do to check it off.');return}
+ const row=[...$('todoList').querySelectorAll('.todo-entry')].find(el=>el.dataset.id===active.id),check=row?.querySelector('input[data-action="done"]');
+ if(check&&!check.checked){check.click();notify('Focus goal reached! Activity marked complete in the To-Do List.')}else notify('Focus goal reached!')
+}
+function finishPhase(){active.running=false;active.left=0;sound();
+ if(active.phase==='focus'){
+  if(record().spent>=goalSeconds()){active.phase='done';markCompleted()}
+  else if(active.rest>0){active.phase='break';active.left=active.rest*60;active.running=true;lastTick=stamp();notify('Focus block complete. Your break is starting now.')}
+  else {active.phase='focus';active.left=blockSeconds();notify('Focus block complete. Start the next block when ready.')}
+ }else if(active.phase==='break'){active.phase='focus';active.left=blockSeconds();notify('Break finished. Start the next focus block when ready.')}
+ save();render();
+}
+function tick(){if(!active||!active.running)return;const now=stamp(),delta=Math.max(0,Math.min(28800,(now-lastTick)/1000));lastTick=now;
+ let used=Math.min(active.left,delta);active.left=Math.max(0,active.left-used);
+ if(active.phase==='focus'){const rec=record(),allowed=Math.max(0,goalSeconds()-rec.spent);used=Math.min(used,allowed);rec.spent=Math.min(goalSeconds(),rec.spent+used);if(rec.spent>=goalSeconds())active.left=0}
+ if(active.left<=.01)finishPhase();else {save();render()}
+}
+function pause(){if(!active)return;tick();active.running=false;save();render()}
+function setConfig(){if(!active)return;const oldGoal=active.goal;active.goal=safe($('focusGoal').value,1,480,15);active.block=safe($('focusBlock').value,1,120,5);active.rest=safe($('focusBreak').value,0,60,2);data.settings={block:active.block,rest:active.rest};
+ const rec=record();rec.goal=active.goal;
+ if(rec.spent>=goalSeconds()){active.phase='done';active.running=false;active.left=0}
+ else if(active.phase==='done'){active.phase='focus';active.left=blockSeconds()}
+ else if(!active.running){if(active.phase==='focus'&&(active.left<=0||oldGoal!==active.goal))active.left=blockSeconds();if(active.phase==='break')active.left=active.rest*60}
+ save();render()}
+function render(){if(!active){$('focusPanel').classList.add('hide');$('focusMini').classList.add('hide');return}
+ const rec=record(),percent=Math.min(100,Math.round(rec.spent/goalSeconds()*100));
+ $('focusTaskName').textContent=active.name;$('focusDateLabel').textContent='Activity date: '+active.date;
+ if(document.activeElement?.id!=='focusGoal')$('focusGoal').value=active.goal;
+ if(document.activeElement?.id!=='focusBlock')$('focusBlock').value=active.block;
+ if(document.activeElement?.id!=='focusBreak')$('focusBreak').value=active.rest;
+ $('focusClock').textContent=display(active.left);$('focusPhase').textContent=active.phase==='done'?'✓ Focus goal completed':active.phase==='break'?'☕ Break '+(active.running?'in progress':'ready'):'🎯 Focus '+(active.running?'in progress':'ready');
+ $('focusSummary').textContent=(rec.spent/60).toFixed(1)+' / '+active.goal+' focused minutes · '+percent+'% complete · breaks excluded';
+ $('focusFill').style.width=percent+'%';$('focusProgress').setAttribute('aria-valuenow',String(percent));
+ $('focusStart').textContent=active.running?'▶ Running…':active.phase==='break'?'▶ Start break':active.phase==='done'?'✓ Complete':'▶ Start / Resume focus';
+ $('focusStart').disabled=active.running||active.phase==='done';$('focusPause').disabled=!active.running;
+ $('focusSkip').disabled=active.phase!=='break';
+ $('focusMini').textContent=(active.phase==='break'?'☕':'⏱')+' '+display(active.left)+' · '+active.name+(active.running?'':' · paused');
+ $('focusMini').classList.remove('hide')
+}
+function openTask(t){if(active?.running)pause();const recKey=t.date+'::'+t.id,rec=data.records[recKey],minutes=safe(rec?.goal??t.minutes??15,1,480,15);
+ const same=active&&key(active)===recKey;
+ if(!same){active={id:t.id,name:t.name,date:t.date,target:t.target||'',goal:minutes,block:safe(data.settings.block,1,120,5),rest:safe(data.settings.rest,0,60,2),phase:'focus',running:false,left:0};
+  active.phase=(rec?.spent||0)>=goalSeconds()?'done':'focus';active.left=active.phase==='done'?0:blockSeconds();}
+ else{active.name=t.name;active.target=t.target||active.target}
+ $('focusPanel').classList.remove('hide');notify('Timer ready. Focus time counts toward this activity; breaks do not.');save();render();$('focusPanel').scrollIntoView({behavior:'smooth',block:'start'})
+}
+window.addEventListener('wurd:focus-task',e=>openTask(e.detail));
+$('focusStart').onclick=()=>{if(!active||active.running||active.phase==='done')return;active.running=true;lastTick=stamp();soundInit();save();render()};
+function soundInit(){try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume()}catch{}}
+$('focusPause').onclick=pause;
+$('focusSkip').onclick=()=>{if(!active||active.phase!=='break')return;pause();active.phase='focus';active.left=blockSeconds();notify('Break skipped. Start focus when ready.');save();render()};
+$('focusReset').onclick=()=>{if(!active||!confirm('Reset focused minutes for this activity and date? This does not change its To-Do checkmark.'))return;pause();data.records[key(active)]={spent:0,goal:active.goal};active.phase='focus';active.left=blockSeconds();notify('Timer reset for this activity.');save();render()};
+$('focusSound').onclick=sound;
+$('focusGoal').onchange=setConfig;$('focusBlock').onchange=setConfig;$('focusBreak').onchange=setConfig;
+document.querySelectorAll('[data-focus-preset]').forEach(b=>b.onclick=()=>{$('focusBlock').value=b.dataset.focusPreset;setConfig()});
+document.querySelectorAll('[data-break-preset]').forEach(b=>b.onclick=()=>{$('focusBreak').value=b.dataset.breakPreset;setConfig()});
+$('focusHide').onclick=()=>{$('focusPanel').classList.add('hide');notify('Timer hidden; use the floating timer to reopen it.')};
+$('focusMini').onclick=()=>{$('focusPanel').classList.remove('hide');$('focusPanel').scrollIntoView({behavior:'smooth',block:'start'})};
+$('focusBackTodo').onclick=()=>$('daily-planner').scrollIntoView({behavior:'smooth',block:'start'});
+$('focusBackTask').onclick=()=>{const row=[...$('todoList').querySelectorAll('.todo-entry')].find(el=>el.dataset.id===active?.id);if(row&&$('todoDate').value===active.date){const btn=row.querySelector('button[data-action="open"]');btn?.click()}else{notify('Choose this activity’s date in the To-Do List to open its page section.');$('daily-planner').scrollIntoView({behavior:'smooth'})}};
+// Use elapsed timestamps rather than relying on setInterval executing in background tabs.
+interval=setInterval(tick,250);document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});window.addEventListener('pagehide',()=>{tick();save()});
+if(active){if(active.phase==='focus'&&active.left<=0)active.left=blockSeconds();$('focusPanel').classList.remove('hide');render()}
 })();
 </script>
 </body></html>
