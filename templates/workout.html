@@ -152,10 +152,10 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 .wp-week-grid button.active{background:#23665b;border-color:#82e3c8}
 .wp-advice{font-size:13px;color:#c5dce5;line-height:1.55}
 @media(max-width:600px){.wp-week-grid{grid-template-columns:repeat(4,1fr)}.waist-program{padding:12px}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 3.9</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.0</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 
 <section class="panel" id="daily-planner" aria-label="Daily to-do planner">
- <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v3.7</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
+ <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v4.0</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
  <div class="todo-nav"><button type="button" class="btn secondary" id="todoPrevious" aria-label="Previous date">←</button><input type="date" class="todo-date" id="todoDate" aria-label="Plan date"><button type="button" class="btn secondary" id="todoNext" aria-label="Next date">→</button><button type="button" class="btn secondary" id="todoToday">Today</button></div></div>
  <div class="todo-stats"><span id="todoCompleted">0 / 0 completed</span><span id="todoRemaining">0 remaining</span><span id="todoPercentage">0%</span></div>
  <div class="todo-progress" role="progressbar" aria-label="Daily to-do progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="todoProgress"><div id="todoFill"></div></div>
@@ -164,7 +164,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
  <form class="todo-form hide" id="todoForm"><h3 id="todoFormTitle">Add an activity</h3><div class="todo-form-grid"><label>Activity name<input id="todoName" maxlength="130" required placeholder="e.g. Cut the grass"></label><label>Repeat<select id="todoRepeat"><option value="once">This date only</option><option value="daily">Every day</option><option value="weekly">Every week on this weekday</option></select></label><label>Place in the list<select id="todoPosition"></select></label></div>
  <div class="todo-form-grid" style="margin-top:10px"><label>Jump to a page activity (optional)<select id="todoTarget"></select></label><label>Minutes (optional)<input id="todoMinutes" type="number" min="1" max="480" placeholder="e.g. 20"></label></div>
  <div class="btnrow"><button type="submit" class="btn primary" id="todoSave">Save activity</button><button type="button" class="btn secondary" id="todoCancel">Cancel</button></div></form>
- <p class="todo-hint" id="todoStatus" role="status">Use ↑ ↓ to reorder tasks or ＋ on any row to insert exactly there. Changes and checkmarks are saved separately for each date in this browser.</p>
+ <p class="todo-hint" id="todoStatus" role="status">Use ↑ ↓ to reorder tasks or ＋ on any row to insert exactly there. Changes and checkmarks save locally, then sync with your signed-in Google account.</p><p id="todoCloudStatus" class="todo-hint" role="status">☁ Checking cloud connection…</p>
 </section>
 <section class="panel"><div class="topline"><div><div class="sectiontitle">Your weekly schedule</div><p style="font-size:13px;margin:6px 0">Today is selected automatically. Tap another weekday to view its plan. Tuesday builds acceleration; Friday adds a second, short sprint session after an initial adaptation period. Thursday is boxing. Weekends remain recovery days.</p></div><div class="btnrow"><button class="btn secondary" id="prev">← Previous</button><button class="btn primary" id="next">Next day →</button></div></div><div id="cycle" class="cycle"></div><div id="daytitle"></div></section>
 <section class="panel" id="cloudPanel" aria-label="Cloud synchronization">
@@ -196,7 +196,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
     <p class="wp-advice" id="wpFocus"></p>
     <details><summary style="cursor:pointer;color:#9eead1;font-weight:700">Choose a program week</summary><div class="wp-week-grid" id="wpWeeks"></div></details>
     <div class="wp-tasks" id="wpTasks"></div>
-    <p class="wp-advice" id="wpStatus" role="status">Check off a task when you finish it. Your checks stay saved for that date.</p>
+    <p class="wp-advice" id="wpStatus" role="status">Check off a task when you finish it. Your checks stay saved for that date.</p><p class="wp-advice" id="wpCloudStatus" role="status">☁ Checking cloud connection…</p>
     <div class="notice" style="margin-bottom:0"><strong>How to use this:</strong> These are example meals, not a strict diet. Swap comparable foods that you enjoy. No food is forbidden. Use water or unsweetened drinks most of the time. Adjust portions to your hunger and progress. Exercise should feel manageable, and rest counts.</div>
   </div>
   <div class="waist-grid"><div class="waist-stat"><strong id="waistLatest">—</strong><small>Latest waist (in)</small></div><div class="waist-stat"><strong id="waistChange">—</strong><small>Change since first entry</small></div><div class="waist-stat"><strong id="waistEntries">0</strong><small>Measurements recorded</small></div></div>
@@ -205,7 +205,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
   <div class="waist-form"><label>Date<input type="date" id="waistDate"></label><label>Waist (inches)<input type="number" id="waistIn" step="0.1" min="15" max="90" placeholder="e.g. 42.0"></label><label>Weight (lb; optional)<input type="number" id="waistWeight" step="0.1" min="50" max="700" placeholder="Optional"></label><label>Week's focus<select id="waistFocus"><option value="portion">Manage portions</option><option value="protein">Protein + produce</option><option value="movement">More daily movement</option><option value="strength">Strength training</option><option value="drinks">Reduce liquid calories</option><option value="sleep">Sleep consistency</option></select></label></div>
   <label class="madden-note-label" for="waistNotes">Notes: What helped, what made it difficult?</label><textarea class="waist-notes" id="waistNotes" placeholder="Examples: Walked after dinner; fewer sweet drinks; more hunger at night..."></textarea>
   <div class="btnrow"><button type="button" class="btn primary" id="waistSave">✓ Save measurement</button><button type="button" class="btn secondary" id="waistCopy">Copy coaching check-in</button><button type="button" class="btn secondary" id="waistExport">Export waist backup</button><button type="button" class="btn secondary" id="waistImportBtn">Import waist backup</button><input id="waistImport" class="hide" type="file" accept=".json,application/json"></div>
-  <p id="waistStatus" class="muted" style="font-size:12px" role="status">Measurements and habits save locally in this browser. Export a backup to move them between devices; this section does not join the existing workout cloud sync.</p>
+  <p id="waistStatus" class="muted" style="font-size:12px" role="status">Measurements and original habit checkboxes still save locally; the new 12-week daily program above now syncs through your cloud account.</p>
   <details><summary>Show measurement history</summary><div class="waist-history" id="waistHistory"></div></details>
   <details><summary style="cursor:pointer;color:#9eead1;font-weight:700;margin-top:18px">Optional: original daily habit checkboxes</summary>
   <h3 style="margin-top:22px">2. Daily habits — check what you achieved today</h3>
@@ -1221,6 +1221,52 @@ useCloud.onclick=()=>{if(!user||!Object.keys(remote).length)return;if(!confirm('
 login.onclick=async()=>{try{await signInWithPopup(auth,provider)}catch(e){if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code)){message('Popup unavailable. Attempting Google redirect sign-in…');try{await signInWithRedirect(auth,provider)}catch(err){message('⚠ Sign-in failed: '+err.message)}}else message('⚠ Sign-in failed: '+e.message)}};
 logout.onclick=async()=>{if(dirty.size){await flush();if(dirty.size&&!confirm('Some cloud changes are not saved. Sign out anyway?'))return}await signOut(auth)};
 getRedirectResult(auth).catch(e=>message('⚠ Google redirect error: '+e.message));
+// v4.0 Separate, live cloud synchronization for planner and 12-week waist program.
+// Uses the SAME authenticated account and Firestore /users/{uid}/sections/ permissions.
+const extraConfigs={
+ dailyPlanner:{key:'wurd-daily-planner-v1',indicator:'todoCloudStatus',fallback:()=>({custom:[],done:{},order:{},hidden:{}})},
+ waistProgram:{key:'wurd_waist_program_v2',indicator:'wpCloudStatus',fallback:()=>({start:new Date().toLocaleDateString('en-CA'),done:{}})}
+};
+let extraUser=null,extraListeners=[],extraReady={},extraPending={},extraWriting={},extraTimer={};
+function extraStatus(k,t){const el=document.getElementById(extraConfigs[k].indicator);if(el)el.textContent=t}
+function extraLocal(k){try{return JSON.parse(localStorage.getItem(extraConfigs[k].key))||extraConfigs[k].fallback()}catch{return extraConfigs[k].fallback()}}
+function extraEmit(k,v){window.dispatchEvent(new CustomEvent('wurd:sync-remote',{detail:{section:k,value:v}}))}
+async function extraWrite(k){if(!extraUser||!extraReady[k]||extraWriting[k]||!extraPending[k])return;
+ const value=extraPending[k];delete extraPending[k];extraWriting[k]=true;
+ try{await setDoc(doc(db,'users',extraUser.uid,'sections',k),{value,updatedAt:serverTimestamp()});extraStatus(k,'☁ ✓ Synced with your other devices')}
+ catch(e){extraStatus(k,'⚠ Cloud sync failed: '+(e.code||e.message)+'. Saved on this device; try a new edit after fixing the connection.');console.error('Extra cloud sync',k,e)}
+ finally{extraWriting[k]=false;if(extraPending[k]&&extraReady[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),1200)}}
+}
+window.addEventListener('wurd:sync-local',e=>{
+ const k=e.detail?.section;if(!extraConfigs[k])return;
+ extraPending[k]=e.detail.value;
+ if(!extraUser){extraStatus(k,'☁ Saved on this device · Sign in above to sync');return}
+ extraStatus(k,'☁ Saving changes…');
+ if(extraReady[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),450)}
+});
+function startExtras(u){
+ for(const off of extraListeners)off();extraListeners=[];
+ Object.values(extraTimer).forEach(clearTimeout);extraTimer={};extraReady={};extraWriting={};extraPending={};extraUser=u;
+ if(!u){for(const k of Object.keys(extraConfigs))extraStatus(k,'☁ Local only · Sign in above with the same Google account on both devices');return}
+ for(const k of Object.keys(extraConfigs)){
+  extraStatus(k,'☁ Connecting to cloud…');let first=true;const uid=u.uid;
+  const off=onSnapshot(doc(db,'users',uid,'sections',k),snap=>{
+   if(!extraUser||extraUser.uid!==uid)return;
+   if(snap.metadata.fromCache&&!extraReady[k]){extraStatus(k,'☁ Waiting for server connection…');return}
+   if(first){first=false;extraReady[k]=true;
+    if(snap.exists()){if(!extraPending[k])extraEmit(k,snap.data().value);else extraStatus(k,'☁ Sending this device’s recent changes…')}
+    else{extraPending[k]=extraPending[k]||extraLocal(k)}
+    if(extraPending[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),450)}
+    else extraStatus(k,'☁ ✓ Live sync active · Same Google account on both devices');
+    return;
+   }
+   if(snap.metadata.hasPendingWrites)return;
+   if(!extraPending[k]&&!extraWriting[k]&&snap.exists()){extraEmit(k,snap.data().value);extraStatus(k,'☁ ✓ Updated from cloud · Live sync active')}
+  },e=>extraStatus(k,'⚠ Cloud connection error: '+e.message));
+  extraListeners.push(off);
+ }
+}
+onAuthStateChanged(auth,u=>{startExtras(u)});
 onAuthStateChanged(auth,u=>{begin(u)});
 </script><script>
 // Standalone academy is isolated in an iframe to avoid naming/CSS conflicts.
@@ -1485,7 +1531,7 @@ loadHabits();render();
 </script>
 
 <script>
-/* v3.9 Daily To-Do: includes Brain & Skills daily assignments; preserves existing data. */
+/* v4.0 Daily To-Do: live Firebase sync + Brain & Skills daily assignments. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id), KEY='wurd-daily-planner-v1';
 const pad=n=>String(n).padStart(2,'0');
@@ -1531,7 +1577,8 @@ let state=blank(),current=today(),editing=null,after=null;
 try{const parsed=JSON.parse(localStorage.getItem(KEY)||'null');if(parsed&&typeof parsed==='object')state={custom:Array.isArray(parsed.custom)?parsed.custom:[],done:parsed.done&&typeof parsed.done==='object'?parsed.done:{},order:parsed.order&&typeof parsed.order==='object'?parsed.order:{},hidden:parsed.hidden&&typeof parsed.hidden==='object'?parsed.hidden:{}}}catch(e){console.warn('Planner restore failed',e)}
 const safeId=()=>('task-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(state));return true}catch(e){$('todoStatus').textContent='Unable to save: browser storage is full or blocked. Export a backup.';return false}};
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(state));window.dispatchEvent(new CustomEvent('wurd:sync-local',{detail:{section:'dailyPlanner',value:JSON.parse(JSON.stringify(state))}}));return true}catch(e){$('todoStatus').textContent='Unable to save: browser storage is full or blocked. Export a backup.';return false}};
+window.addEventListener('wurd:sync-remote',e=>{if(e.detail?.section!=='dailyPlanner')return;const v=e.detail.value;if(!v||!Array.isArray(v.custom))return;state={custom:v.custom,done:v.done&&typeof v.done==='object'?v.done:{},order:v.order&&typeof v.order==='object'?v.order:{},hidden:v.hidden&&typeof v.hidden==='object'?v.hidden:{}};localStorage.setItem(KEY,JSON.stringify(state));render()});
 const applicable=t=>t.repeat==='daily'&&current>=t.start||t.repeat==='weekly'&&current>=t.start&&dayOf(current)===t.weekday||t.repeat==='once'&&t.date===current;
 function tasks(){
  const visible=[...defaults(current),...state.custom.filter(applicable)].filter(t=>!(state.hidden[current]||[]).includes(t.id));
@@ -1631,7 +1678,8 @@ render();
  const safeLoad=()=>{try{const x=JSON.parse(localStorage.getItem(key));return x&&typeof x==='object'?x:{}}catch{return {}}};
  const state=safeLoad();state.start=/^\d{4}-\d{2}-\d{2}$/.test(state.start||'')?state.start:today();state.done=state.done&&typeof state.done==='object'&&!Array.isArray(state.done)?state.done:{};
  let selected=today();
- const save=()=>{try{localStorage.setItem(key,JSON.stringify({start:state.start,done:state.done}))}catch{$('wpStatus').textContent='Could not save on this browser. Check storage permissions.'}};
+ const save=()=>{try{const value={start:state.start,done:state.done};localStorage.setItem(key,JSON.stringify(value));window.dispatchEvent(new CustomEvent('wurd:sync-local',{detail:{section:'waistProgram',value}}))}catch{$('wpStatus').textContent='Could not save on this browser. Check storage permissions.'}};
+window.addEventListener('wurd:sync-remote',e=>{if(e.detail?.section!=='waistProgram')return;const v=e.detail.value;if(!v||typeof v!=='object')return;state.start=/^\d{4}-\d{2}-\d{2}$/.test(v.start||'')?v.start:today();state.done=v.done&&typeof v.done==='object'&&!Array.isArray(v.done)?v.done:{};localStorage.setItem(key,JSON.stringify({start:state.start,done:state.done}));render()});
  const meals=[
  ['2 eggs, whole-grain toast and berries','Turkey or hummus sandwich, side salad and fruit','Baked chicken, vegetables and a moderate portion of rice'],
  ['Plain Greek yogurt with berries and oats','Bean-and-chicken bowl with peppers, lettuce and salsa','Fish, roasted vegetables and a small baked potato'],
@@ -1684,14 +1732,14 @@ render();
   for(let i=1;i<=12;i++){const b=document.createElement('button');b.type='button';b.textContent='Week '+i;b.className=i===week?'active':'';b.onclick=()=>{selected=add(state.start,(i-1)*7);render()};$('wpWeeks').append(b)}
   $('wpTasks').replaceChildren();
   arr.forEach(t=>{const row=document.createElement('div');row.className='wp-task'+(checked[t.id]?' completed':'');const label=document.createElement('label'),box=document.createElement('input'),line=document.createElement('span'),title=document.createElement('b'),detail=document.createElement('p');box.type='checkbox';box.checked=!!checked[t.id];box.setAttribute('aria-label','Completed: '+t.title);title.textContent=t.title;detail.textContent=t.detail;line.append(title);label.append(box,line);row.append(label,detail);box.onchange=()=>{const v=state.done[selected]||{};v[t.id]=box.checked;state.done[selected]=v;save();render()};$('wpTasks').append(row)});
-  $('wpStatus').textContent=`${n} of ${arr.length} daily actions complete. Checks are stored on this browser for ${selected}. Meal examples are flexible.`;
+  $('wpStatus').textContent=`${n} of ${arr.length} daily actions complete. Checks are saved for ${selected} and sync when connected. Meal examples are flexible.`;
  }
  $('wpDate').onchange=e=>{if(e.target.value){selected=e.target.value;render()}};
  $('wpStart').onchange=e=>{if(!e.target.value)return;state.start=e.target.value;save();render()};
  $('wpToday').onclick=()=>{selected=today();render()};
  $('wpPrev').onclick=()=>{selected=add(selected,-1);render()};
  $('wpNext').onclick=()=>{selected=add(selected,1);render()};
- save();render();
+ render();
 })();
 </script>
 </body></html>
