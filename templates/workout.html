@@ -107,7 +107,45 @@
 
 /* v3.6: Smaller Waist Coach — isolated tracking; preserves existing workout and learning data. */
 .waist-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}.waist-stat{padding:13px;background:#193748;border:1px solid #3b6170;border-radius:11px}.waist-stat strong{display:block;color:#9cf0ce;font-size:24px}.waist-stat small{color:#bbd2df}.waist-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.waist-form label{font-size:12px;color:#d3e5ee}.waist-form input,.waist-form select,.waist-notes{display:block;width:100%;margin-top:5px;background:#0d2030;color:#fff;border:1px solid #52708b;border-radius:8px;padding:10px;font:inherit}.waist-habits{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.waist-habits label{padding:11px;background:#162c3f;border:1px solid #39586d;border-radius:9px;font-size:13px;color:#e0edf5}.waist-habits input{accent-color:#75dfbd;margin-right:7px}.waist-history{max-height:220px;overflow-y:auto}.waist-history table{width:100%;border-collapse:collapse;font-size:12px}.waist-history th,.waist-history td{text-align:left;padding:9px 6px;border-bottom:1px solid #365167}.waist-notes{min-height:65px;resize:vertical}.waist-panel details{margin-top:13px}.waist-panel summary{cursor:pointer;color:#9ee8d4;font-weight:700}.waist-panel .btn{margin-top:7px}.waist-panel a{color:#9cddff}@media(max-width:690px){.waist-grid{grid-template-columns:1fr 1fr}.waist-form{grid-template-columns:1fr 1fr}.waist-habits{grid-template-columns:1fr}}@media(max-width:390px){.waist-form{grid-template-columns:1fr}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 3.6</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+
+/* v3.7 Daily To-Do dashboard (separate, date-specific planner storage). */
+html{scroll-behavior:smooth;scroll-padding-top:18px}
+#daily-planner{border-color:#347f78;background:linear-gradient(145deg,#163549,#112638)}
+.todo-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.todo-nav{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.todo-date{background:#0d2535;color:#edfaff;border:1px solid #527889;border-radius:9px;padding:9px;max-width:190px}
+.todo-stats{display:flex;gap:8px;flex-wrap:wrap;margin:13px 0}
+.todo-stats span{background:#1e3b4d;border:1px solid #345f6f;border-radius:10px;padding:9px 13px;font-size:13px}
+.todo-progress{height:11px;background:#091d2d;border-radius:100px;border:1px solid #3c6170;overflow:hidden;margin-bottom:14px}
+.todo-progress>div{height:100%;background:#70dfb8;transition:width .2s}
+.todo-list{display:grid;gap:8px}.todo-entry{display:flex;align-items:center;gap:9px;background:#192e43;border:1px solid #3b546c;border-radius:11px;padding:9px}
+.todo-entry.is-done{background:#15382f;border-color:#36836c}.todo-check{width:21px;height:21px;accent-color:#75e4bc;flex-shrink:0}
+.todo-main{flex:1;min-width:90px}.todo-main button{border:0;background:none;color:#eaf8ff;font:inherit;font-weight:700;text-align:left;padding:2px;cursor:pointer}
+.todo-main button:hover{text-decoration:underline;color:#90edcf}.todo-main small{display:block;color:#a7c4d7;font-size:11px;margin:3px 0 0 2px}
+.todo-entry.is-done .todo-main button{text-decoration:line-through;color:#a2bfaf}.todo-actions{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.todo-mini{background:#233f56;border:1px solid #45677e;border-radius:8px;color:#e6f5ff;padding:6px 9px;font-size:12px;min-height:33px}
+.todo-mini:disabled{opacity:.3;cursor:default}.todo-form{background:#102a3c;border:1px solid #3f6575;border-radius:12px;padding:14px;margin-top:13px}
+.todo-form-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}.todo-form label{font-size:12px;color:#c6dce7}
+.todo-form input,.todo-form select{width:100%;display:block;margin-top:5px;border-radius:8px;border:1px solid #53778a;background:#0b1e30;color:#fff;padding:9px;font:inherit}
+.todo-form .btnrow{margin-top:11px}.todo-hint{font-size:12px;color:#b8d0da;margin:10px 0 0}
+.todo-return{display:flex;justify-content:flex-end;margin-top:14px}.todo-return a,.todo-floating{color:#8febd3;text-decoration:none;font-size:12px;font-weight:800}
+.todo-floating{position:fixed;right:16px;bottom:18px;background:#153a44;border:1px solid #6bd8bd;border-radius:999px;padding:12px 15px;z-index:10;box-shadow:0 6px 25px #0008;display:none}
+.todo-floating.show{display:block}.todo-entry button:focus-visible,.todo-form :focus-visible,.todo-date:focus-visible{outline:2px solid #f2ce7b;outline-offset:2px}
+@media(max-width:650px){.todo-form-grid{grid-template-columns:1fr}.todo-entry{align-items:flex-start;flex-wrap:wrap}.todo-actions{margin-left:30px}.todo-nav{width:100%}}
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 3.7</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+
+<section class="panel" id="daily-planner" aria-label="Daily to-do planner">
+ <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v3.7</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
+ <div class="todo-nav"><button type="button" class="btn secondary" id="todoPrevious" aria-label="Previous date">←</button><input type="date" class="todo-date" id="todoDate" aria-label="Plan date"><button type="button" class="btn secondary" id="todoNext" aria-label="Next date">→</button><button type="button" class="btn secondary" id="todoToday">Today</button></div></div>
+ <div class="todo-stats"><span id="todoCompleted">0 / 0 completed</span><span id="todoRemaining">0 remaining</span><span id="todoPercentage">0%</span></div>
+ <div class="todo-progress" role="progressbar" aria-label="Daily to-do progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="todoProgress"><div id="todoFill"></div></div>
+ <div id="todoList" class="todo-list" aria-live="polite"></div>
+ <div class="btnrow" style="margin-top:13px"><button type="button" class="btn primary" id="todoAdd">＋ Add activity anywhere</button><button type="button" class="btn secondary" id="todoNextTask">Go to next unfinished ↗</button><button type="button" class="btn secondary" id="todoRestore">Restore default tasks</button><button type="button" class="btn secondary" id="todoExport">Export planner backup</button><button type="button" class="btn secondary" id="todoImportButton">Import planner backup</button><input type="file" id="todoImportFile" accept=".json,application/json" class="hide"></div>
+ <form class="todo-form hide" id="todoForm"><h3 id="todoFormTitle">Add an activity</h3><div class="todo-form-grid"><label>Activity name<input id="todoName" maxlength="130" required placeholder="e.g. Cut the grass"></label><label>Repeat<select id="todoRepeat"><option value="once">This date only</option><option value="daily">Every day</option><option value="weekly">Every week on this weekday</option></select></label><label>Place in the list<select id="todoPosition"></select></label></div>
+ <div class="todo-form-grid" style="margin-top:10px"><label>Jump to a page activity (optional)<select id="todoTarget"></select></label><label>Minutes (optional)<input id="todoMinutes" type="number" min="1" max="480" placeholder="e.g. 20"></label></div>
+ <div class="btnrow"><button type="submit" class="btn primary" id="todoSave">Save activity</button><button type="button" class="btn secondary" id="todoCancel">Cancel</button></div></form>
+ <p class="todo-hint" id="todoStatus" role="status">Use ↑ ↓ to reorder tasks or ＋ on any row to insert exactly there. Changes and checkmarks are saved separately for each date in this browser.</p>
+</section>
 <section class="panel"><div class="topline"><div><div class="sectiontitle">Your weekly schedule</div><p style="font-size:13px;margin:6px 0">Today is selected automatically. Tap another weekday to view its plan. Tuesday builds acceleration; Friday adds a second, short sprint session after an initial adaptation period. Thursday is boxing. Weekends remain recovery days.</p></div><div class="btnrow"><button class="btn secondary" id="prev">← Previous</button><button class="btn primary" id="next">Next day →</button></div></div><div id="cycle" class="cycle"></div><div id="daytitle"></div></section>
 <section class="panel" id="cloudPanel" aria-label="Cloud synchronization">
 <div class="headrow"><div><div class="sectiontitle">Workout Coach v2.0 · Cloud account</div><h2>Phone + laptop sync</h2><p class="muted" style="font-size:13px;margin:5px 0">Google sign-in connects both devices to the same private Firebase account. This browser keeps a local copy.</p></div><div class="btnrow"><button type="button" class="btn primary" id="cloudLogin">Sign in with Google</button><button type="button" class="btn secondary hide" id="cloudLogout">Sign out</button></div></div>
@@ -1411,6 +1449,127 @@ $('waistCopy').onclick=async()=>{const t=makeSummary();try{await navigator.clipb
 $('waistExport').onclick=()=>{let habits={};try{habits=JSON.parse(localStorage.getItem(DAYKEY)||'{}')||{}}catch{}const data={app:'WURD Smaller Waist Coach',version:1,exported:new Date().toISOString(),state,habits};const u=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='wurd-waist-coach-'+localDay()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
 $('waistImportBtn').onclick=()=>$('waistImport').click();$('waistImport').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const obj=JSON.parse(await f.text());if(obj.app!=='WURD Smaller Waist Coach'||obj.version!==1||!Array.isArray(obj.state?.measurements)||obj.state.measurements.some(x=>!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||typeof x.waist!=='number'||!Number.isFinite(x.waist)||x.waist<15||x.waist>90))throw Error('Invalid waist-coach backup');if(!confirm('Replace existing waist measurements and daily habits with this backup? Export first if you need to keep them.'))return;state={measurements:obj.state.measurements.map(x=>({date:x.date,waist:x.waist,weight:typeof x.weight==='number'&&Number.isFinite(x.weight)?x.weight:null,focus:String(x.focus||'').slice(0,100),notes:String(x.notes||'').slice(0,3000)}))};persist();if(obj.habits&&typeof obj.habits==='object'&&!Array.isArray(obj.habits))localStorage.setItem(DAYKEY,JSON.stringify(obj.habits));loadHabits();render();status('Waist-coach backup imported.')}catch(err){status('Import failed: '+err.message)}finally{e.target.value=''}};
 loadHabits();render();
+})();
+</script>
+
+<script>
+/* v3.7 Daily To-Do: preserves all existing workout, academy and Madden data. */
+(()=>{'use strict';
+const $=id=>document.getElementById(id), KEY='wurd-daily-planner-v1';
+const pad=n=>String(n).padStart(2,'0');
+const localDate=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const dateFrom=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d,12)};
+const dayOf=s=>(dateFrom(s).getDay()+6)%7; // 0 = Monday
+const today=()=>localDate(new Date());
+const categories=[
+ ['session','🏋️ Physical training','session'],['smaller-waist-coach','🎯 Smaller Waist Coach','smaller-waist-coach'],
+ ['skills-training','🧠 Brain & Skills Training','skills-training'],['learning-center','📚 Weekly Learning Center','learning-center'],
+ ['learning-coach','🧩 Coach-First Challenge','learning-coach'],['madden-training','🎮 Madden 27 Training','madden-training'],
+ ['python','🐍 Python Code Reader','python-code-reader-academy'],['atari','🕹️ Atari 800XL','atari-assembly-academy'],
+ ['printing','🖨️ 3D Printing','printing-academy'],['blackjack','♠️ Blackjack Counting','blackjack-counting-academy'],
+ ['flashcards','🗂️ Flashcards','flashcards-training'],['creativity','💡 Creativity & Invention','creativity-invention-academy'],
+ ['electronics','⚡ Electronics','electronics-academy'],['chess','♟️ Chess','chess-academy'],
+ ['realestate','🏠 Real Estate','real-estate-academy'],['entrepreneurship','🚀 Entrepreneurship','entrepreneurship-academy']
+];
+const academyNames={python:'Python Code Reader',atari:'Atari 800XL Assembly',printing:'3D Printing',blackjack:'Blackjack Counting',flashcards:'Flashcards',creativity:'Creativity & Invention',electronics:'Electronics',chess:'Chess',realestate:'Real Estate Investing',entrepreneurship:'Entrepreneurship'};
+// Exactly the same Monday–Sunday academy rotation used by Learning Center v3.4.
+const academies=[['python'],['entrepreneurship','electronics'],['atari'],['flashcards','creativity'],['blackjack'],['realestate','entrepreneurship'],['printing','chess']];
+const workout=['Back + Biceps','Acceleration + Mobility','Chest + Triceps','Punching Technique + Speed','Legs + Shoulders + Light Arms','Recovery + Mobility','Weekend Recovery'];
+const defaults=date=>{
+ const d=dayOf(date),out=[{id:'base-workout',name:workout[d],target:'session',minutes:null},{id:'base-waist',name:'Smaller Waist Coach — daily habits',target:'smaller-waist-coach',minutes:null}];
+ out.push({id:'base-madden',name:'Madden 27 — deliberate practice',target:'madden-training',minutes:25});
+ academies[d].forEach((c,i)=>out.push({id:'base-academy-'+i,name:academyNames[c]+' Academy',target:c,minutes:null}));
+ out.push({id:'base-coach',name:'Coach-First Learning Challenge',target:'learning-coach',minutes:15});
+ return out;
+};
+const blank=()=>({custom:[],done:{},order:{},hidden:{}});
+let state=blank(),current=today(),editing=null,after=null;
+try{const parsed=JSON.parse(localStorage.getItem(KEY)||'null');if(parsed&&typeof parsed==='object')state={custom:Array.isArray(parsed.custom)?parsed.custom:[],done:parsed.done&&typeof parsed.done==='object'?parsed.done:{},order:parsed.order&&typeof parsed.order==='object'?parsed.order:{},hidden:parsed.hidden&&typeof parsed.hidden==='object'?parsed.hidden:{}}}catch(e){console.warn('Planner restore failed',e)}
+const safeId=()=>('task-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(state));return true}catch(e){$('todoStatus').textContent='Unable to save: browser storage is full or blocked. Export a backup.';return false}};
+const applicable=t=>t.repeat==='daily'&&current>=t.start||t.repeat==='weekly'&&current>=t.start&&dayOf(current)===t.weekday||t.repeat==='once'&&t.date===current;
+function tasks(){
+ const visible=[...defaults(current),...state.custom.filter(applicable)].filter(t=>!(state.hidden[current]||[]).includes(t.id));
+ const order=state.order[current]||[];
+ visible.sort((a,b)=>{const ai=order.indexOf(a.id),bi=order.indexOf(b.id);return (ai<0?1e5:ai)-(bi<0?1e5:bi)});
+ return visible;
+}
+function recordOrder(arr){state.order[current]=arr.map(x=>x.id);persist()}
+function completed(id){return !!state.done[current]?.[id]}
+function render(){
+ $('todoDate').value=current;
+ const day=dateFrom(current),label=day.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+ $('todoHeading').textContent=(current===today()?'Today · ':'')+label;
+ const ts=tasks(),done=ts.filter(t=>completed(t.id)).length,percent=ts.length?Math.round(100*done/ts.length):0;
+ $('todoCompleted').textContent=`${done} / ${ts.length} completed`;$('todoRemaining').textContent=`${ts.length-done} remaining`;$('todoPercentage').textContent=percent+'%';
+ $('todoFill').style.width=percent+'%';$('todoProgress').setAttribute('aria-valuenow',String(percent));
+ $('todoList').innerHTML=ts.map((t,i)=>`<div class="todo-entry ${completed(t.id)?'is-done':''}" data-id="${esc(t.id)}" draggable="true"><input class="todo-check" type="checkbox" data-action="done" ${completed(t.id)?'checked':''} aria-label="Complete ${esc(t.name)}"><div class="todo-main"><button type="button" data-action="open" title="${t.target?'Jump to activity':'Personal task — no page section'}">${esc(t.name)}${t.target?' ↗':''}</button><small>${t.repeat==='daily'?'Repeats daily · ':t.repeat==='weekly'?'Repeats weekly · ':''}${t.minutes?t.minutes+' minutes · ':''}${t.target?'Tap to open activity':'Personal / break'}</small></div><div class="todo-actions"><button class="todo-mini" data-action="up" title="Move up" aria-label="Move ${esc(t.name)} up" ${i===0?'disabled':''}>↑</button><button class="todo-mini" data-action="down" title="Move down" aria-label="Move ${esc(t.name)} down" ${i===ts.length-1?'disabled':''}>↓</button><button class="todo-mini" data-action="insert" title="Insert task immediately after" aria-label="Insert after ${esc(t.name)}">＋</button>${t.id.startsWith('base-')?'<button class="todo-mini" data-action="remove" title="Hide this scheduled task on this date">×</button>':`<button class="todo-mini" data-action="edit" aria-label="Edit ${esc(t.name)}">Edit</button><button class="todo-mini" data-action="remove" aria-label="Delete ${esc(t.name)}">×</button>`}</div></div>`).join('')||'<p class="muted">No tasks for this day. Add one below.</p>';
+ const position=$('todoPosition'),old=position.value;
+ position.innerHTML='<option value="first">At the beginning</option>'+ts.map(t=>`<option value="${esc(t.id)}">After: ${esc(t.name)}</option>`).join('');
+ position.value=[...position.options].some(x=>x.value===old)?old:'first';
+}
+function changeDate(newDate){if(!/^\d{4}-\d{2}-\d{2}$/.test(newDate)||Number.isNaN(dateFrom(newDate).getTime()))return;current=newDate;closeForm();render()}
+function move(id,delta){const arr=tasks(),i=arr.findIndex(t=>t.id===id);if(i<0||i+delta<0||i+delta>=arr.length)return;[arr[i],arr[i+delta]]=[arr[i+delta],arr[i]];recordOrder(arr);render()}
+function openTask(t){
+ if(!t.target){$('todoStatus').textContent='This is a personal task. Check the box when you finish it.';return}
+ const d=dayOf(current);
+ // Match all three weekday selectors where available.
+ if(t.target==='session'){const bs=$('cycle')?.querySelectorAll('button');if(bs&&bs[d])bs[d].click()}
+ if(t.target==='madden-training'){const b=$('maddenDays')?.querySelector(`[data-madden-day="${d}"]`);b?.click()}
+ if(t.target==='learning-center'){const b=$('learningWeekGrid')?.querySelectorAll('button')?.[d];b?.click()}
+ if(academyNames[t.target]){
+  const course=$('learningCourseGrid')?.querySelector(`button[data-course="${t.target}"]`);
+  course?.click();
+ }
+ const id=categories.find(x=>x[0]===t.target)?.[2]||t.target,node=$(id);
+ if(node){node.scrollIntoView({behavior:'smooth',block:'start'});node.classList.add('todo-destination');setTimeout(()=>node.classList.remove('todo-destination'),2000)}
+ else $('todoStatus').textContent='Could not find this activity on the page.';
+}
+function closeForm(){$('todoForm').classList.add('hide');editing=null;after=null;$('todoForm').reset()}
+function showForm(t=null,afterId=null){editing=t?.id||null;after=afterId;$('todoFormTitle').textContent=t?'Edit activity':'Add an activity';$('todoName').value=t?.name||'';$('todoRepeat').value=t?.repeat||'once';$('todoTarget').value=t?.target||'';$('todoMinutes').value=t?.minutes||'';
+ if(afterId)$('todoPosition').value=afterId;
+ else if(t)$('todoPosition').value=(tasks()[Math.max(0,tasks().findIndex(x=>x.id===t.id)-1)]?.id||'first');
+ else $('todoPosition').value='first';
+ $('todoForm').classList.remove('hide');$('todoName').focus();$('todoForm').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function insertOrder(id,position){const arr=tasks().filter(t=>t.id!==id).map(t=>t.id),idx=position==='first'?-1:arr.indexOf(position);arr.splice(idx+1,0,id);state.order[current]=arr}
+$('todoList').addEventListener('change',e=>{if(!e.target.matches('[data-action="done"]'))return;const id=e.target.closest('[data-id]')?.dataset.id;if(!id)return;(state.done[current]??={})[id]=e.target.checked;persist();render()});
+$('todoList').addEventListener('click',e=>{const btn=e.target.closest('button[data-action]');if(!btn)return;const id=btn.closest('[data-id]')?.dataset.id,t=tasks().find(x=>x.id===id);if(!t)return;
+ switch(btn.dataset.action){case 'up':move(id,-1);break;case 'down':move(id,1);break;case 'open':openTask(t);break;case 'insert':showForm(null,id);break;case 'edit':showForm(t);break;
+ case 'remove':if(t.id.startsWith('base-')){(state.hidden[current]??=[]).push(id);persist();render()}else if(confirm(`Delete "${t.name}"${t.repeat!=='once'?' from all recurring dates':''}?`)){state.custom=state.custom.filter(x=>x.id!==id);persist();render()}break;
+ }});
+let dragging=null;
+$('todoList').addEventListener('dragstart',e=>{const row=e.target.closest('.todo-entry');if(!row)return;dragging=row.dataset.id;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',dragging)});
+$('todoList').addEventListener('dragover',e=>{if(dragging&&e.target.closest('.todo-entry'))e.preventDefault()});
+$('todoList').addEventListener('drop',e=>{const row=e.target.closest('.todo-entry');if(!row||!dragging)return;e.preventDefault();const arr=tasks().filter(t=>t.id!==dragging),moving=tasks().find(t=>t.id===dragging),i=arr.findIndex(t=>t.id===row.dataset.id);if(moving&&i>=0){arr.splice(i,0,moving);recordOrder(arr);render()}dragging=null});
+$('todoList').addEventListener('dragend',()=>{dragging=null});
+$('todoForm').addEventListener('submit',e=>{e.preventDefault();const name=$('todoName').value.trim();if(!name)return;const repeat=$('todoRepeat').value,minutes=$('todoMinutes').value?Number($('todoMinutes').value):null;
+ if(minutes!=null&&(!Number.isFinite(minutes)||minutes<1||minutes>480))return;
+ const old=state.custom.find(t=>t.id===editing),id=editing||safeId();
+ const task={id,name:name.slice(0,130),repeat,start:old?.start||current,date:repeat==='once'?current:null,weekday:dayOf(current),target:$('todoTarget').value,minutes};
+ if(old){if(old.repeat==='once'&&repeat==='once')task.date=old.date;state.custom=state.custom.map(t=>t.id===id?task:t)}else state.custom.push(task);
+ insertOrder(id,$('todoPosition').value);persist();closeForm();render();$('todoStatus').textContent='Activity saved. You can reorder it with ↑ and ↓ or drag it.';
+});
+$('todoTarget').innerHTML='<option value="">No page link (personal task)</option>'+categories.map(c=>`<option value="${esc(c[0])}">${esc(c[1])}</option>`).join('');
+$('todoAdd').onclick=()=>showForm();$('todoCancel').onclick=closeForm;
+$('todoPrevious').onclick=()=>{const d=dateFrom(current);d.setDate(d.getDate()-1);changeDate(localDate(d))};
+$('todoNext').onclick=()=>{const d=dateFrom(current);d.setDate(d.getDate()+1);changeDate(localDate(d))};
+$('todoToday').onclick=()=>changeDate(today());$('todoDate').onchange=e=>changeDate(e.target.value);
+$('todoRestore').onclick=()=>{delete state.hidden[current];persist();render();$('todoStatus').textContent='Default scheduled tasks restored for this date.'};
+$('todoNextTask').onclick=()=>{const t=tasks().find(t=>!completed(t.id));if(!t){$('todoStatus').textContent='Everything on this day is checked off!';return}if(t.target)openTask(t);else{$('todoList').querySelector(`[data-id="${t.id}"]`)?.scrollIntoView({behavior:'smooth',block:'center'});$('todoStatus').textContent='Next up: '+t.name}};
+$('todoExport').onclick=()=>{const payload={app:'WURD Daily To-Do',version:1,exported:new Date().toISOString(),state};const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='wurd-daily-todo-'+today()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('todoImportButton').onclick=()=>$('todoImportFile').click();
+$('todoImportFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const x=JSON.parse(await f.text());if(x.app!=='WURD Daily To-Do'||x.version!==1||!x.state||!Array.isArray(x.state.custom)||x.state.custom.length>10000||x.state.custom.some(t=>typeof t.id!=='string'||typeof t.name!=='string'||t.name.length>130||!['once','daily','weekly'].includes(t.repeat)))throw Error('Unrecognized planner backup');if(!confirm('Replace this browser’s daily to-do planner with the imported data? Export your current planner first if you want to keep it.'))return;state={custom:x.state.custom,done:x.state.done&&typeof x.state.done==='object'?x.state.done:{},order:x.state.order&&typeof x.state.order==='object'?x.state.order:{},hidden:x.state.hidden&&typeof x.state.hidden==='object'?x.state.hidden:{}};persist();render();$('todoStatus').textContent='Planner backup imported.'}catch(err){$('todoStatus').textContent='Import failed: '+err.message}finally{e.target.value=''}};
+// Provide a return shortcut after each major top-level activity / academy.
+for(const section of document.querySelectorAll('main.wrap > section.panel, #learningCourses > section.panel')){
+ if(section.id==='daily-planner'||section.querySelector('.todo-return'))continue;
+ const footer=document.createElement('div');footer.className='todo-return';footer.innerHTML='<a href="#daily-planner" aria-label="Return to daily to-do list">↑ Back to Today’s To-Do List</a>';section.append(footer);
+}
+const floating=document.createElement('a');floating.href='#daily-planner';floating.className='todo-floating';floating.textContent='↑ To-Do List';floating.setAttribute('aria-label','Back to daily to-do list');document.body.append(floating);
+if('IntersectionObserver' in window){const obs=new IntersectionObserver(entries=>{floating.classList.toggle('show',!entries[0].isIntersecting&&window.scrollY>250)},{threshold:0});obs.observe($('daily-planner'))}
+else window.addEventListener('scroll',()=>floating.classList.toggle('show',window.scrollY>650),{passive:true});
+render();
 })();
 </script>
 </body></html>
