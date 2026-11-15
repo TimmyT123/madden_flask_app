@@ -152,7 +152,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 .wp-week-grid button.active{background:#23665b;border-color:#82e3c8}
 .wp-advice{font-size:13px;color:#c5dce5;line-height:1.55}
 @media(max-width:600px){.wp-week-grid{grid-template-columns:repeat(4,1fr)}.waist-program{padding:12px}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 3.8</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 3.9</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 
 <section class="panel" id="daily-planner" aria-label="Daily to-do planner">
  <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v3.7</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
@@ -1485,7 +1485,7 @@ loadHabits();render();
 </script>
 
 <script>
-/* v3.7 Daily To-Do: preserves all existing workout, academy and Madden data. */
+/* v3.9 Daily To-Do: includes Brain & Skills daily assignments; preserves existing data. */
 (()=>{'use strict';
 const $=id=>document.getElementById(id), KEY='wurd-daily-planner-v1';
 const pad=n=>String(n).padStart(2,'0');
@@ -1507,9 +1507,21 @@ const academyNames={python:'Python Code Reader',atari:'Atari 800XL Assembly',pri
 // Exactly the same Monday–Sunday academy rotation used by Learning Center v3.4.
 const academies=[['python'],['entrepreneurship','electronics'],['atari'],['flashcards','creativity'],['blackjack'],['realestate','entrepreneurship'],['printing','chess']];
 const workout=['Back + Biceps','Acceleration + Mobility','Chest + Triceps','Punching Technique + Speed','Legs + Shoulders + Light Arms','Recovery + Mobility','Weekend Recovery'];
+// Reflects the existing SKILL_SCHEDULE in Daily Brain & Skills Training (Mon=0, Sun=6).
+// This schedule is listed separately from the Learning Center's academies.
+const brainSessions=[
+ [{name:'Typing',minutes:20}],
+ [{name:'Speech',minutes:20}],
+ [{name:'Memory',minutes:15}],
+ [{name:'Spanish',minutes:20}],
+ [{name:'Typing review',minutes:10},{name:'Speech review',minutes:10}],
+ [{name:'Memory review',minutes:10},{name:'Spanish review',minutes:10}],
+ [{name:'Reading Lab',minutes:15}]
+];
 const defaults=date=>{
  const d=dayOf(date),out=[{id:'base-workout',name:workout[d],target:'session',minutes:null},{id:'base-waist',name:'Smaller Waist Coach — daily habits',target:'smaller-waist-coach',minutes:null}];
  out.push({id:'base-madden',name:'Madden 27 — deliberate practice',target:'madden-training',minutes:25});
+ brainSessions[d].forEach((item,i)=>out.push({id:'base-brain-'+i,name:'Brain & Skills — '+item.name,target:'skills-training',minutes:item.minutes}));
  academies[d].forEach((c,i)=>out.push({id:'base-academy-'+i,name:academyNames[c]+' Academy',target:c,minutes:null}));
  out.push({id:'base-coach',name:'Coach-First Learning Challenge',target:'learning-coach',minutes:15});
  return out;
@@ -1549,6 +1561,7 @@ function openTask(t){
  // Match all three weekday selectors where available.
  if(t.target==='session'){const bs=$('cycle')?.querySelectorAll('button');if(bs&&bs[d])bs[d].click()}
  if(t.target==='madden-training'){const b=$('maddenDays')?.querySelector(`[data-madden-day="${d}"]`);b?.click()}
+ if(t.target==='skills-training'){const b=$('skillDays')?.querySelector(`[data-brain-day="${d}"]`);b?.click()}
  if(t.target==='learning-center'){const b=$('learningWeekGrid')?.querySelectorAll('button')?.[d];b?.click()}
  if(academyNames[t.target]){
   const course=$('learningCourseGrid')?.querySelector(`button[data-course="${t.target}"]`);
