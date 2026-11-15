@@ -169,7 +169,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 .focus-mini{position:fixed;left:15px;bottom:16px;z-index:16;background:#133a49;border:1px solid #70ddc1;color:#f0ffff;border-radius:13px;box-shadow:0 7px 30px #000a;padding:10px 14px;font-weight:800;font-size:13px;cursor:pointer;max-width:min(360px,calc(100vw - 30px));text-align:left}
 .focus-panel .btn{font-size:13px}.focus-panel button:focus-visible,.focus-panel input:focus-visible,.focus-mini:focus-visible{outline:2px solid #f2ce7b;outline-offset:2px}
 @media(max-width:600px){.focus-fields{grid-template-columns:1fr 1fr}.focus-fields label:first-child{grid-column:1/-1}.focus-panel{padding:12px}.focus-mini{bottom:8px}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.2</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.4</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 
 <section class="panel" id="daily-planner" aria-label="Daily to-do planner">
  <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v4.2</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
@@ -186,9 +186,11 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
   <div class="focus-progress" role="progressbar" aria-label="Focused time achieved" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="focusProgress"><div id="focusFill"></div></div>
   <p class="focus-caption" id="focusSummary">0 of 15 focused minutes · 0 minutes of breaks</p>
   <div class="btnrow"><button class="btn primary" type="button" id="focusStart">▶ Start focus</button><button class="btn secondary" type="button" id="focusPause">Pause</button><button class="btn secondary" type="button" id="focusSkip">Skip break</button><button class="btn secondary" type="button" id="focusReset">Reset this activity's timer</button><button class="btn secondary" type="button" id="focusSound">🔊 Test alert</button></div>
+  <label class="focus-caption" style="display:flex;align-items:center;gap:9px;margin:12px 0"><input id="focusKeepAwake" type="checkbox" checked style="width:20px;height:20px;accent-color:#70ddbe"> Keep phone screen awake during focus and breaks (where supported)</label>
+  <p id="focusWakeStatus" class="focus-caption" role="status">Screen-awake protection activates when you start the timer. Keep the page visible.</p>
   <div class="btnrow" style="margin-top:12px"><button class="btn secondary" id="focusBackTask" type="button">↗ Go to activity</button><button class="btn secondary" id="focusBackTodo" type="button">↑ To-Do List</button></div>
   <p id="focusStatus" class="focus-caption" role="status" style="margin:12px 0 0">A break begins automatically after each focus block. After a break, start your next focus block when you're ready. The existing exercise-set rest timer is separate.</p>
-  <p class="focus-caption">Focus minutes are saved in this browser, separate from your existing cloud-synced To-Do checkmarks. Keep this page open for sound alerts; browser background restrictions may delay them.</p>
+  <p class="focus-caption">Focus minutes are saved in this browser, separate from your existing cloud-synced To-Do checkmarks. The screen-awake option requires browser support and a visible HTTPS page. If you lock your phone or switch apps, alarms can still be delayed or silenced. For dependable screen-off alarms, use your phone’s Clock app.</p>
  </section>
  <div class="btnrow" style="margin-top:13px"><button type="button" class="btn primary" id="todoAdd">＋ Add activity anywhere</button><button type="button" class="btn secondary" id="todoNextTask">Go to next unfinished ↗</button><button type="button" class="btn secondary" id="todoRestore">Restore default tasks</button><button type="button" class="btn secondary" id="todoExport">Export planner backup</button><button type="button" class="btn secondary" id="todoImportButton">Import planner backup</button><input type="file" id="todoImportFile" accept=".json,application/json" class="hide"></div>
  <form class="todo-form hide" id="todoForm"><h3 id="todoFormTitle">Add an activity</h3><div class="todo-form-grid"><label>Activity name<input id="todoName" maxlength="130" required placeholder="e.g. Cut the grass"></label><label>Repeat<select id="todoRepeat"><option value="once">This date only</option><option value="daily">Every day</option><option value="weekly">Every week on this weekday</option></select></label><label>Place in the list<select id="todoPosition"></select></label></div>
@@ -1835,7 +1837,18 @@ const safe=(n,lo,hi,fallback)=>{n=Number(n);return Number.isFinite(n)?Math.max(l
 const stamp=()=>Date.now();
 const pad=n=>String(n).padStart(2,'0');
 const display=s=>`${pad(Math.floor(Math.max(0,s)/60))}:${pad(Math.ceil(Math.max(0,s))%60)}`;
-let data={records:{},settings:{block:5,rest:2}},active=null,lastTick=0,interval=null,audio=null;
+let data={records:{},settings:{block:5,rest:2}},active=null,lastTick=0,interval=null,audio=null,wakeLock=null;
+let keepAwake=localStorage.getItem('wurd-focus-keep-awake')!=='false';
+$('focusKeepAwake').checked=keepAwake;
+function wakeStatus(t){$('focusWakeStatus').textContent=t}
+async function releaseWake(){const lock=wakeLock;wakeLock=null;if(lock){try{await lock.release()}catch{}}}
+async function requestWake(){
+ if(!keepAwake||!active?.running||document.hidden)return;
+ if(!('wakeLock' in navigator)){wakeStatus('This browser does not support keeping the screen awake. Use your phone Clock app for screen-off alarms.');return}
+ if(wakeLock)return;
+ try{const lock=await navigator.wakeLock.request('screen');if(!active?.running||!keepAwake||document.hidden){await lock.release();return}wakeLock=lock;wakeStatus('✓ Screen awake while this page is visible. Do not lock the phone or switch apps.');lock.addEventListener('release',()=>{if(wakeLock===lock){wakeLock=null;wakeStatus('Screen-awake protection ended. Return to this page to restore it.')}})}
+ catch(e){wakeStatus('Screen-awake request blocked ('+(e?.name||'unsupported')+'). The phone may sleep; use Clock for dependable alarms.')}
+}
 try{const x=JSON.parse(localStorage.getItem(STORE)||'null');if(x&&typeof x==='object'){data.records=x.records&&typeof x.records==='object'?x.records:{};data.settings=x.settings||data.settings;active=x.active||null}}catch{}
 // Don't resume unobserved background time after a reload; require explicit start.
 if(active){active.running=false;active.left=safe(active.left,0,28800,300);active.spent=safe(active.spent,0,28800,0)}
@@ -1875,14 +1888,14 @@ function finishPhase(){active.running=false;active.left=0;sound();
   else if(active.rest>0){active.phase='break';active.left=active.rest*60;active.running=true;lastTick=stamp();notify('Focus block complete. Your break is starting now.')}
   else {active.phase='focus';active.left=blockSeconds();notify('Focus block complete. Start the next block when ready.')}
  }else if(active.phase==='break'){active.phase='focus';active.left=blockSeconds();notify('Break finished. Start the next focus block when ready.')}
- save();render();
+ save();render();if(!active.running)releaseWake();
 }
 function tick(){if(!active||!active.running)return;const now=stamp(),delta=Math.max(0,Math.min(28800,(now-lastTick)/1000));lastTick=now;
  let used=Math.min(active.left,delta);active.left=Math.max(0,active.left-used);
  if(active.phase==='focus'){const rec=record(),allowed=Math.max(0,goalSeconds()-rec.spent);used=Math.min(used,allowed);rec.spent=Math.min(goalSeconds(),rec.spent+used);if(rec.spent>=goalSeconds())active.left=0}
  if(active.left<=.01)finishPhase();else {save();render()}
 }
-function pause(){if(!active)return;tick();active.running=false;save();render()}
+function pause(){if(!active)return;tick();active.running=false;releaseWake();save();render()}
 function setConfig(){if(!active)return;const oldGoal=active.goal;active.goal=safe($('focusGoal').value,1,480,15);active.block=safe($('focusBlock').value,1,120,5);active.rest=safe($('focusBreak').value,0,60,2);data.settings={block:active.block,rest:active.rest};
  const rec=record();rec.goal=active.goal;
  if(rec.spent>=goalSeconds()){active.phase='done';active.running=false;active.left=0}
@@ -1912,9 +1925,10 @@ function openTask(t){if(active?.running)pause();const recKey=t.date+'::'+t.id,re
  $('focusPanel').classList.remove('hide');notify('Timer ready. Focus time counts toward this activity; breaks do not.');save();render();$('focusPanel').scrollIntoView({behavior:'smooth',block:'start'})
 }
 window.addEventListener('wurd:focus-task',e=>openTask(e.detail));
-$('focusStart').onclick=()=>{if(!active||active.running||active.phase==='done')return;active.running=true;lastTick=stamp();soundInit();save();render()};
+$('focusStart').onclick=()=>{if(!active||active.running||active.phase==='done')return;active.running=true;lastTick=stamp();soundInit();requestWake();save();render()};
 function soundInit(){try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume()}catch{}}
 $('focusPause').onclick=pause;
+$('focusKeepAwake').onchange=e=>{keepAwake=e.target.checked;try{localStorage.setItem('wurd-focus-keep-awake',String(keepAwake))}catch{}if(keepAwake){wakeStatus('Screen-awake enabled. Start the timer to activate it.');requestWake()}else{releaseWake();wakeStatus('Screen-awake disabled. The phone may suspend the timer if it sleeps.')}};
 $('focusSkip').onclick=()=>{if(!active||active.phase!=='break')return;pause();active.phase='focus';active.left=blockSeconds();notify('Break skipped. Start focus when ready.');save();render()};
 $('focusReset').onclick=()=>{if(!active||!confirm('Reset focused minutes for this activity and date? This does not change its To-Do checkmark.'))return;pause();data.records[key(active)]={spent:0,goal:active.goal};active.phase='focus';active.left=blockSeconds();notify('Timer reset for this activity.');save();render()};
 $('focusSound').onclick=sound;
@@ -1926,7 +1940,7 @@ $('focusMini').onclick=()=>{$('focusPanel').classList.remove('hide');$('focusPan
 $('focusBackTodo').onclick=()=>$('daily-planner').scrollIntoView({behavior:'smooth',block:'start'});
 $('focusBackTask').onclick=()=>{const row=[...$('todoList').querySelectorAll('.todo-entry')].find(el=>el.dataset.id===active?.id);if(row&&$('todoDate').value===active.date){const btn=row.querySelector('button[data-action="open"]');btn?.click()}else{notify('Choose this activity’s date in the To-Do List to open its page section.');$('daily-planner').scrollIntoView({behavior:'smooth'})}};
 // Use elapsed timestamps rather than relying on setInterval executing in background tabs.
-interval=setInterval(tick,250);document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});window.addEventListener('pagehide',()=>{tick();save()});
+interval=setInterval(tick,250);document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();requestWake()}else{tick();releaseWake()}});window.addEventListener('pagehide',()=>{tick();releaseWake();save()});
 if(active){if(active.phase==='focus'&&active.left<=0)active.left=blockSeconds();$('focusPanel').classList.remove('hide');render()}
 })();
 </script>
