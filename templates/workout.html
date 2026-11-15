@@ -212,7 +212,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
     <button class="btn secondary" type="button" id="soundtest">🔊 Test loud alert</button>
   </div>
   <div class="volume-settings"><span>🔊 Alert: <strong id="alarmvolumevalue">90%</strong></span><details><summary>Change alert volume</summary><div class="volume-options"><label for="alarmvolume">Alert volume</label><select id="alarmvolume"><option value="50">50%</option><option value="60">60%</option><option value="70">70%</option><option value="80">80%</option><option value="85">85%</option><option value="90">90%</option><option value="95">95%</option><option value="100">100%</option></select></div></details></div>
-  <p class="muted" style="font-size:12px;margin:4px 0 0">One short warning beep at 15 seconds. At zero the timer plays a louder three-chime alert and resets, ready for the next set. On a phone, keep the page visible and sound enabled for the most reliable alert.</p>
+  <p class="muted" style="font-size:12px;margin:4px 0 0">Two short warning beeps at 15 seconds. At zero the timer plays its existing louder three-chime alert and resets, ready for the next set. On a phone, keep the page visible and sound enabled for the most reliable alert.</p>
 </div><div id="exercises" class="exercises"></div><div id="historyToolbar" class="historybar hide"><div><strong>Finish this workout</strong><div class="muted" style="font-size:12px">Your sets save automatically as a draft. Finish & save to add a permanent history record.</div></div><div class="btnrow"><button class="btn primary" id="finishWorkout" type="button">✓ Finish &amp; save workout</button><button class="btn secondary hide" id="recoverLegacy" type="button">Restore older unsaved entries</button></div></div><p id="workoutSessionDate" class="muted" style="font-size:12px;margin:8px 0"></p><div id="historyPanel" class="historybar"><div class="sectiontitle">Saved workout history</div><div id="historyList" class="muted" style="margin-top:8px">No completed sessions yet.</div></div><div id="restpanel" class="hide"></div><div class="summary"><div class="stat"><strong id="settotal">0</strong><span>Sets checked off</span></div><div class="stat"><strong id="exerciseTotal">0</strong><span>Exercises today</span></div></div></section>
 
 
@@ -990,9 +990,18 @@ function ding(){
 }
 
 function warningBeep(){
- try{primeAudio();if(!audioContext)return;const ctx=audioContext,t=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();
- osc.type='sine';osc.frequency.setValueAtTime(660,t);gain.gain.setValueAtTime(.0001,t);gain.gain.linearRampToValueAtTime(.22*alarmVolume/100,t+.025);gain.gain.exponentialRampToValueAtTime(.0001,t+.35);
- osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+.36);
+ try{
+  primeAudio();if(!audioContext)return;
+  const ctx=audioContext,now=ctx.currentTime,level=alarmVolume/100;
+  // Two distinct warning beeps 15 seconds before the exercise rest ends.
+  [0,.33].forEach(offset=>{
+   const osc=ctx.createOscillator(),gain=ctx.createGain(),t=now+offset;
+   osc.type='sine';osc.frequency.setValueAtTime(660,t);
+   gain.gain.setValueAtTime(.0001,t);
+   gain.gain.linearRampToValueAtTime(.22*level,t+.025);
+   gain.gain.exponentialRampToValueAtTime(.0001,t+.24);
+   osc.connect(gain);gain.connect(ctx.destination);osc.start(t);osc.stop(t+.25);
+  });
  }catch(e){console.warn('Rest warning sound unavailable',e)}
 }
 function stopRest(){if(timer){clearInterval(timer);timer=null}restEnd=0;restWarned=false;remaining=restDuration;timerUi()}
@@ -1836,7 +1845,25 @@ function record(){const k=key(active);return data.records[k]||(data.records[k]={
 function goalSeconds(){return safe(active?.goal,1,480,15)*60}
 function blockSeconds(){return Math.min(safe(active.block,1,120,5)*60,Math.max(0,goalSeconds()-record().spent))}
 function notify(message){$('focusStatus').textContent=message}
-function sound(){try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();const now=audio.currentTime;[0,.18,.36].forEach((dt,i)=>{const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=i===2?880:660;g.gain.setValueAtTime(.0001,now+dt);g.gain.exponentialRampToValueAtTime(.18,now+dt+.015);g.gain.exponentialRampToValueAtTime(.0001,now+dt+.14);o.connect(g);g.connect(audio.destination);o.start(now+dt);o.stop(now+dt+.15)})}catch{}}
+function sound(){
+ try{
+  audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+  if(audio.state==='suspended')audio.resume().catch(()=>{});
+  const now=audio.currentTime;
+  // Five stronger, clearly separated beeps for both Test Alert and phase completion.
+  // Browser/device/system volume determines the final maximum loudness.
+  [0,.33,.66,.99,1.32].forEach((dt,i)=>{
+   const o=audio.createOscillator(),g=audio.createGain(),t=now+dt;
+   o.type='square';o.frequency.setValueAtTime(i===4?990:880,t);
+   g.gain.setValueAtTime(.0001,t);
+   g.gain.linearRampToValueAtTime(.34,t+.015);
+   g.gain.setValueAtTime(.34,t+.14);
+   g.gain.exponentialRampToValueAtTime(.0001,t+.22);
+   o.connect(g);g.connect(audio.destination);o.start(t);o.stop(t+.23);
+  });
+  if(navigator.vibrate)navigator.vibrate([180,120,180,120,180]);
+ }catch(e){console.warn('Focus timer alert unavailable',e)}
+}
 function markCompleted(){if(!active)return;const sameDay=$('todoDate')?.value===active.date;
  if(!sameDay){notify('Focus goal reached! Switch to the activity date in To-Do to check it off.');return}
  const row=[...$('todoList').querySelectorAll('.todo-entry')].find(el=>el.dataset.id===active.id),check=row?.querySelector('input[data-action="done"]');
