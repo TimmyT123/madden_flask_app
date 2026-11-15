@@ -132,7 +132,27 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 .todo-floating{position:fixed;right:16px;bottom:18px;background:#153a44;border:1px solid #6bd8bd;border-radius:999px;padding:12px 15px;z-index:10;box-shadow:0 6px 25px #0008;display:none}
 .todo-floating.show{display:block}.todo-entry button:focus-visible,.todo-form :focus-visible,.todo-date:focus-visible{outline:2px solid #f2ce7b;outline-offset:2px}
 @media(max-width:650px){.todo-form-grid{grid-template-columns:1fr}.todo-entry{align-items:flex-start;flex-wrap:wrap}.todo-actions{margin-left:30px}.todo-nav{width:100%}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 3.7</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+
+/* v3.8: actionable 12-week Smaller Waist program */
+.waist-program{border:1px solid #488d85;background:#102b38;border-radius:15px;padding:16px;margin:18px 0}
+.waist-program .wp-top{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.waist-program .wp-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin:13px 0}
+.waist-program .wp-controls label{color:#b9d5e1;font-size:12px}
+.waist-program input[type=date],.waist-program select{display:block;color:#fff;background:#0b2130;border:1px solid #54788c;border-radius:9px;padding:9px;min-height:39px}
+.waist-program .wp-meter{height:11px;border-radius:10px;background:#09212d;overflow:hidden;margin:12px 0}
+.waist-program .wp-meter>div{height:100%;background:#6ed9bb;transition:width .2s}
+.wp-tasks{display:grid;gap:9px;margin-top:13px}
+.wp-task{background:#193447;border:1px solid #42637a;border-radius:11px;padding:12px}
+.wp-task.completed{border-color:#438f7a;background:#163d37}
+.wp-task label{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.wp-task input{width:20px;height:20px;accent-color:#77e1c0;flex:none;margin-top:2px}
+.wp-task b{color:#f0f8ff}.wp-task p{margin:5px 0 0 30px;font-size:13px;color:#c3d8e4}
+.wp-week-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:12px 0}
+.wp-week-grid button{color:#dcecf5;background:#183649;border:1px solid #46677b;border-radius:8px;padding:8px 3px;font-size:12px}
+.wp-week-grid button.active{background:#23665b;border-color:#82e3c8}
+.wp-advice{font-size:13px;color:#c5dce5;line-height:1.55}
+@media(max-width:600px){.wp-week-grid{grid-template-columns:repeat(4,1fr)}.waist-program{padding:12px}}
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 3.8</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 
 <section class="panel" id="daily-planner" aria-label="Daily to-do planner">
  <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v3.7</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
@@ -168,7 +188,17 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 
 
 <section class="panel waist-panel" id="smaller-waist-coach" aria-label="Smaller Waist Coach">
-  <div class="headrow"><div><div class="sectiontitle">12-week health and fitness project · v1.0</div><h2>🎯 Smaller Waist Coach</h2><p class="muted" style="font-size:13px;margin:5px 0">Your starting pattern: a mix of soft and firm abdominal fat, building gradually over several years. Reduce overall body fat, maintain muscle, and check your waist trend—not just the scale.</p></div><span class="pill green">Weekly check-in</span></div>
+  <div class="headrow"><div><div class="sectiontitle">12-week health and fitness project · v2.0</div><h2>🎯 Smaller Waist Coach</h2><p class="muted" style="font-size:13px;margin:5px 0">Your starting pattern: a mix of soft and firm abdominal fat, building gradually over several years. Reduce overall body fat, maintain muscle, and check your waist trend—not just the scale.</p></div><span class="pill green">Weekly check-in</span></div>
+  <div id="waistProgram" class="waist-program" aria-label="Your 12 week daily waist program">
+    <div class="wp-top"><div><div class="sectiontitle">Your step-by-step daily coach · 12 weeks</div><h3 style="margin:6px 0" id="wpHeading">Today's plan</h3><p class="muted" id="wpStage" style="font-size:13px;margin:3px 0"></p></div><span class="pill green" id="wpCount">0/6 done</span></div>
+    <div class="wp-controls"><label>Program starts on<input type="date" id="wpStart" aria-label="Program start date"></label><label>View a day<input type="date" id="wpDate" aria-label="Plan date"></label><div class="btnrow"><button type="button" class="btn secondary" id="wpToday">Today</button><button type="button" class="btn secondary" id="wpPrev">← Day</button><button type="button" class="btn secondary" id="wpNext">Day →</button></div></div>
+    <div class="wp-meter"><div id="wpFill" style="width:0%"></div></div>
+    <p class="wp-advice" id="wpFocus"></p>
+    <details><summary style="cursor:pointer;color:#9eead1;font-weight:700">Choose a program week</summary><div class="wp-week-grid" id="wpWeeks"></div></details>
+    <div class="wp-tasks" id="wpTasks"></div>
+    <p class="wp-advice" id="wpStatus" role="status">Check off a task when you finish it. Your checks stay saved for that date.</p>
+    <div class="notice" style="margin-bottom:0"><strong>How to use this:</strong> These are example meals, not a strict diet. Swap comparable foods that you enjoy. No food is forbidden. Use water or unsweetened drinks most of the time. Adjust portions to your hunger and progress. Exercise should feel manageable, and rest counts.</div>
+  </div>
   <div class="waist-grid"><div class="waist-stat"><strong id="waistLatest">—</strong><small>Latest waist (in)</small></div><div class="waist-stat"><strong id="waistChange">—</strong><small>Change since first entry</small></div><div class="waist-stat"><strong id="waistEntries">0</strong><small>Measurements recorded</small></div></div>
   <div class="notice">Measure around your belly button, standing relaxed after a normal exhale. Check about once a week under similar conditions. Aim for gradual, sustainable progress; no spot reduction or crash dieting.</div>
   <h3>1. Weekly measurement</h3>
@@ -177,9 +207,11 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
   <div class="btnrow"><button type="button" class="btn primary" id="waistSave">✓ Save measurement</button><button type="button" class="btn secondary" id="waistCopy">Copy coaching check-in</button><button type="button" class="btn secondary" id="waistExport">Export waist backup</button><button type="button" class="btn secondary" id="waistImportBtn">Import waist backup</button><input id="waistImport" class="hide" type="file" accept=".json,application/json"></div>
   <p id="waistStatus" class="muted" style="font-size:12px" role="status">Measurements and habits save locally in this browser. Export a backup to move them between devices; this section does not join the existing workout cloud sync.</p>
   <details><summary>Show measurement history</summary><div class="waist-history" id="waistHistory"></div></details>
+  <details><summary style="cursor:pointer;color:#9eead1;font-weight:700;margin-top:18px">Optional: original daily habit checkboxes</summary>
   <h3 style="margin-top:22px">2. Daily habits — check what you achieved today</h3>
   <div class="waist-habits"><label><input type="checkbox" data-waist-habit="produce">Included fruit or vegetables in meals</label><label><input type="checkbox" data-waist-habit="protein">Included satisfying protein sources</label><label><input type="checkbox" data-waist-habit="movement">Completed planned movement / cardio</label><label><input type="checkbox" data-waist-habit="strength">Strength session (if scheduled)</label><label><input type="checkbox" data-waist-habit="drink">Limited sugary or alcoholic drinks</label><label><input type="checkbox" data-waist-habit="sleep">Made time for sufficient sleep</label></div><p class="muted" style="font-size:12px">Not every habit is needed every day (especially strength). This is a behavior guide, not a scorecard for perfection. Today’s checkboxes are saved locally.</p>
-  <h3 style="margin-top:22px">3. Training and coaching plan</h3>
+  </details>
+  <h3 style="margin-top:22px">3. Training and coaching guidance</h3>
   <div class="skill-grid"><div class="skill-card"><h3>Mon / Wed / Fri · Workout days</h3><p>Use the strength sessions already in this page. Add manageable elliptical or bike time when appropriate, building up gradually rather than duplicating or replacing existing workouts.</p></div><div class="skill-card"><h3>Tue / Thu / Sat · Easy activity</h3><p>Walk or cycle at a comfortable brisk pace for 20–30 minutes if recovery allows. Your Thursday boxing session also counts as exercise; adjust activity around it.</p></div><div class="skill-card"><h3>Core · 2–3 short sessions</h3><p>Try bird dogs, dead bugs, and short modified planks. These help strength and stability; they do not selectively burn belly fat.</p></div><div class="skill-card"><h3>Food · One change at a time</h3><p>Start with protein and produce, sensible portions, and fewer liquid calories. We’ll personalize meals based on your measurements and actual eating routine.</p></div></div>
   <div class="notice"><strong>Coach challenge:</strong> What is one eating or drinking habit you could change for seven days without feeling deprived? Choose it, test it, and tell me what happened. Use “Copy coaching check-in” to bring your numbers and reflections into our conversation.</div>
   <p class="muted" style="font-size:12px">If your stomach grows rapidly, becomes painful or unusually tense, or you experience unexplained symptoms, seek medical evaluation instead of treating it as ordinary fat gain.</p>
@@ -1570,6 +1602,83 @@ const floating=document.createElement('a');floating.href='#daily-planner';floati
 if('IntersectionObserver' in window){const obs=new IntersectionObserver(entries=>{floating.classList.toggle('show',!entries[0].isIntersecting&&window.scrollY>250)},{threshold:0});obs.observe($('daily-planner'))}
 else window.addEventListener('scroll',()=>floating.classList.toggle('show',window.scrollY>650),{passive:true});
 render();
+})();
+</script>
+
+<script>
+/* v3.8: self-contained daily Waist Coach plan; saved separately from legacy measurements and planner */
+(()=>{
+ const $=id=>document.getElementById(id), key='wurd_waist_program_v2';
+ const pad=n=>String(n).padStart(2,'0');
+ const local=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+ const parse=s=>{const a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2],12)};
+ const add=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return local(d)};
+ const diff=(a,b)=>Math.round((parse(a)-parse(b))/86400000);
+ const today=()=>local(new Date());
+ const safeLoad=()=>{try{const x=JSON.parse(localStorage.getItem(key));return x&&typeof x==='object'?x:{}}catch{return {}}};
+ const state=safeLoad();state.start=/^\d{4}-\d{2}-\d{2}$/.test(state.start||'')?state.start:today();state.done=state.done&&typeof state.done==='object'&&!Array.isArray(state.done)?state.done:{};
+ let selected=today();
+ const save=()=>{try{localStorage.setItem(key,JSON.stringify({start:state.start,done:state.done}))}catch{$('wpStatus').textContent='Could not save on this browser. Check storage permissions.'}};
+ const meals=[
+ ['2 eggs, whole-grain toast and berries','Turkey or hummus sandwich, side salad and fruit','Baked chicken, vegetables and a moderate portion of rice'],
+ ['Plain Greek yogurt with berries and oats','Bean-and-chicken bowl with peppers, lettuce and salsa','Fish, roasted vegetables and a small baked potato'],
+ ['Oatmeal, fruit and a side of yogurt','Tuna or chickpea wrap with carrots','Lean beef or tofu stir-fry with mixed vegetables'],
+ ['Eggs with spinach, plus toast','Leftover chicken/bean salad and a piece of fruit','Turkey chili or lentil chili with vegetables'],
+ ['Greek yogurt, banana and walnuts','Grilled chicken or tofu sandwich with tomato and greens','Salmon or beans, broccoli and brown rice'],
+ ['Scrambled eggs, salsa and a corn tortilla','Bean soup with whole-grain bread and a side salad','Homemade burger or veggie burger, vegetables and oven potatoes'],
+ ['Whole-grain toast with peanut butter, fruit and yogurt','Chicken, egg or tofu salad wrap','Roast chicken or lentils with vegetables and sweet potato']
+ ];
+ const stages=[
+ {label:'Weeks 1–2 · Set the foundation',focus:'Find a manageable rhythm. Prepare simple meals and add comfortable activity. Start below your current limits; you do not need to make every day perfect.',mins:[10,15,15,15,15,20,15]},
+ {label:'Weeks 3–4 · Build consistency',focus:'Keep protein and vegetables appearing regularly and try slightly longer comfortable movement. Prioritize consistency over intensity.',mins:[15,20,20,20,20,25,20]},
+ {label:'Weeks 5–6 · Improve endurance',focus:'Practice the talk test: you can still speak in sentences during moderate cardio. Keep workouts sustainable.',mins:[20,25,25,25,25,30,20]},
+ {label:'Weeks 7–8 · Strengthen the routine',focus:'Maintain resistance sessions and build toward more weekly movement as recovery allows. Swap an activity for a walk when sore.',mins:[20,30,25,30,25,30,25]},
+ {label:'Weeks 9–10 · Make it automatic',focus:'Aim toward the general 150-minute weekly moderate-activity guideline if your fitness and recovery allow; boxing can count.',mins:[25,30,30,30,25,35,25]},
+ {label:'Weeks 11–12 · Keep what works',focus:'Consolidate a routine you can maintain after week 12. Review waist trends, energy, hunger, and workout performance.',mins:[25,30,30,30,30,35,25]}
+ ];
+ const names=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+ const strength=d=>d===1||d===3||d===5;
+ function tasks(date,week){
+  const day=parse(date).getDay(),phase=stages[Math.min(5,Math.floor((week-1)/2))],menu=meals[day],c=phase.mins[day];
+  const exercise=strength(day)?
+   {title:'Strength workout + optional easy movement',detail:`Complete your existing ${names[day]} strength workout above. If you feel recovered, add ${Math.max(5,Math.round(c/2))} minutes easy bike or elliptical. Do not repeat the entire strength workout here.`}:
+   day===4?{title:'Boxing + recovery',detail:`Do your scheduled Thursday boxing session. If it is already demanding, skip extra cardio; otherwise an optional ${Math.min(15,c)}-minute easy walk is enough.`}:
+   {title:`${c} minutes of walking, cycling or elliptical`,detail:'Use a conversational pace; split into 2 shorter sessions if easier. Saturday/Sunday can be gentle recovery days. If you are not ready for this duration, do less.'};
+  const extras=day===0?
+   {title:'Weekly waist check (once per week)',detail:'Measure around the belly button, relaxed after a normal exhale, at roughly the same time. Enter the result in Weekly Measurement below. Track the trend, not daily changes.'}:
+   {title:'Recovery + sleep plan',detail:'Set a bedtime that allows about 7–9 hours of sleep. If you are sore, reduce activity. Consistency is more important than a perfect day.'};
+  return [
+   {id:'breakfast',title:'Breakfast — '+menu[0],detail:'Choose a portion that satisfies you. Protein examples: eggs, plain Greek yogurt, beans, tofu or nut butter (which also contains fat).'},
+   {id:'lunch',title:'Lunch — '+menu[1],detail:'Include some vegetables or fruit and a satisfying protein source such as chicken, tuna, tofu, beans or lentils.'},
+   {id:'dinner',title:'Dinner — '+menu[2],detail:'A practical plate: roughly half vegetables, one quarter protein and one quarter grains or starchy food. Adjust as needed.'},
+   {id:'movement',...exercise},
+   {id:'drinks',title:'Drinks and snacks — make one helpful choice',detail:'Choose water, sparkling water or an unsweetened drink for your usual drink. If hungry, try fruit with yogurt, a boiled egg or a small portion of nuts. Alcohol is optional, not an everyday target.'},
+   {id:'recovery',...extras}
+  ];
+ }
+ function render(){
+  const elapsed=diff(selected,state.start),week=Math.max(1,Math.min(12,Math.floor(Math.max(0,elapsed)/7)+1)),future=elapsed>=84,before=elapsed<0;
+  const phase=stages[Math.min(5,Math.floor((week-1)/2))];
+  const day=parse(selected).getDay();let arr=tasks(selected,week);
+  const checked=state.done[selected]||{};
+  const n=arr.filter(t=>checked[t.id]).length;
+  $('wpStart').value=state.start;$('wpDate').value=selected;
+  $('wpHeading').textContent=`${names[day]}, ${parse(selected).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · Week ${week} of 12`;
+  $('wpStage').textContent=before?'Before your start date · Preview':future?'Program completed · Maintenance preview':phase.label;
+  $('wpCount').textContent=`${n}/${arr.length} done`;$('wpFill').style.width=(100*n/arr.length)+'%';
+  $('wpFocus').textContent=phase.focus+(future?' You have finished the 12-week period. Continue the habits that work; choose a new start date to restart.':'');
+  $('wpWeeks').replaceChildren();
+  for(let i=1;i<=12;i++){const b=document.createElement('button');b.type='button';b.textContent='Week '+i;b.className=i===week?'active':'';b.onclick=()=>{selected=add(state.start,(i-1)*7);render()};$('wpWeeks').append(b)}
+  $('wpTasks').replaceChildren();
+  arr.forEach(t=>{const row=document.createElement('div');row.className='wp-task'+(checked[t.id]?' completed':'');const label=document.createElement('label'),box=document.createElement('input'),line=document.createElement('span'),title=document.createElement('b'),detail=document.createElement('p');box.type='checkbox';box.checked=!!checked[t.id];box.setAttribute('aria-label','Completed: '+t.title);title.textContent=t.title;detail.textContent=t.detail;line.append(title);label.append(box,line);row.append(label,detail);box.onchange=()=>{const v=state.done[selected]||{};v[t.id]=box.checked;state.done[selected]=v;save();render()};$('wpTasks').append(row)});
+  $('wpStatus').textContent=`${n} of ${arr.length} daily actions complete. Checks are stored on this browser for ${selected}. Meal examples are flexible.`;
+ }
+ $('wpDate').onchange=e=>{if(e.target.value){selected=e.target.value;render()}};
+ $('wpStart').onchange=e=>{if(!e.target.value)return;state.start=e.target.value;save();render()};
+ $('wpToday').onclick=()=>{selected=today();render()};
+ $('wpPrev').onclick=()=>{selected=add(selected,-1);render()};
+ $('wpNext').onclick=()=>{selected=add(selected,1);render()};
+ save();render();
 })();
 </script>
 </body></html>
