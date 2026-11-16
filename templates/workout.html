@@ -274,6 +274,15 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
  <p class="coach-muted">Coach progress is stored in this browser separately from the workout/academy cloud sync. Use Export/Import to move it between devices. Your existing courses and weekly schedule remain unchanged. This is a structured offline coach—not a connected conversational AI.</p>
 </section>
 <div id="learningCourses">
+<section class="panel academy-shell learning-inactive" id="glarry-piano-academy" aria-label="Glarry Piano Academy">
+ <div class="academy-controls"><div><div class="sectiontitle">Music · USB-MIDI interactive practice</div><h2 style="margin-top:7px">🎹 Glarry Piano Academy</h2><p class="muted">Practice note recognition, timing, and the opening of Für Elise with your connected Glarry 88-key keyboard.</p></div><button class="btn primary" id="toggleGlarryPianoAcademy" type="button" aria-expanded="false" aria-controls="glarryPianoAcademyContent">Open Glarry Piano Academy ↓</button></div>
+ <div id="glarryPianoAcademyContent" class="hide">
+  <div class="notice"><strong>Before you start:</strong> Connect the Glarry by USB, open the academy, and choose GENERAL as your MIDI input if prompted. Use Chrome on your laptop over HTTPS.</div>
+  <a class="btn primary" href="/glarry_piano_academy" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none">🎹 Launch interactive piano trainer ↗</a>
+  <p class="muted" style="font-size:12px">The trainer opens in a separate tab for more reliable MIDI permission and input detection. This page keeps your existing Learning Center and daily to-do progress.</p>
+ </div>
+ <div class="todo-return"><a href="#daily-planner">↑ Back to daily to-do list</a></div>
+</section>
 <section class="panel academy-shell learning-inactive" id="entrepreneurship-academy" aria-label="Entrepreneurship Academy">
  <div class="academy-controls"><div><div class="sectiontitle">Business ownership · Build, buy or franchise</div><h2 style="margin-top:7px">🚀 Entrepreneurship Academy</h2><p class="muted">Eight practical lessons, startup and acquisition financial calculators, franchise due diligence, a business decision lab and an opportunity journal.</p></div><button class="btn primary" id="toggleEntrepreneurshipAcademy" type="button" aria-expanded="false" aria-controls="entrepreneurshipAcademyContent">Open Entrepreneurship Academy ↓</button></div>
  <div id="entrepreneurshipAcademyContent" class="hide"><iframe id="entrepreneurshipAcademyFrame" class="learning-frame entrepreneurship-frame" title="Interactive Entrepreneurship Academy" loading="lazy" referrerpolicy="no-referrer" srcdoc="&lt;!doctype html&gt;&lt;html lang=&quot;en&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;&lt;title&gt;Entrepreneurship Academy | Build, Buy or Franchise&lt;/title&gt;&lt;style&gt;
@@ -1394,7 +1403,8 @@ onAuthStateChanged(auth,u=>{begin(u)});
   electronics:{id:'electronics-academy',label:'Electronics',icon:'⚡',toggle:'toggleElectronicsAcademy'},
   chess:{id:'chess-academy',label:'Chess',icon:'♟️',toggle:'toggleChessAcademy'},
   realestate:{id:'real-estate-academy',label:'Real Estate Investing',icon:'🏠',toggle:'toggleRealEstateAcademy'},
-  entrepreneurship:{id:'entrepreneurship-academy',label:'Entrepreneurship',icon:'🚀',toggle:'toggleEntrepreneurshipAcademy'}
+  entrepreneurship:{id:'entrepreneurship-academy',label:'Entrepreneurship',icon:'🚀',toggle:'toggleEntrepreneurshipAcademy'},
+  piano:{id:'glarry-piano-academy',label:'Glarry Piano Academy',icon:'🎹',toggle:'toggleGlarryPianoAcademy'}
  };
  // Each index is Monday..Sunday. Sessions are adjustable by revising this plan.
  const PLAN=[
@@ -1471,7 +1481,7 @@ onAuthStateChanged(auth,u=>{begin(u)});
  const slotId=(day,index)=>day+'-'+index;
  function selectCourse(which){
   selectedCourse=which;
-  if(window.learningCoachSelect)window.learningCoachSelect(which);
+  if(which!=='piano'&&window.learningCoachSelect)window.learningCoachSelect(which);
   for(const [code,meta] of Object.entries(COURSE)){
    const node=el(meta.id);node.classList.toggle('learning-inactive',code!==which);
   }
@@ -1604,12 +1614,12 @@ const categories=[
  ['skills-training','🧠 Brain & Skills Training','skills-training'],['learning-center','📚 Weekly Learning Center','learning-center'],
  ['learning-coach','🧩 Coach-First Challenge','learning-coach'],['madden-training','🎮 Madden 27 Training','madden-training'],
  ['python','🐍 Python Code Reader','python-code-reader-academy'],['atari','🕹️ Atari 800XL','atari-assembly-academy'],
- ['printing','🖨️ 3D Printing','printing-academy'],['blackjack','♠️ Blackjack Counting','blackjack-counting-academy'],
+ ['printing','🖨️ 3D Printing','printing-academy'],['piano','🎹 Glarry Piano Academy','glarry-piano-academy'],['blackjack','♠️ Blackjack Counting','blackjack-counting-academy'],
  ['flashcards','🗂️ Flashcards','flashcards-training'],['creativity','💡 Creativity & Invention','creativity-invention-academy'],
  ['electronics','⚡ Electronics','electronics-academy'],['chess','♟️ Chess','chess-academy'],
  ['realestate','🏠 Real Estate','real-estate-academy'],['entrepreneurship','🚀 Entrepreneurship','entrepreneurship-academy']
 ];
-const academyNames={python:'Python Code Reader',atari:'Atari 800XL Assembly',printing:'3D Printing',blackjack:'Blackjack Counting',flashcards:'Flashcards',creativity:'Creativity & Invention',electronics:'Electronics',chess:'Chess',realestate:'Real Estate Investing',entrepreneurship:'Entrepreneurship'};
+const academyNames={python:'Python Code Reader',atari:'Atari 800XL Assembly',printing:'3D Printing',blackjack:'Blackjack Counting',flashcards:'Flashcards',creativity:'Creativity & Invention',electronics:'Electronics',chess:'Chess',realestate:'Real Estate Investing',entrepreneurship:'Entrepreneurship',piano:'Glarry Piano Academy'};
 // Exactly the same Monday–Sunday academy rotation used by Learning Center v3.4.
 const academies=[['python'],['entrepreneurship','electronics'],['atari'],['flashcards','creativity'],['blackjack'],['realestate','entrepreneurship'],['printing','chess']];
 const workout=['Back + Biceps','Acceleration + Mobility','Chest + Triceps','Punching Technique + Speed','Legs + Shoulders + Light Arms','Recovery + Mobility','Weekend Recovery'];
@@ -1942,6 +1952,20 @@ $('focusBackTask').onclick=()=>{const row=[...$('todoList').querySelectorAll('.t
 // Use elapsed timestamps rather than relying on setInterval executing in background tabs.
 interval=setInterval(tick,250);document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();requestWake()}else{tick();releaseWake()}});window.addEventListener('pagehide',()=>{tick();releaseWake();save()});
 if(active){if(active.phase==='focus'&&active.left<=0)active.left=blockSeconds();$('focusPanel').classList.remove('hide');render()}
+})();
+</script>
+<script>
+/* Optional Glarry piano academy launcher. Standalone tab avoids MIDI access restrictions in an iframe. */
+(()=>{
+ const button=document.getElementById('toggleGlarryPianoAcademy');
+ const panel=document.getElementById('glarryPianoAcademyContent');
+ if(!button||!panel)return;
+ button.addEventListener('click',()=>{
+  const open=panel.classList.contains('hide');
+  panel.classList.toggle('hide',!open);
+  button.setAttribute('aria-expanded',String(open));
+  button.textContent=open?'Close Glarry Piano Academy ↑':'Open Glarry Piano Academy ↓';
+ });
 })();
 </script>
 </body></html>
