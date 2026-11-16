@@ -5279,6 +5279,12 @@ def reading():
 def flashcards():
     return render_template("flashcards.html")
 
+# --- Glarry Piano Academy ---
+@app.route("/glarry_piano_academy")
+@app.route("/glarry_piano_academy.html")
+def glarry_piano_academy():
+    return render_template("/glarry_piano_academy.html")
+
 
 if __name__ == '__main__':
     debug_mode = os.environ.get("FLASK_DEBUG", "0") == "1"
