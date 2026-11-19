@@ -172,7 +172,17 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 .learning-frame.xplane-frame{height:1160px}@media(max-width:740px){.learning-frame.xplane-frame{height:950px}}
 /* Madden topic manager v2 */
 .st-topic-list{display:grid;gap:9px;margin:12px 0}.st-topic{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;background:#172d3e;border:1px solid #3d6171;border-radius:11px;padding:12px}.st-topic-main{flex:1;min-width:220px}.st-topic-main strong{display:block;color:#edf9ff}.st-topic-main p{font-size:12px;line-height:1.45;margin:5px 0;color:#c0d6e4}.st-topic-main small{color:#8be0c8;font-size:11px}.st-topic .btn{padding:8px 10px;font-size:12px}.st-trainer #stTopicForm input,.st-trainer #stTopicForm select,.st-trainer #stTopicForm textarea{display:block;width:100%;background:#0b2032;border:1px solid #55748c;border-radius:9px;color:#fff;padding:10px;font:inherit}.st-trainer #stTopicForm textarea{min-height:75px;resize:vertical}@media(max-width:640px){.st-topic .btnrow{width:100%}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.6</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+
+/* Madden Skills Trainer catalog v4.8: isolated, uses existing topic storage. */
+.st-skill-catalog{border:1px solid #3b6676;background:#102839;border-radius:12px;padding:13px}
+.st-catalog-group{margin:13px 0;border-top:1px solid #345269;padding-top:9px}
+.st-catalog-group h4{margin:0 0 8px;color:#a3e8d8;font-size:14px}
+.st-catalog-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 4px;border-bottom:1px solid #284559}
+.st-catalog-row strong{font-size:13px;color:#f0f8ff}
+.st-catalog-row p{font-size:12px;margin:4px 0;color:#bfd2df}
+.st-catalog-row button{white-space:nowrap;flex-shrink:0;font-size:12px}
+@media(max-width:600px){.st-catalog-row{align-items:flex-start;flex-direction:column}.st-catalog-row button{width:100%}}
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.8</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 
 <section class="panel" id="daily-planner" aria-label="Daily to-do planner">
  <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v4.6</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
@@ -932,9 +942,15 @@ let remaining=300,running=false,lastTick=0,interval=null;function drawTimer(){$(
 </div>
 
 <div id="skillsTrainerCompanion" class="st-trainer" aria-label="Madden 27 practice topics">
-  <div class="headrow"><div><div class="sectiontitle">Madden 27 · Skills Trainer &amp; targeted practice</div><h3 style="margin:5px 0">🎯 My Madden Practice Topics</h3><p class="muted" style="font-size:13px;margin:5px 0">Start with Madden's built-in Skills Trainer. If a specific problem remains, practice it in Madden Practice mode. Build a custom webpage drill only when the game cannot train that skill effectively.</p></div><span class="pill green" id="stSessionCount">0 sessions logged</span></div>
-  <div class="notice"><strong>Practice sequence:</strong> ① Find the closest in-game Skills Trainer lesson → ② Test the skill without prompts → ③ Identify one issue → ④ Practice that issue in Madden Practice mode → ⑤ Record what worked and review later. <strong>Use the Universal Focus &amp; Break Timer above</strong> from the Madden daily to-do activity; no second timer here.</div>
+  <div class="headrow"><div><div class="sectiontitle">Madden 27 · Skills Trainer tutorials &amp; minigames</div><h3 style="margin:5px 0">🎯 My Madden Practice Topics</h3><p class="muted" style="font-size:13px;margin:5px 0">Use Madden 27's built-in Skills Trainer tutorials and minigames as your main training program. Choose drills below and record the lessons you learn.</p></div><span class="pill green" id="stSessionCount">0 sessions logged</span></div>
+  <div class="notice"><strong>Practice sequence:</strong> ① Learn the in-game tutorial or minigame → ② Repeat with a clear goal → ③ Try without prompts → ④ Record the cause of each mistake → ⑤ Review the same drill later. <strong>Use the Universal Focus &amp; Break Timer above</strong> from the Madden daily to-do activity; no second timer here.</div>
   <div class="btnrow" style="margin:12px 0"><button class="btn primary" id="stAddTopic" type="button">＋ Add practice topic</button><button class="btn secondary" id="stGoTimer" type="button">↗ Universal focus timer / To-Do</button></div>
+  <details id="stSkillCatalog" class="st-skill-catalog" style="margin:12px 0">
+    <summary style="cursor:pointer;color:#a4f4de;font-weight:800">📚 Skills Trainer tutorials &amp; minigames — choose drills to practice</summary>
+    <p class="st-stat">Choose from your 21 Skills Trainer tutorials/practices and six selected minigames. Select <strong>Add to my topics</strong> to track a lesson using the existing practice notebook. Defensive Line Mechanics remains an optional fundamentals overview.</p>
+    <div id="stSkillCatalogList"></div>
+    <p class="st-stat" id="stCatalogStatus" role="status">Recommended session: 5 minutes learning, 8 minutes repetition, 7 minutes game-like practice, 5 minutes review. Use the existing Universal Focus &amp; Break Timer.</p>
+  </details>
   <div class="notice" style="margin:10px 0"><strong>CPU lab:</strong> Find a repeatable AI tendency, test the same play at least 5 times, then change only one variable. Record both successes and failures. A lower-rated CPU can still punish late throws or unblocked pressure; do not assume a glitch.</div><div id="stTopicList" class="st-topic-list" aria-label="Editable Madden practice topics"></div>
   <form id="stTopicForm" class="todo-form hide" style="margin:12px 0"><h3 id="stTopicFormTitle">Add a practice topic</h3><label class="madden-note-label" for="stTopicName">Topic name</label><input id="stTopicName" type="text" maxlength="150" required placeholder="e.g. HB flat throw and catch"><label class="madden-note-label" for="stTopicDetail">What needs practice / coaching hypothesis</label><textarea id="stTopicDetail" maxlength="1500" placeholder="Describe the mistake and what you want to test"></textarea><label class="madden-note-label" for="stTopicCategory">Opponent / section</label><select id="stTopicCategory"><option value="human">Vs. Human Users</option><option value="cpu">Vs. CPU — AI Pattern Lab</option></select><label class="madden-note-label" for="stTopicMethod">Where to train it</label><select id="stTopicMethod"><option value="trainer">Madden Skills Trainer first</option><option value="practice">Madden Practice mode</option><option value="custom">Custom practice (only if needed)</option></select><div class="btnrow" style="margin-top:12px"><button class="btn primary" type="submit">Save topic</button><button class="btn secondary" id="stTopicCancel" type="button">Cancel</button></div></form>
   <div class="st-grid">
@@ -1916,6 +1932,43 @@ window.addEventListener('wurd:sync-remote',e=>{if(e.detail?.section!=='waistProg
  {id:'cpu-read',category:'cpu',name:'CPU offense — identify coverage and exploit space',detail:'Check safeties, corners, LB depth pre-snap; confirm post-snap. Compare flats, seams, drags and crossers against coverage; track the actual open window, not a claimed money play.',method:'practice'},
  {id:'cpu-defense',category:'cpu',name:'CPU defense — force predictable quarterback decisions',detail:'Compare Cover 3, Cover 4, man and pressure in repeated scenarios. Track checkdowns, scramble, sacks, completion rate, and coverage busted; vary one element at a time.',method:'practice'},
  {id:'cpu-playbook',category:'cpu',name:'CPU play lab — dependable three-play package',detail:'Choose one run, one fast pass, and one coverage-beater from Bills playbook. Record formation, defensive look, five repetitions each, yards/turnovers and counters when the CPU adjusts.',method:'practice'}];
+ const skillCatalog=[
+  {group:'Quarterback Mechanics · priority 1',items:[
+   ['Pass Leading Tutorial','Test placement, lead direction and defender leverage.'],
+   ['Throw on the Run Tutorial','Compare moving and planted throws; practice R2 release.'],
+   ['Play Action Abort Tutorial','Identify pressure and abort the play-action fake.'],
+   ['Playmaker Tutorial','Scramble, use L2 + right stick to redirect the nearest receiver into space, then throw.'],
+   ['Revamped Passing – Back Shoulder Pass Tutorial','Practice placing throws away from tight coverage; verify with Placement & Accuracy.'],
+   ['Revamped Passing – Pylon Pass Tutorial','Practice end-zone corner placement; verify with Placement & Accuracy.']]},
+  {group:'Receiver Mechanics · priority 2',items:[
+   ['Timing Based Catching Tutorial','Learn timing and recognize catch feedback.'],
+   ['Timing Based Catching Practice','Repeat catches at game speed, tracking successful timing.']]},
+  {group:'Coverage Mechanics · priority 2',items:[
+   ['Play Ball Tutorial','Time your attempt at the ball instead of chasing an animation.'],
+   ['Defensive Strafe Tutorial','Maintain positioning without overcommitting.'],
+   ['Defensive Crossover Tutorial','Practice changing directions in coverage.'],
+   ['Man Press Tutorial','Practice press timing and alignment.'],
+   ['Man Jostle Tutorial','Maintain position near a receiver.'],
+   ['Zone Chuck Tutorial','Learn contact and route disruption in zone coverage.'],
+   ['Coverage Crash Tutorial','Practice when to close on a pass.'],
+   ['Player Swap Tutorial','Select the intended defender without losing your angle.'],
+   ['Player Swap – Switch Stick Tutorial','Change defenders quickly and preserve coverage.']]},
+  {group:'Ballcarrier Mechanics · secondary',items:[
+   ['Juke Tutorial','Make a defender miss without unnecessary moves.'],
+   ['Spin Tutorial','Practice timing and spacing.'],
+   ['Steerable Spin Tutorial','Control the exit direction after a spin.'],
+   ['Combo Moves Tutorial','Link moves only when defender angles justify them.']]},
+  {group:'Defensive Line Mechanics · optional',items:[
+   ['Defensive Line Mechanics — Fundamentals','Survey the in-game defensive-line lessons when desired. Focus on understanding pass rush and run gaps; no weekly drill required.']]},
+  {group:'Minigames · selected',items:[
+   ['Two Minute Drill','Practice efficient late-game decisions, clock awareness, and scoring under time pressure.'],
+   ['Pocket Presence – All Out Blitz','Recognize incoming pressure and practice quick, controlled quarterback decisions.'],
+   ['Bucket Drop – Rapid Fire','Practice rapid, accurate ball placement; observe which throws lose accuracy.'],
+   ['Scramble Survive – Full House','With Josh Allen, escape before the pocket deadline, avoid two pursuing linemen, manage R2, and prioritize touchdown passes over +500 sideline markers.'],
+   ['Rushing Attack – Close Quarters','Practice reading short-space pursuit angles and choosing a purposeful ballcarrier move.'],
+   ['Option Attack','Study option decisions and learn when to keep or hand off as the drill permits.']]}
+ ];
+ function renderSkillCatalog(){const target=$('stSkillCatalogList');if(!target)return;target.replaceChildren();skillCatalog.forEach(group=>{const section=document.createElement('div');section.className='st-catalog-group';const heading=document.createElement('h4');heading.textContent=group.group;section.append(heading);group.items.forEach(([name,detail])=>{const r=document.createElement('div');r.className='st-catalog-row';const copy=document.createElement('div');const b=document.createElement('strong');b.textContent=name;const p=document.createElement('p');p.textContent=detail;copy.append(b,p);const button=document.createElement('button');button.type='button';button.className='btn secondary';const exists=topics.some(t=>t.name===name);button.textContent=exists?'Practice topic':'＋ Add to my topics';button.onclick=()=>{let found=topics.find(t=>t.name===name);if(!found){found={id:'skill-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),name,detail,method:'trainer',category:'human'};topics.push(found);saveTopics();render();renderSkillCatalog();}$('stFocus').value=found.id;chosen();$('stTutorial').value=name;$('stCatalogStatus').textContent='Selected: '+name+'. Log results below after your drill.';$('stFocus').scrollIntoView({behavior:'smooth',block:'center'});};r.append(copy,button);section.append(r)});target.append(section)});}
  const nameSafe=x=>String(x||'').slice(0,150);
  function readTopics(){try{const x=JSON.parse(localStorage.getItem(topicsKey));if(Array.isArray(x))return x.filter(t=>t&&typeof t.id==='string'&&typeof t.name==='string').slice(0,250).map(t=>({id:t.id,name:nameSafe(t.name),detail:String(t.detail||'').slice(0,1500),method:['trainer','practice','custom'].includes(t.method)?t.method:'trainer',category:t.category==='cpu'?'cpu':'human'}));}catch{}return defaults.map(x=>({...x,category:x.category||'human'}))}
  let topics=readTopics(),editing=null;
@@ -1947,7 +2000,7 @@ window.addEventListener('wurd:sync-remote',e=>{if(e.detail?.section!=='waistProg
  $('stCopy').onclick=async()=>{try{await navigator.clipboard.writeText(dataText());$('stStatus').textContent='Copied. Paste into ChatGPT or discuss in voice chat.'}catch{$('stStatus').textContent='Clipboard blocked; manually copy the observations instead.'}};
  $('stExport').onclick=()=>{const blob=new Blob([JSON.stringify({version:3,topics,records:records(),notebooks},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='madden-practice-topics-and-history.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)};
  $('stImportBtn').onclick=()=>$('stImport').click();$('stImport').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const raw=JSON.parse(await file.text());const r=Array.isArray(raw)?raw:raw.records,t=Array.isArray(raw)?null:raw.topics;if(raw.notebooks&&typeof raw.notebooks==='object'&&!Array.isArray(raw.notebooks)){notebooks={...notebooks,...Object.fromEntries(Object.entries(raw.notebooks).filter(([k,v])=>typeof k==='string'&&typeof v==='string'&&v.length<30000))};saveNotebooks();loadNotebook()}if(!Array.isArray(r)||r.length>10000||!r.every(x=>x&&typeof x.date==='string'&&typeof x.focus==='string'))throw Error('Invalid records');if(t!=null){if(!Array.isArray(t)||t.length>250||!t.every(x=>x&&typeof x.id==='string'&&typeof x.name==='string'))throw Error('Invalid topics');topics=[...topics,...t.filter(x=>!topics.some(y=>y.id===x.id)).map(x=>({id:x.id,name:nameSafe(x.name),detail:String(x.detail||'').slice(0,1500),method:['trainer','practice','custom'].includes(x.method)?x.method:'trainer',category:x.category==='cpu'?'cpu':'human'}))];saveTopics();render()}const all=[...records(),...r].filter((x,i,a)=>a.findIndex(y=>y.date===x.date&&y.focus===x.focus)===i);if(saveRecords(all)){$('stStatus').textContent='History imported; existing records retained.';renderHistory()}}catch{$('stStatus').textContent='Import failed: invalid Madden practice backup.'}e.target.value=''};
- render();chosen();renderHistory();
+ render();chosen();renderHistory();renderSkillCatalog();
 })();
 </script>
 <button type="button" class="focus-mini hide" id="focusMini" aria-label="Return to active focus timer"></button>
