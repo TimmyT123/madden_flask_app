@@ -172,10 +172,10 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 .learning-frame.xplane-frame{height:1160px}@media(max-width:740px){.learning-frame.xplane-frame{height:950px}}
 /* Madden topic manager v2 */
 .st-topic-list{display:grid;gap:9px;margin:12px 0}.st-topic{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;background:#172d3e;border:1px solid #3d6171;border-radius:11px;padding:12px}.st-topic-main{flex:1;min-width:220px}.st-topic-main strong{display:block;color:#edf9ff}.st-topic-main p{font-size:12px;line-height:1.45;margin:5px 0;color:#c0d6e4}.st-topic-main small{color:#8be0c8;font-size:11px}.st-topic .btn{padding:8px 10px;font-size:12px}.st-trainer #stTopicForm input,.st-trainer #stTopicForm select,.st-trainer #stTopicForm textarea{display:block;width:100%;background:#0b2032;border:1px solid #55748c;border-radius:9px;color:#fff;padding:10px;font:inherit}.st-trainer #stTopicForm textarea{min-height:75px;resize:vertical}@media(max-width:640px){.st-topic .btnrow{width:100%}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.5</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.6</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 
 <section class="panel" id="daily-planner" aria-label="Daily to-do planner">
- <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v4.2</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
+ <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v4.6</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
  <div class="todo-nav"><button type="button" class="btn secondary" id="todoPrevious" aria-label="Previous date">←</button><input type="date" class="todo-date" id="todoDate" aria-label="Plan date"><button type="button" class="btn secondary" id="todoNext" aria-label="Next date">→</button><button type="button" class="btn secondary" id="todoToday">Today</button></div></div>
  <div class="todo-stats"><span id="todoCompleted">0 / 0 completed</span><span id="todoRemaining">0 remaining</span><span id="todoPercentage">0%</span></div>
  <div class="todo-progress" role="progressbar" aria-label="Daily to-do progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="todoProgress"><div id="todoFill"></div></div>
@@ -199,7 +199,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
  <form class="todo-form hide" id="todoForm"><h3 id="todoFormTitle">Add an activity</h3><div class="todo-form-grid"><label>Activity name<input id="todoName" maxlength="130" required placeholder="e.g. Cut the grass"></label><label>Repeat<select id="todoRepeat"><option value="once">This date only</option><option value="daily">Every day</option><option value="weekly">Every week on this weekday</option></select></label><label>Place in the list<select id="todoPosition"></select></label></div>
  <div class="todo-form-grid" style="margin-top:10px"><label>Jump to a page activity (optional)<select id="todoTarget"></select></label><label>Minutes (optional)<input id="todoMinutes" type="number" min="1" max="480" placeholder="e.g. 20"></label></div>
  <div class="btnrow"><button type="submit" class="btn primary" id="todoSave">Save activity</button><button type="button" class="btn secondary" id="todoCancel">Cancel</button></div></form>
- <p class="todo-hint" id="todoStatus" role="status">Use ↑ ↓ to reorder tasks or ＋ on any row to insert exactly there. Changes and checkmarks save locally, then sync with your signed-in Google account.</p><p id="todoCloudStatus" class="todo-hint" role="status">☁ Checking cloud connection…</p>
+ <p class="todo-hint" id="todoStatus" role="status">Use ↑ ↓ to reorder tasks or ＋ on any row to insert exactly there. Checking or unchecking an activity saves locally and automatically updates your other signed-in devices when connected.</p><p id="todoCloudStatus" class="todo-hint" role="status">☁ Checking cloud connection…</p>
 </section>
 <section class="panel"><div class="topline"><div><div class="sectiontitle">Your weekly schedule</div><p style="font-size:13px;margin:6px 0">Today is selected automatically. Tap another weekday to view its plan. Tuesday builds acceleration; Friday adds a second, short sprint session after an initial adaptation period. Thursday is boxing. Weekends remain recovery days.</p></div><div class="btnrow"><button class="btn secondary" id="prev">← Previous</button><button class="btn primary" id="next">Next day →</button></div></div><div id="cycle" class="cycle"></div><div id="daytitle"></div></section>
 <section class="panel" id="cloudPanel" aria-label="Cloud synchronization">
@@ -1343,41 +1343,73 @@ const extraConfigs={
  dailyPlanner:{key:'wurd-daily-planner-v1',indicator:'todoCloudStatus',fallback:()=>({custom:[],done:{},order:{},hidden:{}})},
  waistProgram:{key:'wurd_waist_program_v2',indicator:'wpCloudStatus',fallback:()=>({start:new Date().toLocaleDateString('en-CA'),done:{}})}
 };
-let extraUser=null,extraListeners=[],extraReady={},extraPending={},extraWriting={},extraTimer={};
+let extraUser=null,extraListeners=[],extraReady={},extraPending={},extraWriting={},extraTimer={},extraWatchdog={},extraGeneration=0;
 function extraStatus(k,t){const el=document.getElementById(extraConfigs[k].indicator);if(el)el.textContent=t}
 function extraLocal(k){try{return JSON.parse(localStorage.getItem(extraConfigs[k].key))||extraConfigs[k].fallback()}catch{return extraConfigs[k].fallback()}}
 function extraEmit(k,v){window.dispatchEvent(new CustomEvent('wurd:sync-remote',{detail:{section:k,value:v}}))}
-async function extraWrite(k){if(!extraUser||!extraReady[k]||extraWriting[k]||!extraPending[k])return;
- const value=extraPending[k];delete extraPending[k];extraWriting[k]=true;
- try{await setDoc(doc(db,'users',extraUser.uid,'sections',k),{value,updatedAt:serverTimestamp()});extraStatus(k,'☁ ✓ Synced with your other devices')}
- catch(e){extraStatus(k,'⚠ Cloud sync failed: '+(e.code||e.message)+'. Saved on this device; try a new edit after fixing the connection.');console.error('Extra cloud sync',k,e)}
- finally{extraWriting[k]=false;if(extraPending[k]&&extraReady[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),1200)}}
+// Keep unsent edits across refreshes or interrupted mobile connections.
+function extraQueueKey(k,uid){return 'wurd-cloud-outbox-v46-'+uid+'-'+k}
+function extraSaveQueue(k,value){if(!extraUser)return;try{localStorage.setItem(extraQueueKey(k,extraUser.uid),JSON.stringify(value))}catch(e){console.warn('Cannot store cloud outbox',e)}}
+function extraRestoreQueue(k,uid){try{const v=localStorage.getItem(extraQueueKey(k,uid));return v?JSON.parse(v):null}catch{return null}}
+function extraClearQueue(k,uid,value){try{const key=extraQueueKey(k,uid);if(localStorage.getItem(key)===JSON.stringify(value))localStorage.removeItem(key)}catch(e){console.warn('Cannot clear cloud outbox',e)}}
+async function extraWrite(k){
+ if(!extraUser||!extraReady[k]||extraWriting[k]||!extraPending[k])return;
+ const uid=extraUser.uid,generation=extraGeneration,value=extraPending[k];
+ extraWriting[k]=true;
+ // Firestore waits for the server when offline; say so rather than displaying "Saving" indefinitely.
+ clearTimeout(extraWatchdog[k]);
+ extraWatchdog[k]=setTimeout(()=>{if(extraGeneration===generation&&extraWriting[k])extraStatus(k,'☁ Waiting for cloud connection… Saved here; will sync when online.')},6500);
+ try{
+  await setDoc(doc(db,'users',uid,'sections',k),{value,updatedAt:serverTimestamp()});
+  if(extraGeneration!==generation)return;
+  extraClearQueue(k,uid,value);
+  if(extraPending[k]===value)delete extraPending[k];
+  extraStatus(k,extraPending[k]?'☁ Saving newer changes…':'☁ ✓ Synced · Checks update on all signed-in devices');
+ }catch(e){
+  if(extraGeneration!==generation)return;
+  extraStatus(k,'⚠ Cloud sync failed: '+(e.code||e.message)+'. Saved here; retrying when connected.');
+  console.error('Extra cloud sync',k,e);
+ }finally{
+  clearTimeout(extraWatchdog[k]);
+  if(extraGeneration===generation){extraWriting[k]=false;if(extraPending[k]&&extraReady[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),2500)}}
+ }
 }
 window.addEventListener('wurd:sync-local',e=>{
  const k=e.detail?.section;if(!extraConfigs[k])return;
  extraPending[k]=e.detail.value;
  if(!extraUser){extraStatus(k,'☁ Saved on this device · Sign in above to sync');return}
+ extraSaveQueue(k,extraPending[k]);
  extraStatus(k,'☁ Saving changes…');
- if(extraReady[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),450)}
+ if(extraReady[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),250)}
 });
+window.addEventListener('online',()=>{for(const k of Object.keys(extraConfigs))if(extraPending[k]&&extraReady[k]&&!extraWriting[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),150)}});
 function startExtras(u){
+ extraGeneration++;
  for(const off of extraListeners)off();extraListeners=[];
- Object.values(extraTimer).forEach(clearTimeout);extraTimer={};extraReady={};extraWriting={};extraPending={};extraUser=u;
+ Object.values(extraTimer).forEach(clearTimeout);Object.values(extraWatchdog).forEach(clearTimeout);
+ extraTimer={};extraWatchdog={};extraReady={};extraWriting={};extraPending={};extraUser=u;
  if(!u){for(const k of Object.keys(extraConfigs))extraStatus(k,'☁ Local only · Sign in above with the same Google account on both devices');return}
  for(const k of Object.keys(extraConfigs)){
-  extraStatus(k,'☁ Connecting to cloud…');let first=true;const uid=u.uid;
-  const off=onSnapshot(doc(db,'users',uid,'sections',k),snap=>{
-   if(!extraUser||extraUser.uid!==uid)return;
-   if(snap.metadata.fromCache&&!extraReady[k]){extraStatus(k,'☁ Waiting for server connection…');return}
+  extraStatus(k,'☁ Connecting to cloud…');let first=true;const uid=u.uid,generation=extraGeneration;
+  const queued=extraRestoreQueue(k,uid);
+  if(queued){extraPending[k]=queued;extraStatus(k,'☁ Restoring changes not yet confirmed by cloud…')}
+  const off=onSnapshot(doc(db,'users',uid,'sections',k),{includeMetadataChanges:true},snap=>{
+   if(extraGeneration!==generation||!extraUser||extraUser.uid!==uid)return;
+   if(snap.metadata.fromCache&&!extraReady[k]){extraStatus(k,'☁ Waiting for server connection… Local checkmarks are safe.');return}
    if(first){first=false;extraReady[k]=true;
-    if(snap.exists()){if(!extraPending[k])extraEmit(k,snap.data().value);else extraStatus(k,'☁ Sending this device’s recent changes…')}
-    else{extraPending[k]=extraPending[k]||extraLocal(k)}
-    if(extraPending[k]){clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),450)}
-    else extraStatus(k,'☁ ✓ Live sync active · Same Google account on both devices');
+    if(snap.exists()){
+     if(!extraPending[k])extraEmit(k,snap.data().value);
+     else extraStatus(k,'☁ Sending this device’s recent changes…');
+    }else extraPending[k]=extraPending[k]||extraLocal(k);
+    if(extraPending[k]){extraSaveQueue(k,extraPending[k]);clearTimeout(extraTimer[k]);extraTimer[k]=setTimeout(()=>extraWrite(k),250)}
+    else extraStatus(k,'☁ ✓ Live sync active · Checks update automatically');
     return;
    }
-   if(snap.metadata.hasPendingWrites)return;
-   if(!extraPending[k]&&!extraWriting[k]&&snap.exists()){extraEmit(k,snap.data().value);extraStatus(k,'☁ ✓ Updated from cloud · Live sync active')}
+   if(snap.metadata.hasPendingWrites||snap.metadata.fromCache)return;
+   if(!extraPending[k]&&!extraWriting[k]&&snap.exists()){
+    extraEmit(k,snap.data().value);
+    extraStatus(k,'☁ ✓ Updated from cloud · Checkmarks refreshed automatically');
+   }
   },e=>extraStatus(k,'⚠ Cloud connection error: '+e.message));
   extraListeners.push(off);
  }
