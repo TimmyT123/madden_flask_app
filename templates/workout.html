@@ -173,7 +173,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 /* Madden topic manager v2 */
 .st-topic-list{display:grid;gap:9px;margin:12px 0}.st-topic{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;background:#172d3e;border:1px solid #3d6171;border-radius:11px;padding:12px}.st-topic-main{flex:1;min-width:220px}.st-topic-main strong{display:block;color:#edf9ff}.st-topic-main p{font-size:12px;line-height:1.45;margin:5px 0;color:#c0d6e4}.st-topic-main small{color:#8be0c8;font-size:11px}.st-topic .btn{padding:8px 10px;font-size:12px}.st-trainer #stTopicForm input,.st-trainer #stTopicForm select,.st-trainer #stTopicForm textarea{display:block;width:100%;background:#0b2032;border:1px solid #55748c;border-radius:9px;color:#fff;padding:10px;font:inherit}.st-trainer #stTopicForm textarea{min-height:75px;resize:vertical}@media(max-width:640px){.st-topic .btnrow{width:100%}}
 
-/* Madden Skills Trainer catalog v4.8: isolated, uses existing topic storage. */
+/* Madden Skills Trainer catalog v4.9: isolated, uses existing topic storage. */
 .st-skill-catalog{border:1px solid #3b6676;background:#102839;border-radius:12px;padding:13px}
 .st-catalog-group{margin:13px 0;border-top:1px solid #345269;padding-top:9px}
 .st-catalog-group h4{margin:0 0 8px;color:#a3e8d8;font-size:14px}
@@ -182,7 +182,7 @@ html{scroll-behavior:smooth;scroll-padding-top:18px}
 .st-catalog-row p{font-size:12px;margin:4px 0;color:#bfd2df}
 .st-catalog-row button{white-space:nowrap;flex-shrink:0;font-size:12px}
 @media(max-width:600px){.st-catalog-row{align-items:flex-start;flex-direction:column}.st-catalog-row button{width:100%}}
-</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.8</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
+</style></head><body><header><div class="brand">WORKOUT <span style="color:#fff">/ COACH</span></div><a class="navlink" href="/">← WURD home</a></header><main class="wrap"><section class="hero"><div class="eyebrow">Workout Coach • Version 4.9</div><h1>Build strength. Train your game.</h1><p>Strength, sprint speed, Madden 27, and a flexible weekly Learning Center — all in one place.</p></section>
 
 <section class="panel" id="daily-planner" aria-label="Daily to-do planner">
  <div class="todo-head"><div><div class="sectiontitle">Your daily command center · v4.6</div><h2 id="todoHeading" style="margin:6px 0">Today's To-Do List</h2><p class="muted" style="font-size:13px;margin:4px 0">Check off what you finish. Tap a linked activity to jump straight to it.</p></div>
@@ -947,7 +947,7 @@ let remaining=300,running=false,lastTick=0,interval=null;function drawTimer(){$(
   <div class="btnrow" style="margin:12px 0"><button class="btn primary" id="stAddTopic" type="button">＋ Add practice topic</button><button class="btn secondary" id="stGoTimer" type="button">↗ Universal focus timer / To-Do</button></div>
   <details id="stSkillCatalog" class="st-skill-catalog" style="margin:12px 0">
     <summary style="cursor:pointer;color:#a4f4de;font-weight:800">📚 Skills Trainer tutorials &amp; minigames — choose drills to practice</summary>
-    <p class="st-stat">Choose from your 21 Skills Trainer tutorials/practices and six selected minigames. Select <strong>Add to my topics</strong> to track a lesson using the existing practice notebook. Defensive Line Mechanics remains an optional fundamentals overview.</p>
+    <p class="st-stat">Choose from your 29 Skills Trainer tutorials/practices and six selected minigames. Select <strong>Add to my topics</strong> to track a lesson using the existing practice notebook. Defensive Line Mechanics remains an optional fundamentals overview.</p>
     <div id="stSkillCatalogList"></div>
     <p class="st-stat" id="stCatalogStatus" role="status">Recommended session: 5 minutes learning, 8 minutes repetition, 7 minutes game-like practice, 5 minutes review. Use the existing Universal Focus &amp; Break Timer.</p>
   </details>
@@ -1940,6 +1940,15 @@ window.addEventListener('wurd:sync-remote',e=>{if(e.detail?.section!=='waistProg
    ['Playmaker Tutorial','Scramble, use L2 + right stick to redirect the nearest receiver into space, then throw.'],
    ['Revamped Passing – Back Shoulder Pass Tutorial','Practice placing throws away from tight coverage; verify with Placement & Accuracy.'],
    ['Revamped Passing – Pylon Pass Tutorial','Practice end-zone corner placement; verify with Placement & Accuracy.']]},
+  {group:'Offensive Preplay Mechanics · high priority',items:[
+   ['Pass Protection – Half Slide Tutorial','Learn how to direct part of the offensive line toward pressure while protecting the opposite side.'],
+   ['Pass Protection – Full Slide Tutorial','Practice sliding protection toward a suspected pressure side; notice who becomes unblocked.'],
+   ['Pass Protection – Base Tutorial','Study the default protection and compare it with adjusted blocking.'],
+   ['Pass Protection – Empty Tutorial','Learn protection decisions without a back staying in to block.'],
+   ['Pass Protection – Max Protect Tutorial','Practice keeping extra blockers in against heavy pressure; identify the route trade-off.'],
+   ['Pass Protection – ID the Mike Tutorial','Identify the key defender for blocking assignments, then test whether the rush is picked up.'],
+   ['Pass Protection – Untarget Defender Tutorial','Learn when and how to exclude a defender from a protection assignment.'],
+   ['Preplay Substitutions Tutorial','Make purposeful personnel substitutions before snapping.']]},
   {group:'Receiver Mechanics · priority 2',items:[
    ['Timing Based Catching Tutorial','Learn timing and recognize catch feedback.'],
    ['Timing Based Catching Practice','Repeat catches at game speed, tracking successful timing.']]},
