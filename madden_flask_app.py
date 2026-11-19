@@ -1,5 +1,6 @@
 # madden_flask_app_v9_5.py
-# Version: 9.5
+# Version: 9.6
+# Flyer: validate live team IDs and records; restore home/away from weekly schedule.
 # Modified sections: Corrected default and hardcoded fallback league IDs to active WURD league 1886931.
 
 from flask import Flask, request, jsonify, url_for, redirect, make_response
@@ -2602,146 +2603,109 @@ def get_schedule():
 
 @app.get("/api/flyer/game")
 def flyer_game():
+    """Build a flyer using *current-season* league IDs, records and home/away order.
 
-    # 1️⃣ Query params first
-    league = request.args.get("league")
-    season = request.args.get("season")
-    week = normalize_period(
-        request.args.get("week") or league_data.get("latest_week") or "week_1"
-    )
+    Fail closed rather than printing a plausible poster with fallback teams or
+    previous-season team IDs. No arithmetic ID offsets are assumed here.
+    """
+    league = request.args.get("league") or league_data.get("latest_league")
+    season = request.args.get("season") or league_data.get("latest_season")
+    week = normalize_period(request.args.get("week") or league_data.get("latest_week") or "week_1")
+    home_id = str(request.args.get("home") or "")
+    away_id = str(request.args.get("away") or "")
 
-    home_id = request.args.get("home")
-    away_id = request.args.get("away")
+    # Rehydrate from disk if in-memory state is incomplete.
+    if not all((league, season)):
+        saved = _load_json_safe(os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")) or {}
+        league = league or saved.get("league")
+        season = season or saved.get("season")
+        if not request.args.get("week"):
+            week = normalize_period(saved.get("week") or week)
 
-    # 2️⃣ fallback if needed
-    if not all([league, season, week]):
-        latest_path = os.path.join(app.config["UPLOAD_FOLDER"], "_latest.json")
+    if not league or not str(season or "").startswith("season_") or not is_valid_period(week):
+        return jsonify({"error": "Missing/invalid live league, season or period"}), 400
+    if not home_id or not away_id or home_id == away_id:
+        return jsonify({"error": "Two different team IDs are required"}), 400
 
-        if os.path.exists(latest_path):
-            try:
-                with open(latest_path, "r", encoding="utf-8") as f:
-                    saved = json.load(f)
-                    league = league or saved.get("league")
-                    season = season or saved.get("season")
-                    week = week or saved.get("week")
+    root = os.path.join(app.config["UPLOAD_FOLDER"], str(league))
+    info_path = resolve_league_file(root, season, "parsed_league_info.json")
+    league_info = _load_json_safe(info_path) or {}
+    teams = (league_info.get("leagueTeamInfoList") or league_info.get("teamInfoList") or league_info.get("teams") or [])
+    by_id = {str(t.get("teamId") or t.get("id")): t for t in teams if isinstance(t, dict)}
 
-                    league_data["latest_league"] = league
-                    league_data["latest_season"] = season
-                    league_data["latest_week"] = week
+    missing = [tid for tid in (home_id, away_id) if tid not in by_id]
+    if missing:
+        app.logger.error("Flyer IDs not in live %s %s league data: %s", league, season, missing)
+        return jsonify({"error": "Team ID not found in current league data", "ids": missing}), 422
 
-            except Exception as e:
-                return jsonify({
-                    "error": f"Failed reading _latest.json: {e}"
-                }), 500
+    # The thread title's first team is NOT necessarily the schedule's home team.
+    # For regular-season games, use the exported schedule as the authority.
+    if week.startswith("week_") and 1 <= period_number(week) <= 18:
+        schedule_path = os.path.join(root, str(season), week, "parsed_schedule.json")
+        schedule = _load_json_safe(schedule_path)
+        if isinstance(schedule, dict):
+            schedule = schedule.get("schedule") or schedule.get("games") or schedule.get("items")
+        if not isinstance(schedule, list):
+            return jsonify({"error": "Current week schedule unavailable"}), 503
+        matches = [g for g in schedule if isinstance(g, dict) and
+                   {str(g.get("homeTeamId")), str(g.get("awayTeamId"))} == {home_id, away_id}]
+        if len(matches) != 1:
+            return jsonify({"error": "Matchup not uniquely found in this week's schedule"}), 422
+        home_id = str(matches[0]["homeTeamId"])
+        away_id = str(matches[0]["awayTeamId"])
 
-    # 🔒 ALWAYS validate (this is the key improvement)
-    if not season or not str(season).startswith("season_"):
-        print(f"🚨 Invalid season loaded: {season}")
-        return jsonify({"error": "Invalid season"}), 400
+    records = load_team_records(root, season)
+    if home_id not in records or away_id not in records:
+        return jsonify({"error": "Current season standings unavailable for matchup"}), 503
 
-    if not week or not is_valid_period(week):
-        print(f"🚨 Invalid week loaded: {week}")
-        return jsonify({"error": "Invalid week"}), 400
-
-    # 3️⃣ final check
-    if not all([league, season, week]):
-        print("🚨 Missing core state → league/season/week")
-        return jsonify({"error": "Missing core state"}), 400
-
-    # --- Load core data ---
-    root = os.path.join(app.config["UPLOAD_FOLDER"], league)
-    records = load_team_records(root)
-    team_map = _load_json_safe(os.path.join(root, "team_map.json")) or {}
-    team_ovr = load_team_ovr_by_id(league)
-    roster   = load_roster_index(league)["players"]
-
+    roster = load_roster_index(str(league), season)["players"]
 
     def team_block(team_id):
-        original_team_id = str(team_id)
-        league_team_id = original_team_id
+        info = by_id[team_id]
+        w, l, t = records[team_id]
+        rating = info.get("teamOvr")
+        if rating is None:
+            rating = info.get("teamOverall")
+        if rating is None:
+            rating = info.get("ovr")
+        name = info.get("name") or info.get("teamName") or info.get("nickName")
+        if not name or rating is None:
+            raise ValueError(f"Missing current name/rating for team {team_id}")
 
-        # Madden roster endpoints can use a second team-ID namespace.
-        # Flyer/league data uses the league/schedule namespace.
-        if league_team_id not in team_map:
-            try:
-                candidate = str(int(league_team_id) - 131072)
-
-                if candidate in team_map:
-                    print(
-                        f"🔄 Flyer team ID translated: "
-                        f"{original_team_id} -> {candidate}"
-                    )
-                    league_team_id = candidate
-
-            except (TypeError, ValueError):
-                pass
-
-        info = team_map.get(league_team_id, {})
-        wlt = records.get(league_team_id, (0, 0, 0))
-
-        record = (
-            f"{wlt[0]}-{wlt[1]}"
-            if wlt[2] == 0
-            else f"{wlt[0]}-{wlt[1]}-{wlt[2]}"
-        )
-
-        # Roster players may still use the roster namespace (+131072).
-        roster_ids_to_match = {
-            original_team_id,
-            league_team_id,
-        }
-
+        # Normalized roster may use the current ID or roster namespace.
+        roster_ids = {team_id}
         try:
-            roster_ids_to_match.add(str(int(league_team_id) + 131072))
-        except (TypeError, ValueError):
+            roster_ids.add(str(int(team_id) + 131072))
+        except ValueError:
             pass
-
-        top_players = sorted(
-            [
-                p for p in roster
-                if str(p.get("teamId")) in roster_ids_to_match
-            ],
-            key=lambda p: p.get("ovr", 0),
-            reverse=True
+        players = sorted(
+            [p for p in roster if str(p.get("teamId")) in roster_ids],
+            key=lambda p: p.get("ovr") or 0, reverse=True,
         )[:3]
-
-        team_name = (
-                info.get("name")
-                or info.get("displayName")
-                or info.get("teamName")
-                or info.get("nickName")
-                or f"Team {league_team_id}"
-        )
-
         return {
-            "teamId": league_team_id,
-            "name": team_name,
-            "user": (
-                    info.get("user")
-                    or info.get("userName")
-                    or info.get("displayName")
-                    or "CPU"
-            ),
-            "record": record,
-            "ovr": team_ovr.get(league_team_id),
+            "teamId": team_id,
+            "name": name,
+            "user": info.get("user") or info.get("userName") or "CPU",
+            "record": f"{w}-{l}" if not t else f"{w}-{l}-{t}",
+            "ovr": rating,
             "top_players": [
-                {
-                    "name": p["name"],
-                    "pos": p["pos"],
-                    "ovr": p["ovr"]
-                }
-                for p in top_players
-            ]
+                {"name": p["name"], "pos": p["pos"], "ovr": p["ovr"]}
+                for p in players
+            ],
         }
+
+    try:
+        home = team_block(home_id)
+        away = team_block(away_id)
+    except (ValueError, KeyError, TypeError) as exc:
+        app.logger.error("Flyer team data incomplete: %s", exc)
+        return jsonify({"error": "Current flyer team data incomplete"}), 503
 
     return jsonify({
-        "league": league,
-        "season": season,
-        "week": period_number(week),
-        "period": week,
+        "league": league, "season": season,
+        "week": period_number(week), "period": week,
         "period_label": period_display_name(week),
-        "home": team_block(home_id),
-        "away": team_block(away_id)
+        "home": home, "away": away,
     })
 
 
