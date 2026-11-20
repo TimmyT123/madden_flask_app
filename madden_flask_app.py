@@ -1,5 +1,5 @@
 # madden_flask_app_v9_5.py
-# Version: 9.6
+# Version: 9.7
 # Flyer: validate live team IDs and records; restore home/away from weekly schedule.
 # Modified sections: Corrected default and hardcoded fallback league IDs to active WURD league 1886931.
 
@@ -2647,12 +2647,16 @@ def flyer_game():
             schedule = schedule.get("schedule") or schedule.get("games") or schedule.get("items")
         if not isinstance(schedule, list):
             return jsonify({"error": "Current week schedule unavailable"}), 503
+        translation = resolve_schedule_team_ids(schedule, by_id)
+        if not translation:
+            return jsonify({"error": "Schedule IDs could not be verified against current league"}), 422
         matches = [g for g in schedule if isinstance(g, dict) and
-                   {str(g.get("homeTeamId")), str(g.get("awayTeamId"))} == {home_id, away_id}]
+                   {translation.get(str(g.get("homeTeamId"))),
+                    translation.get(str(g.get("awayTeamId")))} == {home_id, away_id}]
         if len(matches) != 1:
             return jsonify({"error": "Matchup not uniquely found in this week's schedule"}), 422
-        home_id = str(matches[0]["homeTeamId"])
-        away_id = str(matches[0]["awayTeamId"])
+        home_id = translation[str(matches[0]["homeTeamId"])]
+        away_id = translation[str(matches[0]["awayTeamId"])]
 
     records = load_team_records(root, season)
     if home_id not in records or away_id not in records:
@@ -4363,63 +4367,66 @@ def rosters():
     )
 
 
-def build_schedule_id_fallback_map(league_id: str, parsed_schedule: list) -> dict:
+def resolve_schedule_team_ids(parsed_schedule: list, league_team_ids) -> dict:
+    """Return {schedule ID: league/standings ID}, only for a fully verified namespace.
+
+    Madden can assign schedule IDs a fixed multiple of 131072 away from
+    league-info IDs. Never pair IDs with names by sorting incomplete game lists.
+    If more than one offset fits, fail closed rather than guess.
     """
-    Some older saved leagues have schedule team IDs that do not match league/team_map IDs.
-    This builds a fallback map by matching sorted schedule IDs to leagueTeamInfoList order.
-    """
-    league_info_path = os.path.join(
-        app.config["UPLOAD_FOLDER"],
-        str(league_id),
-        "season_global",
-        "week_global",
-        "league.json"
+    schedule_ids = {
+        str(g.get(key))
+        for g in parsed_schedule if isinstance(g, dict)
+        for key in ("awayTeamId", "homeTeamId")
+        if g.get(key) not in (None, "", 0)
+    }
+    target_ids = {str(tid) for tid in league_team_ids}
+    if not schedule_ids or not target_ids:
+        return {}
+    # Require every schedule ID to resolve; Week 10 includes only 28 of 32 teams.
+    candidates = []
+    for multiplier in range(-16, 17):
+        offset = 131072 * multiplier
+        translated = {}
+        for sid in schedule_ids:
+            try:
+                tid = str(int(sid) - offset)
+            except (TypeError, ValueError):
+                break
+            if tid not in target_ids:
+                break
+            translated[sid] = tid
+        if len(translated) == len(schedule_ids):
+            candidates.append((offset, translated))
+    if len(candidates) == 1:
+        return candidates[0][1]
+    app.logger.warning(
+        "Schedule team ID mapping ambiguous/unavailable: %d candidates for %d IDs",
+        len(candidates), len(schedule_ids),
     )
+    return {}
 
-    if not os.path.exists(league_info_path):
-        return {}
 
-    try:
-        with open(league_info_path, "r", encoding="utf-8") as f:
-            league_info = json.load(f)
-    except Exception:
-        return {}
-
-    teams = league_info.get("leagueTeamInfoList") or league_info.get("teamInfoList") or []
-
-    schedule_team_ids = set()
-
-    for game in parsed_schedule:
-        for key in ("awayTeamId", "homeTeamId", "awayTeam", "homeTeam", "awayId", "homeId"):
-            value = game.get(key)
-            if value not in (None, "", 0):
-                schedule_team_ids.add(str(value))
-
-    schedule_ids_sorted = sorted(schedule_team_ids, key=lambda x: int(x))
-
+def build_schedule_id_fallback_map(league_id: str, parsed_schedule: list, season: str | None = None) -> dict:
+    """Map schedule IDs to actual team identities, never by positional zip."""
+    root = os.path.join(app.config["UPLOAD_FOLDER"], str(league_id))
+    path = resolve_league_file(root, season, "parsed_league_info.json")
+    data = _load_json_safe(path) or {}
+    teams = (data.get("leagueTeamInfoList") or data.get("teamInfoList") or data.get("teams") or [])
+    by_id = {str(t.get("teamId")): t for t in teams if isinstance(t, dict) and t.get("teamId") is not None}
+    translation = resolve_schedule_team_ids(parsed_schedule, by_id)
     fallback = {}
-
-    for schedule_id, team in zip(schedule_ids_sorted, teams):
-        name = (
-            team.get("displayName")
-            or team.get("nickName")
-            or team.get("teamName")
-            or team.get("cityName")
-            or f"Team {schedule_id}"
-        )
-
-        abbr = team.get("abbrName") or team.get("teamAbbr") or ""
-
-        fallback[str(schedule_id)] = {
-            "name": name,
-            "abbr": abbr,
-            "userName": team.get("userName") or "CPU",
-            "displayName": name,
-            "cityName": team.get("cityName", ""),
-            "nickName": team.get("nickName", "")
+    for schedule_id, league_id_key in translation.items():
+        team = by_id[league_id_key]
+        fallback[schedule_id] = {
+            "name": team.get("name") or team.get("teamName") or team.get("nickName") or "",
+            "abbr": team.get("abbr") or team.get("abbrName") or team.get("teamAbbr") or "",
+            "user": team.get("user") or team.get("userName") or "CPU",
+            "teamOvr": team.get("teamOvr"),
+            "leagueTeamId": league_id_key,
         }
-
     return fallback
+
 
 # Scheduler is Discord-owned; Flask reads a read-only JSON snapshot.
 # Configure WURD_GAME_SCHEDULE_FILE identically in bot and Flask .env if needed.
@@ -4506,25 +4513,33 @@ def show_schedule():
             except json.JSONDecodeError:
                 print("❌ Failed to parse JSON in schedule file.")
 
-    # Load team_map.json (rich structure: id -> {abbr,name,user,...})
-    team_map_path = os.path.join(app.config['UPLOAD_FOLDER'], league_id, "team_map.json")
-    team_map = {}
-    if os.path.exists(team_map_path):
-        with open(team_map_path, encoding="utf-8") as f:
-            team_map = json.load(f)
+    root_dir = os.path.join(app.config['UPLOAD_FOLDER'], str(league_id))
+    league_info = _load_json_safe(resolve_league_file(root_dir, season, "parsed_league_info.json")) or {}
+    league_teams = (league_info.get("leagueTeamInfoList") or league_info.get("teamInfoList") or league_info.get("teams") or [])
+    canonical_team_map = {
+        str(t["teamId"]): {
+            "name": t.get("name") or t.get("teamName") or t.get("nickName") or "",
+            "abbr": t.get("abbr") or t.get("abbrName") or "",
+            "user": t.get("user") or t.get("userName") or "CPU",
+        }
+        for t in league_teams if isinstance(t, dict) and t.get("teamId") is not None
+    }
+    # Preserve original game IDs and scores. Add display lookup keys only.
+    id_translation = resolve_schedule_team_ids(parsed_schedule, canonical_team_map)
+    team_map = dict(canonical_team_map)
+    if id_translation:
+        for schedule_id, canonical_id in id_translation.items():
+            team_map[schedule_id] = dict(canonical_team_map[canonical_id])
+    elif parsed_schedule:
+        app.logger.warning("Unresolved schedule IDs for %s %s %s", league_id, season, week)
 
-    # Fallback for old leagues where schedule team IDs do not match team_map IDs
-    schedule_fallback_map = build_schedule_id_fallback_map(league_id, parsed_schedule)
+    records = load_team_records(root_dir, season)
+    for schedule_id, canonical_id in id_translation.items():
+        if canonical_id in records:
+            records[schedule_id] = records[canonical_id]
 
-    for tid, info in schedule_fallback_map.items():
-        if tid not in team_map:
-            team_map[tid] = info
-
-    # Load records once (from season_global/week_global)
-    root_dir = os.path.join(app.config['UPLOAD_FOLDER'], league_id)
-    records = load_team_records(root_dir)
-
-    scheduler_matchups = _wurd_scheduler_lookup(league_id, season, week, team_map)
+    scheduler_team_map = {sid: team_map[sid] for sid in id_translation}
+    scheduler_matchups = _wurd_scheduler_lookup(league_id, season, week, scheduler_team_map)
 
     # Decorate labels (visitor first); choose 'name' or switch to 'abbr'
     prefer = "name"  # change to "abbr" if you want e.g., MIA(15-1)
@@ -4600,12 +4615,18 @@ def show_schedule():
         try:
             week_num = int(str(week).replace("week_", ""))
             if week_num <= 18:
-                all_team_ids = set(team_map.keys())
-                teams_played = {str(g.get("homeTeamId")) for g in parsed_schedule} | {str(g.get("awayTeamId")) for g in
-                                                                                      parsed_schedule}
-                bye_team_ids = all_team_ids - teams_played
-                bye_teams = sorted(
-                    [make_label_with_record(tid, team_map, records, prefer=prefer) for tid in bye_team_ids])
+                # Compare a single ID namespace, not unioned schedule/root IDs.
+                if id_translation:
+                    all_team_ids = set(canonical_team_map)
+                    teams_played = set(id_translation.values())
+                    bye_team_ids = all_team_ids - teams_played
+                    bye_teams = sorted(
+                        [make_label_with_record(tid, canonical_team_map, records, prefer=prefer)
+                         for tid in bye_team_ids]
+                    )
+                else:
+                    # Unknown ID mapping: a fake 32-team bye list would mislead users.
+                    bye_teams = []
         except ValueError:
             print(f"⚠️ Could not parse week value: {week}")
 
